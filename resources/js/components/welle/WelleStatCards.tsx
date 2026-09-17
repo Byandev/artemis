@@ -3,7 +3,7 @@ import { BookOpen, Brain, Footprints, Sparkles } from 'lucide-react';
 
 /** What every My ESC card says about the figures beside it. */
 export interface WelleStatContext {
-    /** Days Welle has a record of this month — what each figure is read over. */
+    /** Days of the month that have elapsed — what each figure is read over. */
     total_days: number;
     /** `YYYY-MM`. */
     month: string;
@@ -11,11 +11,13 @@ export interface WelleStatContext {
     month_label: string;
     /** Whether a Welle account is connected at all. */
     connected: boolean;
+    /** Whether that account has ever been fetched. */
+    synced: boolean;
 }
 
 /** The ESC Rate endpoint's answer. See WelleStatsController::escRate. */
 export interface EscRateStat extends WelleStatContext {
-    /** ESC days over recorded days as a percentage; null with nothing synced. */
+    /** ESC days over elapsed days as a percentage; null before the month starts. */
     value: number | null;
     /** Days where all three pillars were done. */
     esc_days: number;
@@ -29,9 +31,9 @@ export type Pillar = 'movement' | 'meditation' | 'learning';
  * See WelleStatsController::daysWithPillar.
  */
 export interface DaysWithPillarStat extends WelleStatContext {
-    /** Days the pillar was ticked; null with nothing synced. */
+    /** Days the pillar was ticked; null before the month starts. */
     value: number | null;
-    /** Those days as a share of the month's recorded days. */
+    /** Those days as a share of the month's elapsed days. */
     rate: number | null;
     /** Which pillar was counted. */
     pillar: Pillar;
@@ -146,30 +148,33 @@ export function WelleStatCard({
 }
 
 /**
- * The footnote for a card with no days behind it, or null when it has some.
+ * The footnote for a card with nothing real behind it, or null when it has
+ * something to say.
  *
- * Two empty cards that look alike need different advice: a connected account
- * whose month has not been fetched yet will fill itself in, and one with no
- * Welle account behind it never will until somebody connects one.
+ * Three empty cards look alike and need different advice. No account connected
+ * never fills itself in; a connected account that has never been fetched will;
+ * and a month with no days in it yet has nothing to fetch. A connected, fetched
+ * account with a month of zeroes is none of these — that card reads 0%, which
+ * is the true answer rather than an empty state.
  */
 export function emptyFootnote(stat: WelleStatContext): string | null {
-    if (stat.total_days > 0) return null;
+    if (!stat.connected) return 'Connect Welle in Settings → Integrations';
+    if (!stat.synced) return `No days synced yet for ${stat.month_label}`;
+    if (stat.total_days === 0) return `${stat.month_label} has not started yet`;
 
-    return stat.connected
-        ? `No days synced yet for ${stat.month_label}`
-        : 'Connect Welle in Settings → Integrations';
+    return null;
 }
 
 /**
- * ESC Rate — the share of this month's recorded days that were ESC days.
+ * ESC Rate — the share of this month's elapsed days that were ESC days.
  *
  * Shown whole: 43.75% is "44%", because a rate counted out of sixteen days
  * cannot carry two decimals' worth of meaning, and the days it was drawn from
  * are named underneath it anyway. The bar is filled from the unrounded rate —
  * it is a length, not a number to read off.
  *
- * A dash rather than 0% while there is nothing to read — a month with no days
- * synced is not a month of missed days.
+ * A dash rather than 0% only while there is nothing to read at all; once an
+ * account is connected and fetched, 0% is the answer rather than an absence.
  */
 export function EscRateStatCard({
     stat,

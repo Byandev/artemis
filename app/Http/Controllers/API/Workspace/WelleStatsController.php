@@ -25,34 +25,35 @@ use Illuminate\Http\Request;
  * toggle and the grant have to be checked where the data is read, not only
  * where it is displayed. See WelleController for the page.
  *
- * Every card is counted over the days Welle has a record of for the month, not
- * over the days on the calendar: FetchWelleProgress drops days still to come
- * and writes a row for every elapsed one, blank days included, so "7 of 16
- * days" means seven days out of sixteen lived rather than seven out of a month
- * that has not happened yet. Every card names the day count it was drawn from,
- * so a figure is never shown without the days behind it.
+ * Every rate on this page is counted over the days of the month that have
+ * actually happened — the 1st through today, or the whole of a month already
+ * past — so "7 of 16 days" means seven days out of sixteen lived rather than
+ * seven out of a month that has not happened yet. Every card names the day
+ * count it was drawn from, so a figure is never shown without the days behind
+ * it.
+ *
+ * The denominator is the calendar rather than a count of rows, because a day
+ * with none of the three pillars ticked has no row: it is a day that happened
+ * and went unused, and leaving it out of the denominator would turn a month of
+ * two good days into 100%.
  */
 class WelleStatsController extends Controller
 {
     use AuthorizesRequests;
 
-    /** ESC Rate — the share of the month's recorded days that were ESC days. */
+    /** ESC Rate — the share of the month's elapsed days that were ESC days. */
     public function escRate(Request $request, Workspace $workspace): JsonResponse
     {
         $this->authorizeCards($workspace);
 
         $month = $this->month($request);
 
-        $totals = $this->days($request, $workspace, $month)
-            ->selectRaw('COUNT(*) as total_days, COALESCE(SUM(is_esc), 0) as esc_days')
-            ->first();
-
-        $total = (int) $totals->total_days;
-        $esc = (int) $totals->esc_days;
+        $total = $this->elapsedDays($month);
+        $esc = $this->days($request, $workspace, $month)->esc()->count();
 
         return response()->json([
-            // Null rather than 0% with nothing recorded — a month that has not
-            // been synced is not a month of missed days.
+            // Null rather than 0% for a month that has not started — a month
+            // with no days lived in it yet is not a month of missed days.
             'value' => $total === 0 ? null : round($esc / $total * 100, 2),
             'esc_days' => $esc,
             'total_days' => $total,
@@ -75,16 +76,13 @@ class WelleStatsController extends Controller
 
         $month = $this->month($request);
 
-        $totals = $this->days($request, $workspace, $month)
-            ->selectRaw('COUNT(*) as total_days, COALESCE(SUM(movement), 0) as pillar_days')
-            ->first();
-
-        $total = (int) $totals->total_days;
-        $days = (int) $totals->pillar_days;
+        $total = $this->elapsedDays($month);
+        $days = $this->days($request, $workspace, $month)->where('movement', true)->count();
 
         return response()->json([
-            // Null rather than a count of none: with no days recorded we do not
-            // know the pillar was missed, only that Welle has not said.
+            // Null rather than a count of none, as the ESC rate above: with no
+            // days lived yet there is nothing the pillar could have been missed
+            // on.
             'value' => $total === 0 ? null : $days,
             'total_days' => $total,
             'rate' => $total === 0 ? null : round($days / $total * 100, 2),
@@ -100,12 +98,8 @@ class WelleStatsController extends Controller
 
         $month = $this->month($request);
 
-        $totals = $this->days($request, $workspace, $month)
-            ->selectRaw('COUNT(*) as total_days, COALESCE(SUM(meditation), 0) as pillar_days')
-            ->first();
-
-        $total = (int) $totals->total_days;
-        $days = (int) $totals->pillar_days;
+        $total = $this->elapsedDays($month);
+        $days = $this->days($request, $workspace, $month)->where('meditation', true)->count();
 
         return response()->json([
             'value' => $total === 0 ? null : $days,
@@ -123,12 +117,8 @@ class WelleStatsController extends Controller
 
         $month = $this->month($request);
 
-        $totals = $this->days($request, $workspace, $month)
-            ->selectRaw('COUNT(*) as total_days, COALESCE(SUM(learning), 0) as pillar_days')
-            ->first();
-
-        $total = (int) $totals->total_days;
-        $days = (int) $totals->pillar_days;
+        $total = $this->elapsedDays($month);
+        $days = $this->days($request, $workspace, $month)->where('learning', true)->count();
 
         return response()->json([
             'value' => $total === 0 ? null : $days,
@@ -154,13 +144,12 @@ class WelleStatsController extends Controller
         $month = $this->month($request);
 
         $totals = $this->days($request, $workspace, $month)
-            ->selectRaw('COUNT(*) as total_days')
             ->selectRaw('COALESCE(SUM(movement), 0) as movement_days')
             ->selectRaw('COALESCE(SUM(meditation), 0) as meditation_days')
             ->selectRaw('COALESCE(SUM(learning), 0) as learning_days')
             ->first();
 
-        $total = (int) $totals->total_days;
+        $total = $this->elapsedDays($month);
         $movement = (int) $totals->movement_days;
         $meditation = (int) $totals->meditation_days;
         $learning = (int) $totals->learning_days;
@@ -173,7 +162,7 @@ class WelleStatsController extends Controller
                 [
                     'pillar' => 'movement',
                     'days' => $movement,
-                    // Null rather than 0% with nothing recorded, as the cards do.
+                    // Null rather than 0% for a month not started, as the cards do.
                     'rate' => $total === 0 ? null : round($movement / $total * 100, 2),
                 ],
                 [
@@ -196,9 +185,10 @@ class WelleStatsController extends Controller
      * many of the three pillars were ticked on it.
      *
      * The rows themselves rather than a count: the calendar colours a day by
-     * how complete it was, which is a figure no aggregate can give back. Days
-     * still to come, and days before the account was connected, simply have no
-     * row — the grid draws those as untracked rather than as empty days.
+     * how complete it was, which is a figure no aggregate can give back. A day
+     * with none of the three ticked has no row, as do days still to come and
+     * days before the account was connected — the grid draws all of those as
+     * blank, and `total_days` says how many of them were days that happened.
      */
     public function calendar(Request $request, Workspace $workspace): JsonResponse
     {
@@ -211,11 +201,11 @@ class WelleStatsController extends Controller
             ->get(['date', 'pillars_completed'])
             ->map(fn (WelleDailyRecord $day) => [
                 'date' => $day->date->toDateString(),
-                'pillars_completed' => (int) $day->pillars_completed,
+                'pillars_completed' => $day->pillars_completed,
             ]);
 
         return response()->json([
-            'total_days' => $days->count(),
+            'total_days' => $this->elapsedDays($month),
             'days' => $days,
             ...$this->context($request, $month),
         ]);
@@ -240,14 +230,14 @@ class WelleStatsController extends Controller
             ->get(['date', 'movement', 'meditation', 'learning', 'is_esc'])
             ->map(fn (WelleDailyRecord $day) => [
                 'date' => $day->date->toDateString(),
-                'movement' => (bool) $day->movement,
-                'meditation' => (bool) $day->meditation,
-                'learning' => (bool) $day->learning,
-                'is_esc' => (bool) $day->is_esc,
+                'movement' => $day->movement,
+                'meditation' => $day->meditation,
+                'learning' => $day->learning,
+                'is_esc' => $day->is_esc,
             ]);
 
         return response()->json([
-            'total_days' => $days->count(),
+            'total_days' => $this->elapsedDays($month),
             'days' => $days,
             ...$this->context($request, $month),
         ]);
@@ -261,6 +251,26 @@ class WelleStatsController extends Controller
         $this->authorize(Permission::ViewMyEsc->value, $workspace);
     }
 
+    /**
+     * How many days of the month have actually happened — the denominator
+     * every rate on the page is drawn against.
+     *
+     * The whole of a month already past, the 1st through today for the current
+     * one, and none of a month still to come. Read off the calendar rather than
+     * counted from the table: days with nothing done have no row, and counting
+     * rows would quietly drop them out of the denominator and flatter the rate.
+     */
+    private function elapsedDays(CarbonImmutable $month): int
+    {
+        $today = CarbonImmutable::today();
+
+        if ($month->isAfter($today)) {
+            return 0;
+        }
+
+        return (int) $month->diffInDays($month->endOfMonth()->min($today)) + 1;
+    }
+
     /** The signed-in user's days in this workspace, for one month. */
     private function days(Request $request, Workspace $workspace, CarbonImmutable $month): Builder
     {
@@ -272,21 +282,26 @@ class WelleStatsController extends Controller
 
     /**
      * What every card says about the figures beside them: which month they
-     * cover, and whether there is a Welle account behind the page at all.
+     * cover, whether there is a Welle account behind the page at all, and
+     * whether it has ever been fetched.
      *
-     * The last lets a card tell "connected, nothing synced yet" apart from "no
-     * account connected", which are the same empty card with different advice.
+     * The last two are what let a card tell three empty cards apart: no account
+     * connected, an account connected but never fetched, and a month genuinely
+     * spent doing nothing. The rows cannot answer that on their own — a day
+     * with nothing ticked has no row, so "no rows" is the same silence whether
+     * the month was missed or never synced.
      *
      * @return array<string, mixed>
      */
     private function context(Request $request, CarbonImmutable $month): array
     {
+        $welle = $request->user()->integrationFor(IntegrationService::Welle);
+
         return [
             'month' => $month->format('Y-m'),
             'month_label' => $month->format('F Y'),
-            'connected' => (bool) $request->user()
-                ->integrationFor(IntegrationService::Welle)
-                ?->hasToken(),
+            'connected' => (bool) $welle?->hasToken(),
+            'synced' => $welle?->last_synced_at !== null,
         ];
     }
 

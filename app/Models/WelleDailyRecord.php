@@ -11,9 +11,14 @@ use Illuminate\Support\Carbon;
  * One day of a user's Welle ESC (Extreme Self Care) record.
  *
  * A day has three pillars — movement, meditation and learning — and counts as
- * ESC only when all three are done. Welle writes a row for every elapsed day,
- * including ones with nothing ticked, which is what lets "6 of 15 days" be
- * counted from this table without knowing today's date.
+ * ESC only when all three are done. That count and that verdict are derived
+ * from the three flags and stored alongside them: every read of this table is
+ * an aggregate over many rows, so they are worked out once here, on the one
+ * path that writes a day, rather than recomputed on every card and rollup.
+ *
+ * A day with none of the three ticked is not written at all. A row here means
+ * something was done, so the table cannot be counted to learn how many days
+ * have elapsed — that comes from the calendar. See WelleStatsController.
  *
  * Welle credentials belong to the user, not the workspace, so the same day is
  * written once per Welle-enabled workspace the user belongs to — that keeps
@@ -40,9 +45,14 @@ class WelleDailyRecord extends Model
      * Upsert one day for a (workspace, user, date). Re-running a day corrects
      * the row rather than adding a second one.
      *
+     * A day with nothing ticked is not stored, and null comes back. If such a
+     * day already has a row — it was ticked when we last looked and has since
+     * been un-ticked on Welle — the row is removed, so that "a row exists"
+     * keeps meaning "something was done that day" after a correction too.
+     *
      * @param  array<string, mixed>  $day  One entry of Welle's progress week.
      */
-    public static function upsertDaily(int $workspaceId, int $userId, string $date, array $day): self
+    public static function upsertDaily(int $workspaceId, int $userId, string $date, array $day): ?self
     {
         $pillars = [];
 
@@ -50,22 +60,27 @@ class WelleDailyRecord extends Model
             $pillars[$pillar] = self::pillarDone($day, $pillar);
         }
 
+        $key = [
+            'workspace_id' => $workspaceId,
+            'user_id' => $userId,
+            'date' => $date,
+        ];
+
         $completed = count(array_filter($pillars));
 
-        return static::updateOrCreate(
-            [
-                'workspace_id' => $workspaceId,
-                'user_id' => $userId,
-                'date' => $date,
-            ],
-            [
-                ...$pillars,
-                'pillars_completed' => $completed,
-                // The ESC definition, in one place: all three pillars done.
-                'is_esc' => $completed === count(self::PILLARS),
-                'synced_at' => now(),
-            ],
-        );
+        if ($completed === 0) {
+            static::query()->where($key)->delete();
+
+            return null;
+        }
+
+        return static::updateOrCreate($key, [
+            ...$pillars,
+            'pillars_completed' => $completed,
+            // The ESC definition, in one place: all three pillars done.
+            'is_esc' => $completed === count(self::PILLARS),
+            'synced_at' => now(),
+        ]);
     }
 
     /**
@@ -113,7 +128,12 @@ class WelleDailyRecord extends Model
             ->orderBy('date');
     }
 
-    /** Only the days that counted as ESC. */
+    /**
+     * Only the days that counted as ESC.
+     *
+     * Reads the stored verdict rather than testing the three flags, so the
+     * `user_id, is_esc, date` index answers it without touching the rows.
+     */
     public function scopeEsc(Builder $query): Builder
     {
         return $query->where('is_esc', true);

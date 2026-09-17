@@ -106,13 +106,9 @@ class FetchWelleProgress implements ShouldQueue
             }
         }
 
-        // The streaks are the person's own figures, mirrored like the daily
-        // rows; how the fetch went belongs to the connection that did it.
-        $user->forceFill([
-            'welle_streak_days' => $window['streak_days'] ?? null,
-            'welle_longest_streak' => $window['longest_streak'] ?? null,
-        ])->save();
-
+        // How the fetch went belongs to the connection that did it, not to the
+        // user — a person may have connected several services and only one of
+        // them be broken.
         $integration->forceFill([
             'last_synced_at' => now(),
             'last_error' => null,

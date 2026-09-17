@@ -5,11 +5,11 @@ import {
 } from '@/components/welle/WelleStatCards';
 import { useMemo } from 'react';
 
-/** One day Welle has a record of. */
+/** One day Welle has a record of — always at least one pillar ticked. */
 interface CalendarDay {
     /** `YYYY-MM-DD`. */
     date: string;
-    /** 0–3 of the pillars ticked that day. */
+    /** 1–3 of the pillars ticked that day. */
     pillars_completed: number;
 }
 
@@ -18,7 +18,10 @@ interface CalendarDay {
  * See WelleStatsController::calendar.
  */
 export interface EscCalendarStat extends WelleStatContext {
-    /** Days in date order. Days still to come simply are not here. */
+    /**
+     * Days in date order. A day with none of the three ticked is not here, and
+     * neither is a day still to come — both draw as untracked.
+     */
     days: CalendarDay[];
 }
 
@@ -26,16 +29,12 @@ export interface EscCalendarStat extends WelleStatContext {
  * How complete a day was, in colour — lighter for one pillar, darkest green
  * for all three.
  *
- * Index is the pillar count, so a day reads straight off the payload. The
- * classes are written out rather than built from the count: Tailwind only
- * ships a class it can see in the source.
+ * Indexed by pillar count less one: a day with none of the three has no row to
+ * colour, so one pillar is the lightest shade there is. The classes are written
+ * out rather than built from the count: Tailwind only ships a class it can see
+ * in the source.
  */
 const LEVELS = [
-    {
-        label: 'nothing ticked',
-        cell: 'bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-500',
-        swatch: 'bg-stone-200 dark:bg-zinc-700',
-    },
     {
         label: '1 pillar',
         cell: 'bg-brand-200 text-brand-900 dark:bg-brand-900 dark:text-brand-100',
@@ -53,7 +52,10 @@ const LEVELS = [
     },
 ];
 
-/** A day of the month Welle has no row for — still to come, or never synced. */
+/**
+ * A day of the month Welle has no row for — still to come, never synced, or a
+ * day that happened with none of the three ticked.
+ */
 const UNTRACKED =
     'text-gray-300 ring-1 ring-black/5 ring-inset dark:text-gray-600 dark:ring-white/8';
 
@@ -134,7 +136,7 @@ export function EscCalendar({
                                     className={`flex h-8 items-center justify-center rounded-[5px] text-[10px] font-medium tabular-nums ${
                                         day.level === null
                                             ? UNTRACKED
-                                            : LEVELS[day.level].cell
+                                            : LEVELS[day.level - 1].cell
                                     }`}
                                 >
                                     {day.day}
@@ -156,7 +158,7 @@ export function EscCalendar({
                     <span className="mr-0.5 text-[10px] text-gray-400 dark:text-gray-500">
                         Pillars
                     </span>
-                    {LEVELS.map((level, count) => (
+                    {LEVELS.map((level, index) => (
                         <span
                             key={level.label}
                             title={level.label}
@@ -166,7 +168,7 @@ export function EscCalendar({
                                 className={`h-2.5 w-2.5 rounded-[3px] ${level.swatch}`}
                             />
                             <span className="text-[10px] text-gray-400 tabular-nums dark:text-gray-500">
-                                {count}
+                                {index + 1}
                             </span>
                         </span>
                     ))}
@@ -179,7 +181,7 @@ export function EscCalendar({
 /** A day of the month grid: its number, and how complete it was. */
 interface GridDay {
     day: number;
-    /** 0–3, or null for a day Welle has no row for. */
+    /** 1–3, or null for a day Welle has no row for. */
     level: number | null;
 }
 
@@ -221,5 +223,5 @@ function dayTitle(month: string, { day, level }: GridDay): string {
 
     return level === null
         ? `${date} · not tracked`
-        : `${date} · ${LEVELS[level].label}`;
+        : `${date} · ${LEVELS[level - 1].label}`;
 }
