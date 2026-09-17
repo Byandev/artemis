@@ -61,8 +61,8 @@ Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapp
 // Sunday just gone is not in the response and this run cannot capture it.
 Schedule::command('welle:fetch-daily-records')->dailyAt('06:00')->withoutOverlapping();
 
-Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
-Schedule::command('sync:csr-daily-call-records')->dailyAt('04:15');
+Schedule::command('sync:csr-daily-records')->everyTwoHours('03:00');
+Schedule::command('sync:csr-daily-call-records')->everyTwoHours('04:15');
 
 // Roll each shop's previous-14-days RTS rate onto shops.rts_snapshot so the RMO
 // table can show and sort by it without aggregating pancake_orders per request.
