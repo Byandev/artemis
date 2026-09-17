@@ -4,6 +4,7 @@ namespace Modules\Pancake\Actions;
 
 use App\Models\Page;
 use App\Models\Workspace;
+use App\Support\RmoAutoAssign;
 use Carbon\Carbon;
 use Modules\GencysERP\Support\RmoUpsellStamper;
 use Modules\Pancake\Models\Order;
@@ -97,6 +98,15 @@ readonly class SyncParcelTrackingAction
                         'created_at' => $update['updated_at'],
                     ]
                 );
+
+                // Hand the row to a CSR straight away when the workspace has
+                // auto-assignment on. Called for every touched row, not just a
+                // freshly created one: fetch-orders keeps re-touching a parcel
+                // while it is out, so a row that predates the switch — or was
+                // un-assigned since — gets picked up on a later pass. A row that
+                // already has an assignee costs nothing, it returns before any
+                // query, and a manual assignee is never overwritten.
+                RmoAutoAssign::assignOne($workspace, $order_for_delivery);
 
                 $parcel_status = $savedOrder->parcel_status;
 

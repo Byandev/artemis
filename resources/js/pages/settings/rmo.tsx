@@ -3,6 +3,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -10,8 +11,15 @@ import { type BreadcrumbItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Transition } from '@headlessui/react';
 import { Head, useForm } from '@inertiajs/react';
-import { BellRing, CalendarClock, Clock, ListChecks, Tags } from 'lucide-react';
-import { type FormEventHandler } from 'react';
+import {
+    BellRing,
+    CalendarClock,
+    Clock,
+    ListChecks,
+    Tags,
+    UserPlus,
+} from 'lucide-react';
+import { useMemo, type FormEventHandler } from 'react';
 
 // Whole-hour options (00:00 – 23:00); the scheduler checks hourly, so a send
 // time on any other minute would never match.
@@ -26,10 +34,15 @@ interface Props {
         enable_edit_previous_day: boolean;
         enable_bulk_status_update: boolean;
         enable_auto_tag_status: boolean;
+        enable_auto_assign: boolean;
+        /** Pancake user ids in the auto-assign pool. */
+        auto_assign_user_ids: string[];
         discord_daily_stats_enabled: boolean;
         discord_webhook_url: string | null;
         discord_send_at: string;
     };
+    /** CSRs that may be put in the auto-assign pool — Pancake users on a workspace shop. */
+    assignableUsers: { id: string; name: string | null }[];
     /** Whether this user holds "Manage RMO Notifications" on top of the page's own permission. */
     canManageNotifications: boolean;
 }
@@ -37,6 +50,7 @@ interface Props {
 export default function RmoSettings({
     workspace,
     settings,
+    assignableUsers,
     canManageNotifications,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/settings/rmo`;
@@ -50,10 +64,31 @@ export default function RmoSettings({
             enable_edit_previous_day: settings.enable_edit_previous_day,
             enable_bulk_status_update: settings.enable_bulk_status_update,
             enable_auto_tag_status: settings.enable_auto_tag_status,
+            enable_auto_assign: settings.enable_auto_assign,
+            auto_assign_user_ids: settings.auto_assign_user_ids,
             discord_daily_stats_enabled: settings.discord_daily_stats_enabled,
             discord_webhook_url: settings.discord_webhook_url ?? '',
             discord_send_at: settings.discord_send_at,
         });
+
+    const assigneeOptions = useMemo(
+        () =>
+            assignableUsers.map((user) => ({
+                value: String(user.id),
+                label: user.name ?? String(user.id),
+            })),
+        [assignableUsers],
+    );
+
+    // A rejected id comes back under `auto_assign_user_ids.<index>`, which is
+    // not a key of the form data — find it by prefix rather than by name.
+    const poolError = useMemo(
+        () =>
+            Object.entries(errors as Record<string, string>).find(([key]) =>
+                key.startsWith('auto_assign_user_ids'),
+            )?.[1],
+        [errors],
+    );
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -185,6 +220,96 @@ export default function RmoSettings({
                                         away, so you can check it without
                                         waiting for the nightly run.
                                     </p>
+                                )}
+                            </div>
+
+                            <div className="rounded-[12px] border border-black/8 bg-white p-4 dark:border-white/8 dark:bg-zinc-900">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-stone-100 dark:bg-zinc-800">
+                                            <UserPlus className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[13px] font-medium text-gray-900 dark:text-gray-100">
+                                                Auto assigning
+                                            </p>
+                                            <p className="mt-0.5 text-[12px] text-gray-500 dark:text-gray-400">
+                                                Hand RMO orders out to a pool of
+                                                CSRs as they arrive, instead of
+                                                leaving them to be claimed. Each
+                                                order goes to whoever in the
+                                                pool is holding the fewest for
+                                                that delivery date, so the day
+                                                spreads evenly across the team.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        checked={data.enable_auto_assign}
+                                        onCheckedChange={(v) =>
+                                            setData('enable_auto_assign', v)
+                                        }
+                                        aria-label="Enable auto assigning"
+                                    />
+                                </div>
+
+                                {data.enable_auto_assign && (
+                                    <div className="mt-3 space-y-3 border-t border-black/6 pt-3 dark:border-white/6">
+                                        <div className="grid gap-1.5">
+                                            <Label
+                                                htmlFor="auto_assign_user_ids"
+                                                className="text-[12px] text-gray-500 dark:text-gray-400"
+                                            >
+                                                Assign to
+                                            </Label>
+                                            <MultiSelect
+                                                options={assigneeOptions}
+                                                selected={
+                                                    data.auto_assign_user_ids
+                                                }
+                                                onChange={(selected) =>
+                                                    setData(
+                                                        'auto_assign_user_ids',
+                                                        selected,
+                                                    )
+                                                }
+                                                placeholder={
+                                                    assigneeOptions.length === 0
+                                                        ? 'No CSRs available'
+                                                        : 'Search CSRs…'
+                                                }
+                                            />
+                                            {assigneeOptions.length === 0 ? (
+                                                <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                                    No CSRs to choose from — a
+                                                    Pancake user has to be
+                                                    attached to a shop in this
+                                                    workspace before they can be
+                                                    assigned to.
+                                                </p>
+                                            ) : (
+                                                data.auto_assign_user_ids
+                                                    .length === 0 && (
+                                                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                                        Nobody selected — orders
+                                                        stay unassigned until
+                                                        you pick at least one
+                                                        CSR.
+                                                    </p>
+                                                )
+                                            )}
+                                            <InputError message={poolError} />
+                                        </div>
+
+                                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                            Only orders with no assignee are
+                                            touched — anything a CSR assigned by
+                                            hand is left alone. Saving assigns
+                                            today&apos;s unassigned orders
+                                            straight away, and a nightly sweep
+                                            picks up anything the sync missed.
+                                        </p>
+                                    </div>
                                 )}
                             </div>
                         </div>

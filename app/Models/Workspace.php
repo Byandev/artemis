@@ -491,6 +491,17 @@ class Workspace extends Model
         return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_auto_tag_status;
     }
 
+    /**
+     * Whether unassigned RMO orders are handed out to a pool of CSRs on their
+     * own, rather than waiting for someone to claim them. Off by default. The
+     * pool itself lives in rmo_settings.auto_assign_user_ids — switched on with
+     * an empty pool, auto-assignment does nothing.
+     */
+    public function rmoAutoAssignEnabled(): bool
+    {
+        return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_auto_assign;
+    }
+
     public function allowedMetrics(): array
     {
         return $this->metricSetting

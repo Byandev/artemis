@@ -56,6 +56,12 @@ Schedule::command('sync:shop-rts-snapshot')->dailyAt('02:30')->withoutOverlappin
 // courier reported late in the evening.
 Schedule::command('rmo:apply-auto-tag')->dailyAt('00:00')->withoutOverlapping();
 
+// Catch-up sweep for RMO auto-assignment. The parcel sync assigns each row as
+// it touches it, so this normally finds nothing — it exists for rows that
+// predate the switch being turned on, and for days whose syncs came up short.
+// Runs just after auto-tagging, on the same two-day window.
+Schedule::command('rmo:apply-auto-assign')->dailyAt('00:05')->withoutOverlapping();
+
 // ── RMO (Discord) ───────────────────────────────────────────────────────
 // Checked hourly; posts only for workspaces whose configured send time matches
 // the current hour. Send times are whole hours only, so an hourly run always

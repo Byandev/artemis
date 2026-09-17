@@ -12,6 +12,8 @@ class RmoSetting extends Model
         'enable_edit_previous_day',
         'enable_bulk_status_update',
         'enable_auto_tag_status',
+        'enable_auto_assign',
+        'auto_assign_user_ids',
         'discord_daily_stats_enabled',
         'discord_webhook_url',
         'discord_send_at',
@@ -21,6 +23,8 @@ class RmoSetting extends Model
         'enable_edit_previous_day' => 'boolean',
         'enable_bulk_status_update' => 'boolean',
         'enable_auto_tag_status' => 'boolean',
+        'enable_auto_assign' => 'boolean',
+        'auto_assign_user_ids' => 'array',
         'discord_daily_stats_enabled' => 'boolean',
     ];
 
