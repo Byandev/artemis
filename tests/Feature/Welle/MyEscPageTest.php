@@ -8,9 +8,13 @@ use App\Models\User;
 | My ESC
 |--------------------------------------------------------------------------
 |
-| The page itself is still blank, so what there is to assert is the way in:
-| the Welle module toggle decides whether the page exists for a workspace at
-| all, and the "View My ESC" grant decides who inside it gets to read it.
+| The way in, and the one thing the page is given up front: the Welle module
+| toggle decides whether the page exists for a workspace at all, the "View My
+| ESC" grant decides who inside it gets to read it, and `connected` decides
+| whether it opens on the figures or on "set up your Welle account first".
+|
+| The figures themselves are fetched card by card over XHR and are asserted
+| against their own endpoints, not here.
 */
 
 beforeEach(function () {
@@ -31,6 +35,37 @@ it('renders the page for a member holding the grant', function () {
             ->component('workspaces/welle/my-esc')
             ->where('workspace.slug', $this->workspace->slug),
         );
+});
+
+it('opens on the setup prompt while no welle account is connected', function () {
+    // `connected` false is what puts the page on "set up your Welle account
+    // first" instead of seven cards that could never fill.
+    $this->actingAs($this->owner)
+        ->get($this->url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('connected', false));
+});
+
+it('opens on the figures once a welle account is connected', function () {
+    connectWelleAccount($this->owner);
+
+    $this->actingAs($this->owner)
+        ->get($this->url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('connected', true));
+});
+
+it('reads the signed-in user own account, not another member one', function () {
+    // Credentials belong to the person: someone else's connected account does
+    // not put this member's page on the figures.
+    $member = makeMemberWithPermissions($this->workspace, [Permission::ViewMyEsc->value], 'Welle');
+
+    connectWelleAccount($this->owner);
+
+    $this->actingAs($member)
+        ->get($this->url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('connected', false));
 });
 
 it('lets the owner in without the grant, as every other page does', function () {

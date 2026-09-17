@@ -14,9 +14,11 @@ use Illuminate\Support\Carbon;
 | three pillars was ticked, not just how many. That is the one question a grid
 | coloured by a count cannot answer.
 |
-| A day has a row only if something was done on it, so the table lists the days
-| that counted for something and `total_days` says how many days the month has
-| had. Days still to come have no row either.
+| Every day of the month that has happened is listed — the 1st through today, or
+| all of a month already past — whether or not Welle stored anything for it. A
+| day with nothing done has no row in the table, so it comes back with its three
+| pillars false rather than being left out and letting the log skip over it.
+| Days still to come are not listed.
 |
 | The access rules are the page's, re-applied: an endpoint under /api can be
 | reached without going through the page that shows it.
@@ -42,10 +44,11 @@ it('says which pillars a day carried, not just how many', function () {
     welleDay($this->workspace->id, $this->owner->id, 2, false, ['movement' => true, 'learning' => true]);
     welleDay($this->workspace->id, $this->owner->id, 3, false, ['meditation' => true]);
 
+    // Sixteen rows for sixteen days lived, three of them with something on them.
     $this->actingAs($this->owner)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJsonCount(3, 'days')
+        ->assertJsonCount(16, 'days')
         ->assertJson([
             'total_days' => 16,
             'month' => $this->firstOfMonth->format('Y-m'),
@@ -83,10 +86,11 @@ it('tells the three pillars apart, column for column', function () {
     welleDay($this->workspace->id, $this->owner->id, 2, false, ['meditation' => true]);
     welleDay($this->workspace->id, $this->owner->id, 3, false, ['learning' => true]);
 
-    $days = $this->actingAs($this->owner)
-        ->getJson($this->url)
-        ->assertOk()
-        ->json('days');
+    $days = array_slice(
+        $this->actingAs($this->owner)->getJson($this->url)->assertOk()->json('days'),
+        0,
+        3,
+    );
 
     expect(array_column($days, 'movement'))->toBe([true, false, false])
         ->and(array_column($days, 'meditation'))->toBe([false, true, false])
@@ -103,11 +107,40 @@ it('sends the days in date order, whatever order they were written in', function
         ->assertOk()
         ->json('days');
 
-    expect(array_column($days, 'date'))->toBe([
-        $this->firstOfMonth->toDateString(),
-        $this->firstOfMonth->copy()->addDays(3)->toDateString(),
-        $this->firstOfMonth->copy()->addDays(6)->toDateString(),
-    ]);
+    $expected = collect(range(0, 15))
+        ->map(fn (int $offset) => $this->firstOfMonth->copy()->addDays($offset)->toDateString())
+        ->all();
+
+    expect(array_column($days, 'date'))->toBe($expected)
+        // The three that were written land on the days they were written for,
+        // in spite of the order they arrived in.
+        ->and(array_column($days, 'is_esc'))->toBe([
+            true, false, false, true, false, false, true,
+            false, false, false, false, false, false, false, false, false,
+        ]);
+});
+
+it('lists every day of the month up to today, whether or not anything was done', function () {
+    // One day in the middle of the month, and nothing else — the fifteen days
+    // around it happened too and belong in the log as the blanks they were.
+    welleDay($this->workspace->id, $this->owner->id, 9, true);
+
+    $days = $this->actingAs($this->owner)
+        ->getJson($this->url)
+        ->assertOk()
+        ->assertJsonCount(16, 'days')
+        ->json('days');
+
+    expect($days[0])->toBe([
+        'date' => $this->firstOfMonth->toDateString(),
+        'movement' => false,
+        'meditation' => false,
+        'learning' => false,
+        'is_esc' => false,
+    ])
+        // The last row is today's, never a day still to come.
+        ->and($days[15]['date'])->toBe(Carbon::today()->toDateString())
+        ->and(array_column($days, 'is_esc'))->toContain(true);
 });
 
 it('reads only the signed-in user rows, in this workspace, in this month', function () {
@@ -132,13 +165,24 @@ it('reads only the signed-in user rows, in this workspace, in this month', funct
         'is_esc' => true,
     ]);
 
+    // Sixteen rows either way, but only the owner's own day is ticked: the
+    // second is there as a blank rather than carrying someone else's record.
     $this->actingAs($this->owner)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJsonCount(1, 'days')
+        ->assertJsonCount(16, 'days')
         ->assertJson([
             'total_days' => 16,
-            'days' => [['date' => $this->firstOfMonth->toDateString()]],
+            'days' => [
+                ['date' => $this->firstOfMonth->toDateString(), 'is_esc' => true],
+                [
+                    'date' => $this->firstOfMonth->copy()->addDay()->toDateString(),
+                    'movement' => false,
+                    'meditation' => false,
+                    'learning' => false,
+                    'is_esc' => false,
+                ],
+            ],
         ]);
 });
 
@@ -153,10 +197,12 @@ it('reads the month asked for', function () {
         'pillars_completed' => 1,
     ]);
 
-    // August, and all thirty-one of its days.
+    // August, and all thirty-one of its days — a month already past is listed
+    // to its end rather than to today.
     $this->actingAs($this->owner)
         ->getJson($this->url.'?month='.$lastMonth->format('Y-m'))
         ->assertOk()
+        ->assertJsonCount(31, 'days')
         ->assertJson([
             'month' => $lastMonth->format('Y-m'),
             'total_days' => 31,
@@ -166,16 +212,24 @@ it('reads the month asked for', function () {
                 'movement' => false,
                 'is_esc' => false,
             ]],
-        ]);
+        ])
+        ->assertJsonPath(
+            'days.30.date',
+            $lastMonth->copy()->endOfMonth()->toDateString(),
+        );
 });
 
-it('has an empty month rather than an error while nothing is synced', function () {
+it('lists the month as blank days while nothing is synced', function () {
     // No rows, but the month still happened — the table's advice comes from
     // `connected` and `synced`, not from an empty day count.
-    $this->actingAs($this->owner)
+    $days = $this->actingAs($this->owner)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJson(['total_days' => 16, 'days' => [], 'connected' => false, 'synced' => false]);
+        ->assertJsonCount(16, 'days')
+        ->assertJson(['total_days' => 16, 'connected' => false, 'synced' => false])
+        ->json('days');
+
+    expect(array_column($days, 'is_esc'))->each->toBeFalse();
 });
 
 it('has no days at all for a month that has not started', function () {
@@ -204,8 +258,11 @@ it('answers a member holding the grant', function () {
     $this->actingAs($member)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJsonCount(1, 'days')
-        ->assertJson(['total_days' => 16]);
+        ->assertJsonCount(16, 'days')
+        ->assertJson([
+            'total_days' => 16,
+            'days' => [['date' => $this->firstOfMonth->toDateString(), 'is_esc' => true]],
+        ]);
 });
 
 it('is gone while the welle module is switched off', function () {

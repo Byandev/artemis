@@ -27,7 +27,12 @@ interface DailyLogDay extends Record<Pillar, boolean> {
  * See WelleStatsController::dailyLog.
  */
 export interface DailyLogStat extends WelleStatContext {
-    /** Days in date order. Days still to come simply are not here. */
+    /**
+     * Every day of the month that has happened, in date order — the 1st
+     * through today, or all of a month already past. A day Welle has no record
+     * of comes back with its three pillars false. Days still to come are not
+     * here.
+     */
     days: DailyLogDay[];
 }
 
@@ -45,12 +50,16 @@ const HEAD =
     'sticky top-0 z-10 border-b border-black/6 bg-white py-2.5 text-[11px] font-medium text-gray-400 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-500';
 
 /**
- * Day by day — a row per day Welle has a record of, a tick per pillar done.
+ * Day by day — a row per day of the month so far, a tick per pillar done.
  *
  * The calendar says how complete a day was; this says which pillar it was that
  * gave way, which is the thing to act on. A ticked box rather than a bare
  * check, and an empty one rather than a blank cell, so a missed pillar reads as
  * a deliberate no rather than as data that never arrived.
+ *
+ * Every elapsed day gets a row, including the ones nothing was done on: a table
+ * that listed only the days with a record would read as an unbroken run while
+ * quietly skipping the days that broke it.
  */
 export function DailyLogTable({
     stat,

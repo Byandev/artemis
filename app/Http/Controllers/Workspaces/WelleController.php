@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\IntegrationService;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
@@ -25,9 +26,12 @@ class WelleController extends Controller
     /**
      * My ESC — the person's own Extreme Self Care days.
      *
-     * Deliberately blank for now: the route, the page and the grant are in
-     * place so the module toggle and the role editor can be exercised ahead of
-     * the content that will fill it.
+     * The figures themselves are fetched card by card over XHR; what the page
+     * itself has to know is whether there is a Welle account behind it at all.
+     * That comes from here rather than from the cards so an unconnected page
+     * opens straight onto "connect your account" — asked of the cards, the
+     * answer arrives seven times over, after a screen of skeletons that were
+     * never going to fill.
      */
     public function myEsc(Request $request, Workspace $workspace): Response
     {
@@ -35,8 +39,13 @@ class WelleController extends Controller
 
         $this->authorize(Permission::ViewMyEsc->value, $workspace);
 
+        $welle = $request->user()->integrationFor(IntegrationService::Welle);
+
         return Inertia::render('workspaces/welle/my-esc', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
+            // The token never leaves the server; the page learns only that the
+            // email and password have been exchanged for one.
+            'connected' => (bool) $welle?->hasToken(),
         ]);
     }
 }
