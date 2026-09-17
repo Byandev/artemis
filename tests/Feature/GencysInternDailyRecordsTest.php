@@ -174,3 +174,77 @@ test('the callback rejects a bad api key', function () {
         'data' => ['workspace_id' => 1, 'api_key' => 'art_bad', 'records' => []],
     ])->assertStatus(401);
 });
+
+test('the callback closes the sync run n8n echoes back', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+
+    Intern::factory()->for($workspace)->create(['intern_id' => 101]);
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_INTERN_DAILY_RECORDS, [
+        'intern_id' => 101,
+        'date' => '07/06/2026',
+    ]);
+
+    $this->postJson('/api/v1/public/gencys/intern-daily-records', [
+        'workspace_id' => $workspace->id,
+        'api_key' => $raw,
+        'intern_id' => 101,
+        'sync_run_id' => $run->id,
+        'n8n_execution_id' => '10427',
+        'rows' => [
+            ['date' => '2026-07-06', 'sales' => 1500, 'ad_spent' => 640],
+            ['sales' => 99], // no date → nothing to key the upsert on
+        ],
+    ])->assertOk()->assertJson([
+        'saved' => 1,
+        'skipped' => 1,
+        'sync_run_id' => $run->id,
+    ]);
+
+    $run->refresh();
+
+    expect($run->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and((int) $run->rows_received)->toBe(2)
+        ->and((int) $run->rows_saved)->toBe(1)
+        ->and($run->n8n_execution_id)->toBe('10427');
+});
+
+test('an intern with nothing to report still closes its run', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+
+    Intern::factory()->for($workspace)->create(['intern_id' => 101]);
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_INTERN_DAILY_RECORDS, ['intern_id' => 101]);
+
+    $this->postJson('/api/v1/public/gencys/intern-daily-records', [
+        'workspace_id' => $workspace->id,
+        'api_key' => $raw,
+        'intern_id' => 101,
+        'sync_run_id' => $run->id,
+        'rows' => [],
+    ])->assertOk()->assertJson(['saved' => 0, 'skipped' => 0]);
+
+    $run->refresh();
+
+    expect($run->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and((int) $run->rows_received)->toBe(0);
+});
+
+test('a callback with no sync_run_id leaves the run alone', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+
+    Intern::factory()->for($workspace)->create(['intern_id' => 101]);
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_INTERN_DAILY_RECORDS, ['intern_id' => 101]);
+
+    $this->postJson('/api/v1/public/gencys/intern-daily-records', [
+        'workspace_id' => $workspace->id,
+        'api_key' => $raw,
+        'intern_id' => 101,
+        'rows' => [['date' => '2026-07-06', 'sales' => 1500]],
+    ])->assertOk()->assertJson(['saved' => 1, 'sync_run_id' => null]);
+
+    // The rows are still saved — only the bookkeeping is lost, and the run times
+    // out and gets retried rather than being closed by guesswork.
+    expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
+});
