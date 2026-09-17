@@ -12,6 +12,66 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.37.0',
+        date: '2026-09-17',
+        sections: [
+            {
+                title: 'CSR Dashboard (New)',
+                items: [
+                    'The CSR Dashboard is the analytics page read from your own side rather than the page that said metrics would be added soon: the same twelve headline figures — Sales, RTS, Calls Placed and Call Time, RMO Called, RMO Call Time, RMO Real Conversations and Hit Rate, Confirmed Risky Orders and Total Verified Orders — each narrowed to the Pancake logins linked to you and measured against the equally long stretch ending the day before your range, which opens on the last seven days',
+                    'A table underneath lists your own days one by one, carrying every column of both nightly reports, each sortable, with a columns menu that remembers what you left showing and the date pinned to the left so a row two dozen figures wide still says which day it is',
+                    'Two charts sit between them: your calls day by day across the range, and the same calls folded into one round of the clock, so the shape that shows is your own working day rather than the workspace’s',
+                    'Total Verified Orders can read over 100% and that is the reading, not a fault — an order you verified that someone else confirmed counts on both of your cards, on opposite sides of the division, which is exactly what says who is doing the chasing',
+                    'Days you did nothing are left out of the table rather than listed as a row of zeros; the charts are where a quiet day still shows, because a gap in a chart is the reading and a gap in a table is noise',
+                ],
+            },
+            {
+                title: 'CSR — My Calls and My Pancake Users (New)',
+                items: [
+                    'My Calls is every call the mobile app has synced under your Pancake logins — newest first, with the number, whether it was RMO Customer, RMO Rider or Order Verification, the type, how long it ran and the order it was about. Search takes a phone number or an order id, the date, persona and call type narrow the list, and the totals above it count every row the filters left rather than the page on screen',
+                    'My Pancake Users says who this workspace thinks you are on Pancake’s side: each linked login, the shops it works and the last day either nightly report recorded anything against it. The dashboard sums those logins without ever naming them, so a figure you don’t recognise can now be traced to a second login folded in — or to the one you expected never having been linked',
+                    'Calls placed from the older build of the handset app are filed under a different id from the newer one, and both are matched here, so your register doesn’t quietly end at whichever build you were on when it changed',
+                    'Both pages sit under CSR Dashboard in the menu and open to anyone the dashboard already opens to',
+                ],
+            },
+            {
+                title: 'Welle — My ESC (New)',
+                items: [
+                    'My ESC is your own Extreme Self Care record from Welle, a month at a time: ESC Rate for the month and the days you had Movement, Meditation and Learning as four cards, the three pillars against each other, a calendar shaded by how many pillars each day carried — all three being an ESC day — and a day-by-day log with a tick per pillar, so you can see which pillar it was that gave way rather than only that the day fell short',
+                    'Every rate is counted over the days of the month that have actually happened, the 1st through today, and a day nothing was logged on is still a row in the log and still counted in the denominator — a month with two good days in it reads as two days out of sixteen rather than as a perfect record',
+                    'Connect from Settings → Integrations: your Welle email and password are sent to Welle once, exchanged for a token, and the password discarded rather than stored. The account is yours and not the workspace’s, so everyone connects their own, and until you do, My ESC is the setup prompt rather than a screen of empty figures',
+                    'Your days are fetched each morning at 6am, and each run re-states the whole week behind it so anything logged late is corrected. One gap worth knowing: Welle only answers for the week containing today, so a Monday run cannot reach the Sunday just gone',
+                    'Welle is a module a super admin switches on per workspace, and the Integrations section of Settings appears with it — a workspace without it has neither the page nor the setting. A failed overnight fetch is reported on that page with what went wrong, and saving your password again clears it',
+                ],
+            },
+            {
+                title: 'CSR Analytics — Export',
+                items: [
+                    'An Export button beside the columns menu downloads the breakdown as a spreadsheet — the date range, search and sort the table is under, the columns you have left showing, and every CSR they match rather than the page in front of you',
+                    'Money comes out as plain numbers and call times as whole seconds so the sheet can be summed, with the seconds columns saying so in their heading, and every column is sized to its contents so the long headings are readable the moment it opens',
+                ],
+            },
+            {
+                title: 'Orders — Customer Orders',
+                items: [
+                    'A Customer orders filter narrows the list by how many orders the customer has placed in total — greater than, less than, equal to or between the figures you type — read off that phone number’s own Pancake report, which covers every page and shop Pancake knows about rather than only what has been synced here',
+                    'The same count is available as a column, sortable, and off by default in the columns menu: the list is already wide, and the number is mostly asked for through the filter rather than read row by row',
+                    'A customer with no report behind their number is left out of every comparison rather than treated as a customer with none — an unknown history is not a history of zero orders, and first-time buyers are the no report answer on the Customer RTS filter beside it',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The CSR sales and call reports are rebuilt every two hours rather than once at 3am, so today’s figures on CSR Analytics and the CSR Dashboard fill in through the day instead of waiting until tomorrow morning. Each pass re-states the last three days rather than the last one or two weeks, and runs on its own queue so the rebuild doesn’t sit behind other work',
+                    'Editing a CSR’s status saves again for anyone whose row was written before the column settled on ACTIVE and INACTIVE — the dialog opened blank on those, and saving was then refused on the CSR’s own stored value',
+                    'A call the handset reports with no number against it is skipped and the rest of the batch still syncs; one such entry used to turn back the whole upload, and there was nothing to match it to an order or a delivery on anyway',
+                    'Calls Placed on CSR Analytics now says how many distinct orders those calls reached, so the count reads as breadth or as repeat ringing rather than as a number on its own',
+                    'Parcels already on their way are re-checked at 10am as well, closing one more gap in the working morning',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.36.2',
         date: '2026-09-11',
         sections: [
