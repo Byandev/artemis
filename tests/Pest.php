@@ -1,13 +1,17 @@
 <?php
 
+use App\Enums\IntegrationService;
 use App\Jobs\SyncCsrDailyCallRecord;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserIntegration;
+use App\Models\WelleDailyRecord;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
 use Tests\TestCase;
@@ -197,4 +201,86 @@ function makeApiKey(Workspace $workspace, ?string $name = null): array
     ]);
 
     return ['model' => $model, 'raw' => $generated['raw']];
+}
+
+/**
+ * Give a user a stored Welle token — the only credential that is ever kept.
+ *
+ * Lives here rather than beside one Welle test because several of them need a
+ * connected account, and a helper declared inside a test file only exists for
+ * a run that happens to load that file.
+ */
+function connectWelleAccount(User $user, string $token = 'welle-token-abc'): UserIntegration
+{
+    return $user->integrations()->updateOrCreate(
+        ['service' => IntegrationService::Welle],
+        ['token' => $token],
+    );
+}
+
+/**
+ * Pin "today" for the My ESC tests.
+ *
+ * Every rate on that page divides by the days of the month that have elapsed,
+ * so a test that left the date alone would assert against a denominator that
+ * changed with the calendar. The 16th of September gives sixteen elapsed days
+ * this month and a full thirty-one for the month before — two different
+ * denominators, both fixed.
+ *
+ * Laravel clears the test clock in tearDown, so nothing has to unset it.
+ */
+function freezeWelleToday(string $today = '2026-09-16 09:00:00'): CarbonImmutable
+{
+    Carbon::setTestNow($today);
+
+    return CarbonImmutable::today();
+}
+
+/**
+ * One day of a user's Welle record, `$dayOfMonth` days into the current month.
+ *
+ * `$pillars` overrides individual pillars on top of `$isEsc`, which is what
+ * makes a day that had movement but was not an ESC day expressible — the case
+ * every pillar card and bar exists to count.
+ *
+ * At least one pillar has to be ticked: a day with none of the three is not
+ * stored at all, so a blank row is a state the fetch cannot produce and a test
+ * should not be able to fake.
+ *
+ * Lives here for the same reason connectWelleAccount does: more than one Welle
+ * test needs it, and a helper declared inside a test file only exists for a
+ * run that happens to load that file.
+ *
+ * @param  array<string, bool>  $pillars
+ */
+function welleDay(
+    int $workspaceId,
+    int $userId,
+    int $dayOfMonth,
+    bool $isEsc,
+    array $pillars = [],
+): WelleDailyRecord {
+    $ticked = [];
+
+    foreach (WelleDailyRecord::PILLARS as $pillar) {
+        $ticked[$pillar] = $pillars[$pillar] ?? $isEsc;
+    }
+
+    $completed = count(array_filter($ticked));
+
+    if ($completed === 0) {
+        throw new InvalidArgumentException(
+            'A Welle day with no pillars ticked is never stored — tick one, or leave the day out.',
+        );
+    }
+
+    return WelleDailyRecord::create([
+        'workspace_id' => $workspaceId,
+        'user_id' => $userId,
+        'date' => Carbon::today()->startOfMonth()->addDays($dayOfMonth - 1)->toDateString(),
+        ...$ticked,
+        'pillars_completed' => $completed,
+        'is_esc' => $completed === count(WelleDailyRecord::PILLARS),
+        'synced_at' => now(),
+    ]);
 }

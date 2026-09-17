@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\IntegrationService;
 use App\Enums\Permission;
 use App\Notifications\ResetPasswordNotification;
 use BackedEnum;
@@ -58,6 +59,23 @@ class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * Third-party accounts this user has connected.
+     *
+     * One row per service, holding a token and nothing else — see
+     * UserIntegration for why no credential is kept alongside it.
+     */
+    public function integrations(): HasMany
+    {
+        return $this->hasMany(UserIntegration::class);
+    }
+
+    /** This user's connection to one service, if they have one. */
+    public function integrationFor(IntegrationService $service): ?UserIntegration
+    {
+        return $this->integrations()->forService($service)->first();
     }
 
     /**

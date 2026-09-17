@@ -10,6 +10,7 @@ import {
     Bell,
     CalendarClock,
     KeyRound,
+    Plug,
     ReceiptText,
     Server,
     User,
@@ -78,6 +79,21 @@ export default function SettingsLayout({
                 },
             ],
         });
+
+        // Welle is the only integration so far, so the whole group rides on
+        // its module toggle rather than showing an empty section.
+        if (workspace.welle_module_enabled) {
+            groups.push({
+                label: 'Integrations',
+                items: [
+                    {
+                        title: 'Welle',
+                        href: `/workspaces/${workspace.slug}/settings/integrations`,
+                        icon: Plug,
+                    },
+                ],
+            });
+        }
 
         if (canManageDiscordNotifications) {
             groups.push({

@@ -11,7 +11,7 @@ class SyncCsrDailyCallRecords extends Command
 {
     protected $signature = 'sync:csr-daily-call-records
                             {--date= : Single target date in Y-m-d format. If omitted, the last --days days are dispatched (one job per day).}
-                            {--days=14 : Number of trailing days to backfill when --date is not provided.}
+                            {--days=3 : Number of trailing days to backfill when --date is not provided.}
                             {--workspace= : Limit to one workspace, by id or slug. Defaults to every workspace.}';
 
     protected $description = 'Dispatch SyncCsrDailyCallRecord jobs to aggregate per-CSR call metrics. Backfills the last 14 days by default.';
@@ -39,7 +39,7 @@ class SyncCsrDailyCallRecords extends Command
 
         for ($i = 0; $i < $days; $i++) {
             $date = $start->subDays($i)->toDateString();
-            SyncCsrDailyCallRecord::dispatch($date, $workspaceId);
+            SyncCsrDailyCallRecord::dispatch($date, $workspaceId)->onQueue('analytics');
         }
 
         $this->info("Dispatched {$days} SyncCsrDailyCallRecord job(s){$scope} covering {$start->subDays($days - 1)->toDateString()} → {$start->toDateString()}.");

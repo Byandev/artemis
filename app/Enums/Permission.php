@@ -202,6 +202,13 @@ enum Permission: string
     case ViewOptimizationLogs = 'View Optimization Logs';
     case ViewAdSpentSummary = 'View Adspent Summary';
 
+    // Welle
+    //
+    // Welle credentials belong to the person rather than the workspace, so the
+    // grant is only ever over their own record — see the Welle module toggle in
+    // Workspace::hiddenPermissionNames().
+    case ViewMyEsc = 'View My ESC';
+
     // Data Access
     case ViewAllWorkspaceData = 'View All Workspace Data';
 
@@ -369,6 +376,8 @@ enum Permission: string
             self::ApproveOptimizationRules,
             self::ViewOptimizationLogs,
             self::ViewAdSpentSummary => 'Meta Ads',
+
+            self::ViewMyEsc => 'Welle',
 
             self::ViewAllWorkspaceData => 'Data Access',
         };
