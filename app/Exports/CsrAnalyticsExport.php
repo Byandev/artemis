@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -17,8 +18,11 @@ use Spatie\QueryBuilder\QueryBuilder;
  * and call time as whole seconds, both so the sheet can be summed; the screen's
  * peso and h:mm:ss formatting stays on the screen, and the seconds columns say
  * so in their heading.
+ *
+ * ShouldAutoSize widens each column to its widest cell, so the long headings
+ * are readable on opening rather than clipped to a default width.
  */
-class CsrAnalyticsExport implements FromQuery, WithHeadings, WithMapping
+class CsrAnalyticsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping
 {
     /** Every exportable column, in the order the table lays them out. */
     public const AVAILABLE_COLUMNS = [
