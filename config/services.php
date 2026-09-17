@@ -81,9 +81,9 @@ return [
         'base_url' => env('SENDGATE_BASE_URL', 'https://sendgate-test.on-forge.com'),
     ],
 
-    // Welle. Every user connects their own account (one row per user in
-    // `user_integrations`), so there is no shared credential here — only where
-    // the API lives, and how long one sign-in is worth reusing.
+    // Welle. Every user connects their own account (users.welle_email /
+    // welle_password), so there is no shared credential here — only where the
+    // API lives, and how long one sign-in is worth reusing.
     //
     // The paths are config rather than constants so the client can be pointed
     // at a staging host, or follow a moved endpoint, without a code change.
