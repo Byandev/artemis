@@ -12,6 +12,34 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.37.1',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Sales & Marketing — Intern Figures',
+                items: [
+                    'Each intern’s day — sales, orders, ad spend and ROAS, and the returns behind them — is pulled from the ERP on the morning sync again, so Quick Data View (Sales/ROAS) on the Dashboard and the Daily Report fills itself in. The intern pull had been left out of the scheduled sync entirely, and those rows only moved when someone went and asked for them by hand',
+                    'This is for workspaces that read their advertisers from Gencys; everywhere else the same table is built from your own users and nothing about it changes',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Sync Schedule',
+                items: [
+                    'The intern figures are fetched on the 9am pass only. That pull asks the ERP once per intern per day and waits for each answer before the next goes out, so a roster of a dozen is a long queue on its own — the midday, 2pm, 5pm and 7pm passes now carry transactions, purchase orders and the daily sales tracker alone rather than queueing the whole roster again behind them',
+                    'Nothing else about the five passes changes, and a day’s intern figures can still be re-fetched from Sync Batches whenever you need them before tomorrow morning',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Sync Batches',
+                items: [
+                    'An intern’s figures close their own run the moment they land, with the rows that came back and the rows that were written recorded against it, and the batch moves on to the next intern straight away. Until now nothing ever closed those runs: each one sat on Pending until it timed out, was retried, and timed out again, so a roster that had already reported in full still took hours to walk through and finished marked as failures',
+                    'An intern who had nothing that day closes their run just the same, rather than leaving an open run that reads exactly like the ERP never answering',
+                    'Rows that come back without a date are counted as skipped rather than saved — they have nothing to file them under and are dropped, and the run’s saved figure now says so instead of counting them in',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.37.0',
         date: '2026-09-17',
         sections: [
