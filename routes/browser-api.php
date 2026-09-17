@@ -220,6 +220,9 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/movement', [WelleStatsController::class, 'movement'])->name('movement');
             Route::get('/meditation', [WelleStatsController::class, 'meditation'])->name('meditation');
             Route::get('/learning', [WelleStatsController::class, 'learning'])->name('learning');
+            Route::get('/pillar-breakdown', [WelleStatsController::class, 'pillarBreakdown'])->name('pillar-breakdown');
+            Route::get('/calendar', [WelleStatsController::class, 'calendar'])->name('calendar');
+            Route::get('/daily-log', [WelleStatsController::class, 'dailyLog'])->name('daily-log');
         });
     });
 });

@@ -19,39 +19,6 @@ use Illuminate\Support\Carbon;
 | reached without going through the page that shows it.
 */
 
-/**
- * A day of the current month, `$dayOfMonth` days in.
- *
- * `$pillars` overrides individual pillars on top of `$isEsc`, which is what
- * makes a day that had movement but was not an ESC day expressible — the case
- * every pillar card exists to count.
- *
- * @param  array<string, bool>  $pillars
- */
-function welleDay(
-    int $workspaceId,
-    int $userId,
-    int $dayOfMonth,
-    bool $isEsc,
-    array $pillars = [],
-): WelleDailyRecord {
-    $ticked = [];
-
-    foreach (WelleDailyRecord::PILLARS as $pillar) {
-        $ticked[$pillar] = $pillars[$pillar] ?? $isEsc;
-    }
-
-    return WelleDailyRecord::create([
-        'workspace_id' => $workspaceId,
-        'user_id' => $userId,
-        'date' => Carbon::today()->startOfMonth()->addDays($dayOfMonth - 1)->toDateString(),
-        ...$ticked,
-        'pillars_completed' => count(array_filter($ticked)),
-        'is_esc' => $isEsc,
-        'synced_at' => now(),
-    ]);
-}
-
 /** One pillar card's endpoint — a route of its own per pillar. */
 function pillarStatUrl(Workspace $workspace, string $pillar): string
 {

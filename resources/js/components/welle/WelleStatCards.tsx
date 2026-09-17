@@ -2,7 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BookOpen, Brain, Footprints, Sparkles } from 'lucide-react';
 
 /** What every My ESC card says about the figures beside it. */
-interface WelleStatContext {
+export interface WelleStatContext {
     /** Days Welle has a record of this month — what each figure is read over. */
     total_days: number;
     /** `YYYY-MM`. */
@@ -45,9 +45,9 @@ export interface DaysWithPillarStat extends WelleStatContext {
  * only ships a class it can see in the source, and an interpolated one is a
  * bar that is the right width and no colour at all.
  */
-type Tone = 'brand' | 'sky' | 'violet' | 'amber';
+export type Tone = 'brand' | 'sky' | 'violet' | 'amber';
 
-const TONES: Record<Tone, { icon: string; bar: string }> = {
+export const TONES: Record<Tone, { icon: string; bar: string }> = {
     brand: {
         icon: 'text-brand-600 dark:text-brand-400',
         bar: 'bg-brand-500 dark:bg-brand-400',
@@ -152,7 +152,7 @@ export function WelleStatCard({
  * whose month has not been fetched yet will fill itself in, and one with no
  * Welle account behind it never will until somebody connects one.
  */
-function emptyFootnote(stat: WelleStatContext): string | null {
+export function emptyFootnote(stat: WelleStatContext): string | null {
     if (stat.total_days > 0) return null;
 
     return stat.connected
@@ -197,7 +197,7 @@ export function EscRateStatCard({
 }
 
 /** How each pillar is named and drawn. Keyed by the endpoint's own names. */
-const PILLARS: Record<
+export const PILLARS: Record<
     Pillar,
     {
         title: string;

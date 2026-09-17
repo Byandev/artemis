@@ -139,6 +139,120 @@ class WelleStatsController extends Controller
         ]);
     }
 
+    /**
+     * Pillar Breakdown — the three pillars side by side, each read over the
+     * same month of days the cards are.
+     *
+     * One row per pillar rather than one card: the point of the chart is the
+     * comparison, so the three counts have to come back together or two bars
+     * could be drawn from different months.
+     */
+    public function pillarBreakdown(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeCards($workspace);
+
+        $month = $this->month($request);
+
+        $totals = $this->days($request, $workspace, $month)
+            ->selectRaw('COUNT(*) as total_days')
+            ->selectRaw('COALESCE(SUM(movement), 0) as movement_days')
+            ->selectRaw('COALESCE(SUM(meditation), 0) as meditation_days')
+            ->selectRaw('COALESCE(SUM(learning), 0) as learning_days')
+            ->first();
+
+        $total = (int) $totals->total_days;
+        $movement = (int) $totals->movement_days;
+        $meditation = (int) $totals->meditation_days;
+        $learning = (int) $totals->learning_days;
+
+        return response()->json([
+            'total_days' => $total,
+            // A list rather than a map, in the order the bars are drawn — the
+            // same order the Welle dashboard lists the pillars in.
+            'pillars' => [
+                [
+                    'pillar' => 'movement',
+                    'days' => $movement,
+                    // Null rather than 0% with nothing recorded, as the cards do.
+                    'rate' => $total === 0 ? null : round($movement / $total * 100, 2),
+                ],
+                [
+                    'pillar' => 'meditation',
+                    'days' => $meditation,
+                    'rate' => $total === 0 ? null : round($meditation / $total * 100, 2),
+                ],
+                [
+                    'pillar' => 'learning',
+                    'days' => $learning,
+                    'rate' => $total === 0 ? null : round($learning / $total * 100, 2),
+                ],
+            ],
+            ...$this->context($request, $month),
+        ]);
+    }
+
+    /**
+     * The month's calendar — one entry per day Welle has a record of, with how
+     * many of the three pillars were ticked on it.
+     *
+     * The rows themselves rather than a count: the calendar colours a day by
+     * how complete it was, which is a figure no aggregate can give back. Days
+     * still to come, and days before the account was connected, simply have no
+     * row — the grid draws those as untracked rather than as empty days.
+     */
+    public function calendar(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeCards($workspace);
+
+        $month = $this->month($request);
+
+        $days = $this->days($request, $workspace, $month)
+            ->orderBy('date')
+            ->get(['date', 'pillars_completed'])
+            ->map(fn (WelleDailyRecord $day) => [
+                'date' => $day->date->toDateString(),
+                'pillars_completed' => (int) $day->pillars_completed,
+            ]);
+
+        return response()->json([
+            'total_days' => $days->count(),
+            'days' => $days,
+            ...$this->context($request, $month),
+        ]);
+    }
+
+    /**
+     * The day-by-day log — every day Welle has a record of, with the three
+     * pillars as they were ticked on it.
+     *
+     * The calendar above colours a day by how many pillars it carried; this
+     * says which, which is the one question the grid cannot answer. Same rows,
+     * read one column further out.
+     */
+    public function dailyLog(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeCards($workspace);
+
+        $month = $this->month($request);
+
+        $days = $this->days($request, $workspace, $month)
+            ->orderBy('date')
+            ->get(['date', 'movement', 'meditation', 'learning', 'is_esc'])
+            ->map(fn (WelleDailyRecord $day) => [
+                'date' => $day->date->toDateString(),
+                'movement' => (bool) $day->movement,
+                'meditation' => (bool) $day->meditation,
+                'learning' => (bool) $day->learning,
+                'is_esc' => (bool) $day->is_esc,
+            ]);
+
+        return response()->json([
+            'total_days' => $days->count(),
+            'days' => $days,
+            ...$this->context($request, $month),
+        ]);
+    }
+
     /** The page's two gates, re-applied to the data behind it. */
     private function authorizeCards(Workspace $workspace): void
     {
