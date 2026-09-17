@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
+use App\Exports\CsrAnalyticsExport;
 use App\Http\Controllers\Controller;
 use App\Models\PancakeUserDailyCallReport;
 use App\Models\PancakeUserErpDailyReport;
@@ -15,6 +16,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -166,13 +168,15 @@ class CSRController extends Controller
         return CsrComparisonMetrics::resolveKey($request->input('comparison'));
     }
 
-    public function analytics(Request $request, Workspace $workspace)
+    /**
+     * The CSR breakdown for the period, before paging.
+     *
+     * Shared by the page and the export, so the spreadsheet is the table being
+     * read rather than a second opinion on it: same range, same report type,
+     * same team scope, same search, same order — only the paging differs.
+     */
+    private function breakdownQuery(Request $request, Workspace $workspace, string $from, string $to, bool $isErp): QueryBuilder
     {
-        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
-
-        [$from, $to, $type] = $this->analyticsPeriod($request);
-
-        $isErp = $type === 'erp';
         $drClass = $isErp ? PancakeUserErpDailyReport::class : PancakeUserPosDailyReport::class;
 
         // Per-CSR sales/delivery rollup for the selected period (POS or ERP).
@@ -252,7 +256,7 @@ class CSRController extends Controller
             }
         }
 
-        $records = QueryBuilder::for($base)
+        return QueryBuilder::for($base)
             ->leftJoinSub($drSummary, 'dr', 'dr.pancake_user_id', '=', 'pancake_users.id')
             ->leftJoinSub($rmoSummary, 'rmo', 'rmo.pancake_user_id', '=', 'pancake_users.id')
             ->select('pancake_users.*')
@@ -347,7 +351,18 @@ class CSRController extends Controller
                     $query->where('pancake_users.name', 'like', "%{$value}%");
                 }),
             ])
-            ->defaultSort('-total_sales')
+            ->defaultSort('-total_sales');
+    }
+
+    public function analytics(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to, $type] = $this->analyticsPeriod($request);
+
+        $isErp = $type === 'erp';
+
+        $records = $this->breakdownQuery($request, $workspace, $from, $to, $isErp)
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
@@ -373,6 +388,36 @@ class CSRController extends Controller
                 'comparison' => $this->comparisonTab($request),
             ],
         ]);
+    }
+
+    /**
+     * The CSR breakdown as an .xlsx, for the filters the page is showing.
+     *
+     * The same query the table is built from, so the range, the report type,
+     * the team scope, the search and the sort all carry over — and every
+     * matching CSR is written, not just the page being looked at. `columns` is
+     * the reader's own choice from the table's column menu; leaving it off
+     * writes the whole report.
+     */
+    public function analyticsExport(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to, $type] = $this->analyticsPeriod($request);
+
+        $query = $this->breakdownQuery($request, $workspace, $from, $to, $type === 'erp');
+
+        // Sent as a comma-separated list by the page; an array is accepted too,
+        // the way the RMO export takes it.
+        $columns = $request->input('columns', []);
+
+        if (is_string($columns)) {
+            $columns = array_filter(explode(',', $columns));
+        }
+
+        $filename = 'csr-analytics-'.$from.'-to-'.$to.'-'.now()->format('His').'.xlsx';
+
+        return Excel::download(new CsrAnalyticsExport($query, (array) $columns), $filename);
     }
 
     public function update(Request $request, Workspace $workspace, PancakeUser $employee)
