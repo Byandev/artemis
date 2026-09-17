@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\IntegrationService;
 use App\Models\User;
+use App\Models\UserIntegration;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -38,9 +40,18 @@ function fakeWelleLogin(): void
 }
 
 /** Connect the owner without going through the form. */
-function connectWelle(User $user, string $token = 'welle-token-abc'): void
+function connectWelle(User $user, string $token = 'welle-token-abc'): UserIntegration
 {
-    $user->forceFill(['welle_email' => 'integration@example.com', 'welle_token' => $token])->save();
+    return $user->integrations()->updateOrCreate(
+        ['service' => IntegrationService::Welle],
+        ['token' => $token],
+    );
+}
+
+/** The owner's Welle connection, freshly read. */
+function welleIntegration(User $user): ?UserIntegration
+{
+    return $user->fresh()->integrationFor(IntegrationService::Welle);
 }
 
 it('shows the integrations page to a workspace member', function () {
@@ -69,21 +80,26 @@ it('exchanges the credentials for a token and stores only the token', function (
         ->assertSessionHasNoErrors()
         ->assertRedirect($this->editUrl);
 
-    $user = $this->owner->fresh();
+    $integration = welleIntegration($this->owner);
 
-    expect($user->welle_email)->toBe('integration@example.com')
-        ->and($user->welle_token)->toBe('welle-token-abc')
-        ->and($user->hasWelleToken())->toBeTrue();
+    expect($integration)->not->toBeNull()
+        ->and($integration->service)->toBe(IntegrationService::Welle)
+        ->and($integration->token)->toBe('welle-token-abc')
+        ->and($integration->hasToken())->toBeTrue();
 
-    // The password was sent to Welle and dropped — the users table has no
-    // column for it at all, and nothing about the request left one behind.
-    expect(Schema::hasColumn('users', 'welle_password'))->toBeFalse();
+    // Nothing that could be used to sign in as them is kept: no password
+    // column on users at all, and no address on the integration row either.
+    expect(Schema::hasColumn('users', 'welle_password'))->toBeFalse()
+        ->and(Schema::hasColumn('user_integrations', 'username'))->toBeFalse()
+        ->and(Schema::hasColumn('user_integrations', 'password'))->toBeFalse()
+        ->and(Schema::hasColumn('user_integrations', 'email'))->toBeFalse();
 
-    $stored = (array) DB::table('users')->where('id', $user->id)->first();
-    expect(collect($stored)->filter(fn ($value) => $value === 'welle-secret'))->toBeEmpty();
+    $stored = (array) DB::table('user_integrations')->where('id', $integration->id)->first();
 
-    // The token column holds ciphertext, not the token itself.
-    expect($stored['welle_token'])->not->toBe('welle-token-abc');
+    // Neither the password nor the plaintext token is anywhere in the row.
+    expect(collect($stored)->filter(fn ($value) => in_array($value, ['welle-secret', 'integration@example.com'], true)))
+        ->toBeEmpty()
+        ->and($stored['token'])->not->toBe('welle-token-abc');
 });
 
 it('sends the password to welle exactly once, on connect', function () {
@@ -109,7 +125,7 @@ it('rejects credentials welle will not accept, saving nothing', function () {
         ->put($this->updateUrl, $this->payload)
         ->assertSessionHasErrors('welle_password');
 
-    expect($this->owner->fresh()->hasWelleToken())->toBeFalse();
+    expect(welleIntegration($this->owner))->toBeNull();
 });
 
 it('blames welle, not the password, when welle cannot be reached', function () {
@@ -119,7 +135,7 @@ it('blames welle, not the password, when welle cannot be reached', function () {
         ->put($this->updateUrl, $this->payload)
         ->assertSessionHasErrors('welle_email');
 
-    expect($this->owner->fresh()->hasWelleToken())->toBeFalse();
+    expect(welleIntegration($this->owner))->toBeNull();
 });
 
 it('keeps each member\'s welle account separate', function () {
@@ -134,14 +150,17 @@ it('keeps each member\'s welle account separate', function () {
         'welle_password' => 'member-secret',
     ]);
 
-    expect($this->owner->fresh()->welle_email)->toBe('integration@example.com')
-        ->and($member->fresh()->welle_email)->toBe('member@example.com');
+    // Two connections, one each, neither able to read the other's token.
+    expect(welleIntegration($this->owner)->token)->toBe('welle-token-abc')
+        ->and(welleIntegration($member)->token)->toBe('welle-token-abc')
+        ->and(welleIntegration($this->owner)->id)->not->toBe(welleIntegration($member)->id);
 });
 
 it('never serializes the welle token to the client', function () {
-    connectWelle($this->owner);
+    $integration = connectWelle($this->owner);
 
-    expect($this->owner->fresh()->toArray())->not->toHaveKey('welle_token');
+    expect($integration->fresh()->toArray())->not->toHaveKey('token')
+        ->and($this->owner->fresh()->toArray())->not->toHaveKey('welle_token');
 });
 
 it('reports the connection state to the page without leaking the token', function () {
@@ -151,9 +170,10 @@ it('reports the connection state to the page without leaking the token', functio
         ->get($this->editUrl)
         ->assertInertia(fn ($page) => $page
             ->component('settings/integrations')
-            ->where('welle.email', 'integration@example.com')
             ->where('welle.connected', true)
             ->missing('welle.token')
+            // Not even the address reaches the page — it is not stored.
+            ->missing('welle.email')
         );
 });
 
@@ -172,10 +192,9 @@ it('rejects an email that is not an email', function () {
 });
 
 it('shows the page how the last unattended fetch went', function () {
-    connectWelle($this->owner);
-    $this->owner->forceFill([
-        'welle_last_synced_at' => now()->subHours(3),
-        'welle_last_error' => 'Welle rejected your token — reconnect your account.',
+    connectWelle($this->owner)->forceFill([
+        'last_synced_at' => now()->subHours(3),
+        'last_error' => 'Welle rejected your token — reconnect your account.',
     ])->save();
 
     $this->actingAs($this->owner)
@@ -189,47 +208,44 @@ it('shows the page how the last unattended fetch went', function () {
 it('replaces the token and clears a stale failure when reconnecting', function () {
     fakeWelleLogin();
 
-    connectWelle($this->owner, 'stale-token');
-    $this->owner->forceFill(['welle_last_error' => 'Welle rejected your token.'])->save();
+    connectWelle($this->owner, 'stale-token')
+        ->forceFill(['last_error' => 'Welle rejected your token.'])->save();
 
     $this->actingAs($this->owner)
         ->put($this->updateUrl, $this->payload)
         ->assertSessionHasNoErrors();
 
-    $user = $this->owner->fresh();
+    $integration = welleIntegration($this->owner);
 
-    expect($user->welle_token)->toBe('welle-token-abc')
-        ->and($user->welle_last_error)->toBeNull();
+    // Replaced in place, not stacked up beside the old one.
+    expect(UserIntegration::count())->toBe(1)
+        ->and($integration->token)->toBe('welle-token-abc')
+        ->and($integration->last_error)->toBeNull();
 });
 
 it('leaves a stale failure in place when the exchange fails', function () {
-    connectWelle($this->owner, 'stale-token');
-    $this->owner->forceFill(['welle_last_error' => 'Welle rejected your token.'])->save();
+    connectWelle($this->owner, 'stale-token')
+        ->forceFill(['last_error' => 'Welle rejected your token.'])->save();
 
     Http::fake(['welle.test/api/v1/login' => Http::response(['message' => 'nope'], 422)]);
 
     $this->actingAs($this->owner)->put($this->updateUrl, $this->payload);
 
     // Nothing has been fixed, so the page must keep saying so.
-    expect($this->owner->fresh()->welle_last_error)->not->toBeNull();
+    expect(welleIntegration($this->owner)->last_error)->not->toBeNull();
 });
 
 it('disconnects the welle account', function () {
-    connectWelle($this->owner);
-    $this->owner->forceFill([
-        'welle_last_synced_at' => now(),
-        'welle_last_error' => 'Welle rejected your token.',
+    connectWelle($this->owner)->forceFill([
+        'last_synced_at' => now(),
+        'last_error' => 'Welle rejected your token.',
     ])->save();
 
     $this->actingAs($this->owner)
         ->delete($this->destroyUrl)
         ->assertRedirect($this->editUrl);
 
-    $user = $this->owner->fresh();
-
-    expect($user->welle_email)->toBeNull()
-        ->and($user->welle_token)->toBeNull()
-        ->and($user->hasWelleToken())->toBeFalse()
-        ->and($user->welle_last_synced_at)->toBeNull()
-        ->and($user->welle_last_error)->toBeNull();
+    // The row goes, taking the token and its sync state with it.
+    expect(welleIntegration($this->owner))->toBeNull()
+        ->and(UserIntegration::count())->toBe(0);
 });

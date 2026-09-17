@@ -20,7 +20,6 @@ export default function Integrations({
     workspace: Workspace;
     /** The signed-in user's Welle account — credentials are per user. */
     welle: {
-        email: string | null;
         connected: boolean;
         /** When the nightly fetch last succeeded, ISO-8601. */
         last_synced_at: string | null;
@@ -122,9 +121,8 @@ export default function Integrations({
                                         type="email"
                                         name="welle_email"
                                         className="mt-1 block w-full"
-                                        defaultValue={welle.email ?? ''}
                                         autoComplete="off"
-                                        placeholder="integration@example.com"
+                                        placeholder="you@example.com"
                                     />
                                     <InputError
                                         className="mt-1"

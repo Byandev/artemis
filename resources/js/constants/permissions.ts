@@ -165,6 +165,9 @@ export const PERMISSIONS = {
     ViewVideoEditorDashboard: 'View Video Editor Dashboard',
     ViewCsrDashboard: 'View CSR Dashboard',
 
+    // Welle
+    ViewMyEsc: 'View My ESC',
+
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',

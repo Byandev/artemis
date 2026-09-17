@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\IntegrationService;
 use App\Exceptions\WelleException;
 use App\Jobs\FetchWelleProgress;
 use App\Models\User;
+use App\Models\UserIntegration;
 use App\Models\WelleDailyRecord;
 use App\Services\Welle\WelleClient;
 use Illuminate\Support\Facades\Http;
@@ -23,12 +25,15 @@ function makeWelleWorkspaceWithConnectedOwner(): array
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $workspace->update(['welle_module_enabled' => true]);
-    $user->forceFill([
-        'welle_email' => 'owner@welle.test',
-        'welle_token' => 'welle-token-abc',
-    ])->save();
+    connectWelleAccount($user);
 
     return ['user' => $user->refresh(), 'workspace' => $workspace];
+}
+
+/** A user's Welle connection, freshly read. */
+function welleConnection(User $user): ?UserIntegration
+{
+    return $user->fresh()->integrationFor(IntegrationService::Welle);
 }
 
 /** One entry of a progress window, shaped as Welle's ProgressController sends it. */
@@ -117,7 +122,7 @@ test('the --user option narrows the run to one account', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWelleWorkspaceWithConnectedOwner();
 
     $other = makeWorkspaceMember($workspace);
-    $other->forceFill(['welle_email' => 'other@welle.test', 'welle_token' => 'other-token'])->save();
+    connectWelleAccount($other, 'other-token');
 
     $this->artisan('welle:fetch-daily-records', ['--user' => $user->email])->assertSuccessful();
 
@@ -287,10 +292,13 @@ test('the window carries the streak figures onto the user', function () {
 
     (new FetchWelleProgress($user->id))->handle(app(WelleClient::class));
 
+    // The streaks are the person's own figures; how the fetch went belongs to
+    // the connection that made it.
     expect($user->refresh()->welle_streak_days)->toBe(4)
-        ->and($user->welle_longest_streak)->toBe(12)
-        ->and($user->welle_last_synced_at)->not->toBeNull()
-        ->and($user->welle_last_error)->toBeNull();
+        ->and($user->welle_longest_streak)->toBe(12);
+
+    expect(welleConnection($user)->last_synced_at)->not->toBeNull()
+        ->and(welleConnection($user)->last_error)->toBeNull();
 });
 
 test('re-reading the same window corrects the days instead of duplicating them', function () {
@@ -317,16 +325,16 @@ test('a rejected token flags the account for reconnection and writes nothing', f
     (new FetchWelleProgress($user->id))->handle(app(WelleClient::class));
 
     expect(WelleDailyRecord::count())->toBe(0)
-        ->and($user->refresh()->welle_last_error)->toContain('reconnect')
-        ->and($user->welle_last_synced_at)->toBeNull()
-        ->and($user->welleNeedsReconnect())->toBeTrue();
+        ->and(welleConnection($user)->last_error)->toContain('reconnect')
+        ->and(welleConnection($user)->last_synced_at)->toBeNull()
+        ->and(welleConnection($user)->needsReconnect())->toBeTrue();
 });
 
 test('a user who disconnected between dispatch and run is left alone', function () {
     fakeWelle();
 
     ['user' => $user] = makeWelleWorkspaceWithConnectedOwner();
-    $user->forceFill(['welle_email' => null, 'welle_token' => null])->save();
+    $user->integrations()->forService(IntegrationService::Welle)->delete();
 
     (new FetchWelleProgress($user->id))->handle(app(WelleClient::class));
 
@@ -342,7 +350,7 @@ test('a window without a days list bubbles up so the queue retries it', function
     expect(fn () => (new FetchWelleProgress($user->id))->handle(app(WelleClient::class)))
         ->toThrow(WelleException::class);
 
-    expect(User::find($user->id)->welle_last_synced_at)->toBeNull();
+    expect(welleConnection($user)->last_synced_at)->toBeNull();
 });
 
 test('an unusable answer from welle bubbles up so the queue retries it', function () {
@@ -367,14 +375,14 @@ test('--sync fetches inline so the rows are there when the command returns', fun
     ])->assertSuccessful();
 
     expect(WelleDailyRecord::count())->toBe(2)
-        ->and($user->refresh()->welle_last_synced_at)->not->toBeNull();
+        ->and(welleConnection($user)->last_synced_at)->not->toBeNull();
 });
 
 test('--sync reports the users that failed and finishes the rest', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWelleWorkspaceWithConnectedOwner();
 
     $other = makeWorkspaceMember($workspace);
-    $other->forceFill(['welle_email' => 'other@welle.test', 'welle_token' => 'other-token'])->save();
+    connectWelleAccount($other, 'other-token');
 
     Http::fake([
         'welle.test/api/v1/progress/week' => Http::sequence()
