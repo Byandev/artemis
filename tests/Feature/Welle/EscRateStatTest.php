@@ -4,16 +4,20 @@ use App\Enums\Permission;
 use App\Models\User;
 use App\Models\WelleDailyRecord;
 use App\Models\Workspace;
-use Illuminate\Support\Carbon;
 
 /*
 |--------------------------------------------------------------------------
 | My ESC stat cards
 |--------------------------------------------------------------------------
 |
-| Every card is counted over the days Welle has a record of — the fetch writes
-| a row for every elapsed day and drops the ones still to come — so "7 of 16"
-| is seven days out of sixteen lived, not seven out of a whole month.
+| Every card is counted over the days of the month that have elapsed — the 1st
+| through today, or the whole of a month already past — so "7 of 16" is seven
+| days out of sixteen lived, not seven out of a whole month. The clock is
+| pinned, or the denominator would move with the calendar.
+|
+| A day nothing was done on has no row at all, and still belongs in that
+| denominator: it is a day that happened and went unused, and dropping it would
+| turn a month of two good days into 100%.
 |
 | The access rules are the page's, re-applied: an endpoint under /api can be
 | reached without going through the page that shows it.
@@ -26,6 +30,9 @@ function pillarStatUrl(Workspace $workspace, string $pillar): string
 }
 
 beforeEach(function () {
+    // The 16th: sixteen days lived this month, a full thirty-one last month.
+    $this->today = freezeWelleToday();
+
     ['user' => $this->owner, 'workspace' => $this->workspace] = makeWorkspaceWithOwner();
 
     $this->workspace->update(['welle_module_enabled' => true]);
@@ -34,10 +41,10 @@ beforeEach(function () {
     $this->movementUrl = pillarStatUrl($this->workspace, 'movement');
 });
 
-it('counts esc days over the days the month has a record of', function () {
-    // Sixteen recorded days, seven of them ESC — 43.75%, which the card rounds.
-    foreach (range(1, 16) as $day) {
-        welleDay($this->workspace->id, $this->owner->id, $day, $day <= 7);
+it('counts esc days over the days of the month that have elapsed', function () {
+    // Seven ESC days out of sixteen lived — 43.75%, which the card rounds.
+    foreach (range(1, 7) as $day) {
+        welleDay($this->workspace->id, $this->owner->id, $day, true);
     }
 
     $this->actingAs($this->owner)
@@ -47,9 +54,43 @@ it('counts esc days over the days the month has a record of', function () {
             'value' => 43.75,
             'esc_days' => 7,
             'total_days' => 16,
-            'month' => Carbon::today()->format('Y-m'),
+            'month' => $this->today->format('Y-m'),
             'connected' => false,
         ]);
+});
+
+it('counts the days nothing was done on, which have no row of their own', function () {
+    // Two ESC days and fourteen days that went by unused. Counted over the rows
+    // alone this is a perfect month; counted over the days lived it is 12.5%.
+    welleDay($this->workspace->id, $this->owner->id, 1, true);
+    welleDay($this->workspace->id, $this->owner->id, 2, true);
+
+    $this->actingAs($this->owner)
+        ->getJson($this->url)
+        ->assertOk()
+        ->assertJson(['value' => 12.5, 'esc_days' => 2, 'total_days' => 16]);
+});
+
+it('counts a whole month of days for a month already over', function () {
+    // August has thirty-one days and all of them are behind us, so the month is
+    // counted out of the month rather than out of today's date.
+    $lastMonth = $this->today->startOfMonth()->subMonth();
+
+    welleDay($this->workspace->id, $this->owner->id, 1, true);
+
+    $this->actingAs($this->owner)
+        ->getJson($this->url.'?month='.$lastMonth->format('Y-m'))
+        ->assertOk()
+        ->assertJson(['esc_days' => 0, 'total_days' => 31]);
+});
+
+it('has no rate for a month that has not started', function () {
+    $nextMonth = $this->today->startOfMonth()->addMonth();
+
+    $this->actingAs($this->owner)
+        ->getJson($this->url.'?month='.$nextMonth->format('Y-m'))
+        ->assertOk()
+        ->assertJson(['value' => null, 'esc_days' => 0, 'total_days' => 0]);
 });
 
 it('reads only the signed-in user rows, in this workspace, in this month', function () {
@@ -57,7 +98,7 @@ it('reads only the signed-in user rows, in this workspace, in this month', funct
     ['workspace' => $otherWorkspace] = makeWorkspaceWithOwner();
 
     welleDay($this->workspace->id, $this->owner->id, 1, true);
-    welleDay($this->workspace->id, $this->owner->id, 2, false);
+    welleDay($this->workspace->id, $this->owner->id, 2, false, ['movement' => true]);
 
     // Someone else's day, the same day in another workspace, and a day of the
     // month before — none of them belong in this card's figures.
@@ -67,32 +108,40 @@ it('reads only the signed-in user rows, in this workspace, in this month', funct
     WelleDailyRecord::create([
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->owner->id,
-        'date' => Carbon::today()->startOfMonth()->subDay()->toDateString(),
+        'date' => $this->today->startOfMonth()->subDay()->toDateString(),
+        'movement' => true,
+        'meditation' => true,
+        'learning' => true,
         'pillars_completed' => 3,
         'is_esc' => true,
     ]);
 
+    // One ESC day of the owner's own, over the sixteen days lived.
     $this->actingAs($this->owner)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJson(['value' => 50, 'esc_days' => 1, 'total_days' => 2]);
+        ->assertJson(['value' => 6.25, 'esc_days' => 1, 'total_days' => 16]);
 });
 
 it('reads the month asked for', function () {
-    $lastMonth = Carbon::today()->startOfMonth()->subMonth();
+    $lastMonth = $this->today->startOfMonth()->subMonth();
 
     WelleDailyRecord::create([
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->owner->id,
         'date' => $lastMonth->toDateString(),
+        'movement' => true,
+        'meditation' => true,
+        'learning' => true,
         'pillars_completed' => 3,
         'is_esc' => true,
     ]);
 
+    // One ESC day out of August's thirty-one.
     $this->actingAs($this->owner)
         ->getJson($this->url.'?month='.$lastMonth->format('Y-m'))
         ->assertOk()
-        ->assertJson(['value' => 100, 'esc_days' => 1, 'total_days' => 1]);
+        ->assertJson(['value' => 3.23, 'esc_days' => 1, 'total_days' => 31]);
 });
 
 it('falls back to this month rather than erroring on an unreadable month', function () {
@@ -101,23 +150,34 @@ it('falls back to this month rather than erroring on an unreadable month', funct
     $this->actingAs($this->owner)
         ->getJson($this->url.'?month=not-a-month')
         ->assertOk()
-        ->assertJson(['month' => Carbon::today()->format('Y-m'), 'total_days' => 1]);
+        ->assertJson(['month' => $this->today->format('Y-m'), 'total_days' => 16]);
 });
 
-it('has no rate rather than a rate of none while nothing is synced', function () {
+it('reads a month of nothing as none of its days rather than as no answer', function () {
+    connectWelleAccount($this->owner)->forceFill(['last_synced_at' => now()])->save();
+
+    // Connected, fetched, and nothing done: 0% is the answer, not an absence.
     $this->actingAs($this->owner)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJson(['value' => null, 'esc_days' => 0, 'total_days' => 0]);
+        ->assertJson(['value' => 0, 'esc_days' => 0, 'total_days' => 16, 'synced' => true]);
 });
 
-it('says whether a welle account is connected at all', function () {
-    connectWelleAccount($this->owner);
+it('says whether a welle account is connected, and whether it has been fetched', function () {
+    $integration = connectWelleAccount($this->owner);
+
+    // The two together are what tell an unfetched card apart from a real zero.
+    $this->actingAs($this->owner)
+        ->getJson($this->url)
+        ->assertOk()
+        ->assertJson(['connected' => true, 'synced' => false]);
+
+    $integration->forceFill(['last_synced_at' => now()])->save();
 
     $this->actingAs($this->owner)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJson(['connected' => true]);
+        ->assertJson(['connected' => true, 'synced' => true]);
 });
 
 it('answers a member holding the grant', function () {
@@ -128,7 +188,7 @@ it('answers a member holding the grant', function () {
     $this->actingAs($member)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJson(['value' => 100, 'esc_days' => 1, 'total_days' => 1]);
+        ->assertJson(['value' => 6.25, 'esc_days' => 1, 'total_days' => 16]);
 });
 
 it('is gone while the welle module is switched off', function () {
@@ -156,15 +216,16 @@ it('turns a guest away', function () {
 | Days with Movement
 |--------------------------------------------------------------------------
 |
-| The same month, counted on one pillar instead of all three — so a day that
-| was not an ESC day still counts here if movement was ticked on it.
+| The same month of elapsed days, counted on one pillar instead of all three —
+| so a day that was not an ESC day still counts here if movement was ticked on
+| it.
 */
 
 it('counts the days movement was ticked, and their share of the month', function () {
-    // Sixteen recorded days: seven full ESC days plus six more where only
-    // movement was ticked — thirteen days with movement, 81.25% of the month.
-    foreach (range(1, 16) as $day) {
-        welleDay($this->workspace->id, $this->owner->id, $day, $day <= 7, ['movement' => $day <= 13]);
+    // Seven full ESC days plus six more where only movement was ticked —
+    // thirteen days with movement out of the sixteen lived, 81.25%.
+    foreach (range(1, 13) as $day) {
+        welleDay($this->workspace->id, $this->owner->id, $day, $day <= 7, ['movement' => true]);
     }
 
     $this->actingAs($this->owner)
@@ -174,18 +235,20 @@ it('counts the days movement was ticked, and their share of the month', function
             'value' => 13,
             'total_days' => 16,
             'rate' => 81.25,
-            'month' => Carbon::today()->format('Y-m'),
+            'month' => $this->today->format('Y-m'),
         ]);
 });
 
 it('counts a movement day that was not an esc day', function () {
+    // One day with movement alone, one with the other two — so the card cannot
+    // be counting days that had something done on them.
     welleDay($this->workspace->id, $this->owner->id, 1, false, ['movement' => true]);
-    welleDay($this->workspace->id, $this->owner->id, 2, false, ['movement' => false]);
+    welleDay($this->workspace->id, $this->owner->id, 2, false, ['meditation' => true, 'learning' => true]);
 
     $this->actingAs($this->owner)
         ->getJson($this->movementUrl)
         ->assertOk()
-        ->assertJson(['value' => 1, 'total_days' => 2, 'rate' => 50]);
+        ->assertJson(['value' => 1, 'total_days' => 16, 'rate' => 6.25]);
 });
 
 it('reads only the signed-in user rows, in this workspace, in this month, for a pillar', function () {
@@ -199,7 +262,7 @@ it('reads only the signed-in user rows, in this workspace, in this month, for a 
     WelleDailyRecord::create([
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->owner->id,
-        'date' => Carbon::today()->startOfMonth()->subDay()->toDateString(),
+        'date' => $this->today->startOfMonth()->subDay()->toDateString(),
         'movement' => true,
         'pillars_completed' => 1,
     ]);
@@ -207,11 +270,11 @@ it('reads only the signed-in user rows, in this workspace, in this month, for a 
     $this->actingAs($this->owner)
         ->getJson($this->movementUrl)
         ->assertOk()
-        ->assertJson(['value' => 1, 'total_days' => 1, 'rate' => 100]);
+        ->assertJson(['value' => 1, 'total_days' => 16, 'rate' => 6.25]);
 });
 
 it('reads the month asked for, for a pillar', function () {
-    $lastMonth = Carbon::today()->startOfMonth()->subMonth();
+    $lastMonth = $this->today->startOfMonth()->subMonth();
 
     WelleDailyRecord::create([
         'workspace_id' => $this->workspace->id,
@@ -224,14 +287,23 @@ it('reads the month asked for, for a pillar', function () {
     $this->actingAs($this->owner)
         ->getJson($this->movementUrl.'?month='.$lastMonth->format('Y-m'))
         ->assertOk()
-        ->assertJson(['value' => 1, 'total_days' => 1, 'month' => $lastMonth->format('Y-m')]);
+        ->assertJson(['value' => 1, 'total_days' => 31, 'month' => $lastMonth->format('Y-m')]);
 });
 
-it('has no count rather than a count of none while nothing is synced', function () {
+it('has no count for a pillar in a month that has not started', function () {
+    $nextMonth = $this->today->startOfMonth()->addMonth();
+
+    $this->actingAs($this->owner)
+        ->getJson($this->movementUrl.'?month='.$nextMonth->format('Y-m'))
+        ->assertOk()
+        ->assertJson(['value' => null, 'total_days' => 0, 'rate' => null]);
+});
+
+it('reads a pillar nobody ticked as none of the month rather than as no answer', function () {
     $this->actingAs($this->owner)
         ->getJson($this->movementUrl)
         ->assertOk()
-        ->assertJson(['value' => null, 'total_days' => 0, 'rate' => null]);
+        ->assertJson(['value' => 0, 'total_days' => 16, 'rate' => 0]);
 });
 
 it('answers a member holding the grant, for a pillar', function () {
@@ -242,26 +314,27 @@ it('answers a member holding the grant, for a pillar', function () {
     $this->actingAs($member)
         ->getJson($this->movementUrl)
         ->assertOk()
-        ->assertJson(['value' => 1, 'total_days' => 1]);
+        ->assertJson(['value' => 1, 'total_days' => 16]);
 });
 
 it('counts meditation and learning on their own terms', function () {
-    // Four recorded days, one ESC. The other three each tick a single pillar,
-    // so no two of the three cards can be reading the same column.
+    // Four days with something on them, one of them ESC. The other three each
+    // tick a single pillar, so no two cards can be reading the same column.
     welleDay($this->workspace->id, $this->owner->id, 1, true);
     welleDay($this->workspace->id, $this->owner->id, 2, false, ['movement' => true, 'meditation' => false, 'learning' => false]);
     welleDay($this->workspace->id, $this->owner->id, 3, false, ['movement' => false, 'meditation' => true, 'learning' => false]);
     welleDay($this->workspace->id, $this->owner->id, 4, false, ['movement' => false, 'meditation' => false, 'learning' => true]);
 
-    // Each pillar: its own day plus the ESC day that ticked all three.
+    // Each pillar: its own day plus the ESC day that ticked all three, over the
+    // sixteen days lived.
     foreach (WelleDailyRecord::PILLARS as $pillar) {
         $this->actingAs($this->owner)
             ->getJson(pillarStatUrl($this->workspace, $pillar))
             ->assertOk()
             ->assertJson([
                 'value' => 2,
-                'total_days' => 4,
-                'rate' => 50,
+                'total_days' => 16,
+                'rate' => 12.5,
                 'pillar' => $pillar,
             ]);
     }

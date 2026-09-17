@@ -14,13 +14,18 @@ use Illuminate\Support\Carbon;
 | three pillars was ticked, not just how many. That is the one question a grid
 | coloured by a count cannot answer.
 |
-| Days still to come have no row, so the table ends at the last day lived.
+| A day has a row only if something was done on it, so the table lists the days
+| that counted for something and `total_days` says how many days the month has
+| had. Days still to come have no row either.
 |
 | The access rules are the page's, re-applied: an endpoint under /api can be
 | reached without going through the page that shows it.
 */
 
 beforeEach(function () {
+    // The 16th: sixteen days lived this month, a full thirty-one last month.
+    freezeWelleToday();
+
     ['user' => $this->owner, 'workspace' => $this->workspace] = makeWorkspaceWithOwner();
 
     $this->workspace->update(['welle_module_enabled' => true]);
@@ -35,13 +40,14 @@ beforeEach(function () {
 it('says which pillars a day carried, not just how many', function () {
     welleDay($this->workspace->id, $this->owner->id, 1, true);
     welleDay($this->workspace->id, $this->owner->id, 2, false, ['movement' => true, 'learning' => true]);
-    welleDay($this->workspace->id, $this->owner->id, 3, false);
+    welleDay($this->workspace->id, $this->owner->id, 3, false, ['meditation' => true]);
 
     $this->actingAs($this->owner)
         ->getJson($this->url)
         ->assertOk()
+        ->assertJsonCount(3, 'days')
         ->assertJson([
-            'total_days' => 3,
+            'total_days' => 16,
             'month' => $this->firstOfMonth->format('Y-m'),
             'month_label' => $this->firstOfMonth->format('F Y'),
             'connected' => false,
@@ -63,7 +69,7 @@ it('says which pillars a day carried, not just how many', function () {
                 [
                     'date' => $this->firstOfMonth->copy()->addDays(2)->toDateString(),
                     'movement' => false,
-                    'meditation' => false,
+                    'meditation' => true,
                     'learning' => false,
                     'is_esc' => false,
                 ],
@@ -119,6 +125,9 @@ it('reads only the signed-in user rows, in this workspace, in this month', funct
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->owner->id,
         'date' => $this->firstOfMonth->copy()->subDay()->toDateString(),
+        'movement' => true,
+        'meditation' => true,
+        'learning' => true,
         'pillars_completed' => 3,
         'is_esc' => true,
     ]);
@@ -128,7 +137,7 @@ it('reads only the signed-in user rows, in this workspace, in this month', funct
         ->assertOk()
         ->assertJsonCount(1, 'days')
         ->assertJson([
-            'total_days' => 1,
+            'total_days' => 16,
             'days' => [['date' => $this->firstOfMonth->toDateString()]],
         ]);
 });
@@ -144,12 +153,13 @@ it('reads the month asked for', function () {
         'pillars_completed' => 1,
     ]);
 
+    // August, and all thirty-one of its days.
     $this->actingAs($this->owner)
         ->getJson($this->url.'?month='.$lastMonth->format('Y-m'))
         ->assertOk()
         ->assertJson([
             'month' => $lastMonth->format('Y-m'),
-            'total_days' => 1,
+            'total_days' => 31,
             'days' => [[
                 'date' => $lastMonth->toDateString(),
                 'meditation' => true,
@@ -160,8 +170,19 @@ it('reads the month asked for', function () {
 });
 
 it('has an empty month rather than an error while nothing is synced', function () {
+    // No rows, but the month still happened — the table's advice comes from
+    // `connected` and `synced`, not from an empty day count.
     $this->actingAs($this->owner)
         ->getJson($this->url)
+        ->assertOk()
+        ->assertJson(['total_days' => 16, 'days' => [], 'connected' => false, 'synced' => false]);
+});
+
+it('has no days at all for a month that has not started', function () {
+    $nextMonth = $this->firstOfMonth->copy()->addMonth();
+
+    $this->actingAs($this->owner)
+        ->getJson($this->url.'?month='.$nextMonth->format('Y-m'))
         ->assertOk()
         ->assertJson(['total_days' => 0, 'days' => []]);
 });
@@ -183,7 +204,8 @@ it('answers a member holding the grant', function () {
     $this->actingAs($member)
         ->getJson($this->url)
         ->assertOk()
-        ->assertJson(['total_days' => 1]);
+        ->assertJsonCount(1, 'days')
+        ->assertJson(['total_days' => 16]);
 });
 
 it('is gone while the welle module is switched off', function () {

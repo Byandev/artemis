@@ -10,15 +10,21 @@ use Illuminate\Support\Carbon;
 | Pillar Breakdown
 |--------------------------------------------------------------------------
 |
-| The three pillars side by side, each bar the same month of recorded days —
-| so the three counts come back together rather than a bar at a time, which is
-| what keeps two bars from being drawn over different months.
+| The three pillars side by side, each bar drawn over the same month of elapsed
+| days — so the three counts come back together rather than a bar at a time,
+| which is what keeps two bars from being drawn over different months.
+|
+| A day nothing was done on has no row and still counts in the denominator: it
+| is a day that happened, and a bar that ignored it would read as a full month.
 |
 | The access rules are the page's, re-applied: an endpoint under /api can be
 | reached without going through the page that shows it.
 */
 
 beforeEach(function () {
+    // The 16th: sixteen days lived this month, a full thirty-one last month.
+    $this->today = freezeWelleToday();
+
     ['user' => $this->owner, 'workspace' => $this->workspace] = makeWorkspaceWithOwner();
 
     $this->workspace->update(['welle_module_enabled' => true]);
@@ -29,10 +35,11 @@ beforeEach(function () {
 });
 
 it('counts every pillar over the same month of days', function () {
-    // Sixteen recorded days: seven full ESC days, six more with movement only,
-    // and three with nothing — thirteen movement days to seven of each other.
-    foreach (range(1, 16) as $day) {
-        welleDay($this->workspace->id, $this->owner->id, $day, $day <= 7, ['movement' => $day <= 13]);
+    // Seven full ESC days, six more with movement only, and three days that
+    // went by unused — thirteen movement days to seven of each other, all of
+    // them over the sixteen days lived.
+    foreach (range(1, 13) as $day) {
+        welleDay($this->workspace->id, $this->owner->id, $day, $day <= 7, ['movement' => true]);
     }
 
     $this->actingAs($this->owner)
@@ -40,8 +47,8 @@ it('counts every pillar over the same month of days', function () {
         ->assertOk()
         ->assertJson([
             'total_days' => 16,
-            'month' => Carbon::today()->format('Y-m'),
-            'month_label' => Carbon::today()->format('F Y'),
+            'month' => $this->today->format('Y-m'),
+            'month_label' => $this->today->format('F Y'),
             'connected' => false,
             'pillars' => [
                 ['pillar' => 'movement', 'days' => 13, 'rate' => 81.25],
@@ -64,15 +71,14 @@ it('draws the bars in the order welle lists the pillars', function () {
 
 it('counts a pillar day that was not an esc day', function () {
     welleDay($this->workspace->id, $this->owner->id, 1, false, ['movement' => true]);
-    welleDay($this->workspace->id, $this->owner->id, 2, false, ['movement' => false]);
 
     $this->actingAs($this->owner)
         ->getJson($this->url)
         ->assertOk()
         ->assertJson([
-            'total_days' => 2,
+            'total_days' => 16,
             'pillars' => [
-                ['pillar' => 'movement', 'days' => 1, 'rate' => 50],
+                ['pillar' => 'movement', 'days' => 1, 'rate' => 6.25],
                 ['pillar' => 'meditation', 'days' => 0, 'rate' => 0],
                 ['pillar' => 'learning', 'days' => 0, 'rate' => 0],
             ],
@@ -102,8 +108,8 @@ it('reads only the signed-in user rows, in this workspace, in this month', funct
         ->getJson($this->url)
         ->assertOk()
         ->assertJson([
-            'total_days' => 1,
-            'pillars' => [['pillar' => 'movement', 'days' => 1, 'rate' => 100]],
+            'total_days' => 16,
+            'pillars' => [['pillar' => 'movement', 'days' => 1, 'rate' => 6.25]],
         ]);
 });
 
@@ -118,22 +124,39 @@ it('reads the month asked for', function () {
         'pillars_completed' => 1,
     ]);
 
+    // August, and all thirty-one of its days.
     $this->actingAs($this->owner)
         ->getJson($this->url.'?month='.$lastMonth->format('Y-m'))
         ->assertOk()
         ->assertJson([
             'month' => $lastMonth->format('Y-m'),
-            'total_days' => 1,
+            'total_days' => 31,
             'pillars' => [
                 ['pillar' => 'movement', 'days' => 0, 'rate' => 0],
-                ['pillar' => 'meditation', 'days' => 1, 'rate' => 100],
+                ['pillar' => 'meditation', 'days' => 1, 'rate' => 3.23],
             ],
         ]);
 });
 
-it('has no rates rather than rates of none while nothing is synced', function () {
+it('reads a month of nothing as none of its days rather than as no answer', function () {
     $this->actingAs($this->owner)
         ->getJson($this->url)
+        ->assertOk()
+        ->assertJson([
+            'total_days' => 16,
+            'pillars' => [
+                ['pillar' => 'movement', 'days' => 0, 'rate' => 0],
+                ['pillar' => 'meditation', 'days' => 0, 'rate' => 0],
+                ['pillar' => 'learning', 'days' => 0, 'rate' => 0],
+            ],
+        ]);
+});
+
+it('has no rates for a month that has not started', function () {
+    $nextMonth = Carbon::today()->startOfMonth()->addMonth();
+
+    $this->actingAs($this->owner)
+        ->getJson($this->url.'?month='.$nextMonth->format('Y-m'))
         ->assertOk()
         ->assertJson([
             'total_days' => 0,
@@ -163,8 +186,8 @@ it('answers a member holding the grant', function () {
         ->getJson($this->url)
         ->assertOk()
         ->assertJson([
-            'total_days' => 1,
-            'pillars' => [['pillar' => 'movement', 'days' => 1, 'rate' => 100]],
+            'total_days' => 16,
+            'pillars' => [['pillar' => 'movement', 'days' => 1, 'rate' => 6.25]],
         ]);
 });
 

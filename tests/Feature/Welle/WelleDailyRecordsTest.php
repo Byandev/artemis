@@ -274,29 +274,48 @@ test('a day missing one pillar is two of three, not ESC', function () {
         ->and($record->is_esc)->toBeFalse();
 });
 
-test('an elapsed day with nothing logged is stored as a tracked, empty day', function () {
+test('an elapsed day with nothing logged is not stored at all', function () {
     fakeWelle(welleWeek([welleWeekDay('2026-09-14', movement: false, meditation: false, learning: false)]));
 
     ['user' => $user] = makeWelleWorkspaceWithConnectedOwner();
 
     (new FetchWelleProgress($user->id))->handle(app(WelleClient::class));
 
-    expect(WelleDailyRecord::sole()->pillars_completed)->toBe(0)
-        ->and(WelleDailyRecord::sole()->is_esc)->toBeFalse();
+    // A row means something was done that day. The day still happened, and the
+    // cards count it from the calendar rather than from this table.
+    expect(WelleDailyRecord::count())->toBe(0);
 });
 
-test('the window carries the streak figures onto the user', function () {
+test('a day un-ticked on welle since the last fetch has its row removed', function () {
+    ['user' => $user] = makeWelleWorkspaceWithConnectedOwner();
+
+    Http::fake([
+        'welle.test/api/v1/progress/week' => Http::sequence()
+            ->push(welleWeek([welleWeekDay('2026-09-14')]))
+            ->push(welleWeek([welleWeekDay('2026-09-14', movement: false, meditation: false, learning: false)])),
+    ]);
+
+    (new FetchWelleProgress($user->id))->handle(app(WelleClient::class));
+
+    expect(WelleDailyRecord::count())->toBe(1);
+
+    // Corrected on Welle's side: the row has to go, or "a row exists" would
+    // stop meaning "something was done" the moment a day was undone.
+    (new FetchWelleProgress($user->id))->handle(app(WelleClient::class));
+
+    expect(WelleDailyRecord::count())->toBe(0);
+});
+
+test('a successful fetch is stamped on the connection that made it', function () {
     fakeWelle(welleWeek([welleWeekDay('2026-09-15')], streak: 4, longest: 12));
 
     ['user' => $user] = makeWelleWorkspaceWithConnectedOwner();
 
     (new FetchWelleProgress($user->id))->handle(app(WelleClient::class));
 
-    // The streaks are the person's own figures; how the fetch went belongs to
-    // the connection that made it.
-    expect($user->refresh()->welle_streak_days)->toBe(4)
-        ->and($user->welle_longest_streak)->toBe(12);
-
+    // Welle sends its own streak figures with every window and nothing reads
+    // them, so they are passed over rather than mirrored onto the user. How the
+    // fetch went belongs to the connection that made it.
     expect(welleConnection($user)->last_synced_at)->not->toBeNull()
         ->and(welleConnection($user)->last_error)->toBeNull();
 });
