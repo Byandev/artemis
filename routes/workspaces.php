@@ -458,6 +458,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/csr/dashboard', [CSRController::class, 'dashboard'])->name('workspaces.csr.dashboard');
     Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
     Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
+    Route::get('/workspaces/{workspace}/csr/analytics/export', [CSRController::class, 'analyticsExport'])->name('workspaces.csr.analytics.export');
 
     // CSR RMO Management (authenticated)
     Route::get('/workspaces/{workspace}/csr/rmo-management', [ForDeliveryController::class, 'csrRmoManagement'])->name('workspaces.csr.rmo-management');
