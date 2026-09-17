@@ -12,6 +12,19 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.37.2',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Gencys ERP — Sync Batches',
+                items: [
+                    'A batch you raise from Sync Batches, and a failed run you send again, goes out the moment it is queued. It had been left sitting on Queued until something else happened to nudge the queue along — and with nothing else in flight, that nudge was the hourly sweep, so work asked for just after the hour could wait the best part of one before its first call reached the ERP',
+                    'The five scheduled passes were in the same position and are back on the hour they say, so the 9am figures arrive in the morning rather than whenever the sweep next came round',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.37.1',
         date: '2026-09-18',
         sections: [
