@@ -212,12 +212,18 @@ class WelleStatsController extends Controller
     }
 
     /**
-     * The day-by-day log — every day Welle has a record of, with the three
-     * pillars as they were ticked on it.
+     * The day-by-day log — every day of the month that has happened, with the
+     * three pillars as they were ticked on it.
      *
      * The calendar above colours a day by how many pillars it carried; this
-     * says which, which is the one question the grid cannot answer. Same rows,
-     * read one column further out.
+     * says which, which is the one question the grid cannot answer.
+     *
+     * Every elapsed day is here, the 1st through today, whether or not Welle
+     * has a row for it: a day with none of the three ticked has no row, and
+     * listing only the rows would leave the table skipping from the 3rd to the
+     * 9th as though the days between had not happened. A day without a row is
+     * sent with all three pillars false — which is what it was. Days still to
+     * come are left out, as they are everywhere else on the page.
      */
     public function dailyLog(Request $request, Workspace $workspace): JsonResponse
     {
@@ -225,16 +231,24 @@ class WelleStatsController extends Controller
 
         $month = $this->month($request);
 
-        $days = $this->days($request, $workspace, $month)
-            ->orderBy('date')
+        $records = $this->days($request, $workspace, $month)
             ->get(['date', 'movement', 'meditation', 'learning', 'is_esc'])
-            ->map(fn (WelleDailyRecord $day) => [
-                'date' => $day->date->toDateString(),
-                'movement' => $day->movement,
-                'meditation' => $day->meditation,
-                'learning' => $day->learning,
-                'is_esc' => $day->is_esc,
-            ]);
+            ->keyBy(fn (WelleDailyRecord $day) => $day->date->toDateString());
+
+        $days = [];
+
+        for ($offset = 0; $offset < $this->elapsedDays($month); $offset++) {
+            $date = $month->addDays($offset)->toDateString();
+            $record = $records->get($date);
+
+            $days[] = [
+                'date' => $date,
+                'movement' => (bool) $record?->movement,
+                'meditation' => (bool) $record?->meditation,
+                'learning' => (bool) $record?->learning,
+                'is_esc' => (bool) $record?->is_esc,
+            ];
+        }
 
         return response()->json([
             'total_days' => $this->elapsedDays($month),

@@ -8,6 +8,7 @@ import {
     pillarBreakdown as pillarBreakdownRoute,
 } from '@/actions/App/Http/Controllers/API/Workspace/WelleStatsController';
 import PageHeader from '@/components/common/PageHeader';
+import { ConnectWellePrompt } from '@/components/welle/ConnectWellePrompt';
 import {
     DailyLogTable,
     type DailyLogStat,
@@ -43,7 +44,15 @@ interface Props {
         name: string;
         slug: string;
     };
+    /**
+     * Whether this person has connected their own Welle account — shared by the
+     * page rather than read off a card, so an unconnected page opens on the
+     * setup prompt instead of a screen of skeletons that cannot fill.
+     */
+    connected: boolean;
 }
+
+type PageWorkspace = Props['workspace'];
 
 /**
  * My ESC — the signed-in user's own Extreme Self Care record: the month's
@@ -53,8 +62,12 @@ interface Props {
  * Every piece is fetched over XHR rather than shared by the page, so the page
  * renders at once and each one skeletons on its own. They all read the month
  * the picker names, so changing it moves the whole page together.
+ *
+ * All of that is behind a connected Welle account: without one the page is the
+ * setup prompt and nothing else, and no request goes out for figures that
+ * cannot exist yet.
  */
-export default function MyEsc({ workspace }: Props) {
+export default function MyEsc({ workspace, connected }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: 'My ESC',
@@ -62,6 +75,37 @@ export default function MyEsc({ workspace }: Props) {
         },
     ];
 
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="My ESC" />
+
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 sm:p-6">
+                {connected ? (
+                    <EscDashboard workspace={workspace} />
+                ) : (
+                    <>
+                        <PageHeader
+                            title="My ESC"
+                            description="Your own Extreme Self Care record from Welle"
+                            divider={false}
+                        />
+                        <ConnectWellePrompt workspaceSlug={workspace.slug} />
+                    </>
+                )}
+            </div>
+        </AppLayout>
+    );
+}
+
+/**
+ * The page proper — the month's cards, the pillars against each other, the
+ * calendar and the day-by-day log.
+ *
+ * Its own component so the month state and the seven requests it keys exist
+ * only once there is an account to answer them; mounted from an unconnected
+ * page, hooks cannot simply be skipped.
+ */
+function EscDashboard({ workspace }: { workspace: PageWorkspace }) {
     // Seeded from the URL and written back to it, so a reload comes back to
     // the month that was being read rather than to this one.
     const [month, setMonth] = useState(monthFromUrl);
@@ -111,48 +155,41 @@ export default function MyEsc({ workspace }: Props) {
     );
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My ESC" />
+        <>
+            <PageHeader
+                title="My ESC"
+                description="Your own Extreme Self Care record from Welle"
+                divider={false}
+                stackActionsOnMobile
+            >
+                <MonthPicker value={month} onChange={pickMonth} />
+            </PageHeader>
 
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 sm:p-6">
-                <PageHeader
-                    title="My ESC"
-                    description="Your own Extreme Self Care record from Welle"
-                    divider={false}
-                    stackActionsOnMobile
-                >
-                    <MonthPicker value={month} onChange={pickMonth} />
-                </PageHeader>
-
-                <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    <EscRateStatCard stat={escRate} loading={escRateLoading} />
-                    <DaysWithPillarStatCard
-                        pillar="movement"
-                        stat={movement}
-                        loading={movementLoading}
-                    />
-                    <DaysWithPillarStatCard
-                        pillar="meditation"
-                        stat={meditation}
-                        loading={meditationLoading}
-                    />
-                    <DaysWithPillarStatCard
-                        pillar="learning"
-                        stat={learning}
-                        loading={learningLoading}
-                    />
-                </div>
-
-                <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <PillarBreakdown
-                        stat={breakdown}
-                        loading={breakdownLoading}
-                    />
-                    <EscCalendar stat={calendar} loading={calendarLoading} />
-                </div>
-
-                <DailyLogTable stat={dailyLog} loading={dailyLogLoading} />
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <EscRateStatCard stat={escRate} loading={escRateLoading} />
+                <DaysWithPillarStatCard
+                    pillar="movement"
+                    stat={movement}
+                    loading={movementLoading}
+                />
+                <DaysWithPillarStatCard
+                    pillar="meditation"
+                    stat={meditation}
+                    loading={meditationLoading}
+                />
+                <DaysWithPillarStatCard
+                    pillar="learning"
+                    stat={learning}
+                    loading={learningLoading}
+                />
             </div>
-        </AppLayout>
+
+            <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <PillarBreakdown stat={breakdown} loading={breakdownLoading} />
+                <EscCalendar stat={calendar} loading={calendarLoading} />
+            </div>
+
+            <DailyLogTable stat={dailyLog} loading={dailyLogLoading} />
+        </>
     );
 }
