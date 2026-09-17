@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Move connected third-party accounts off the users table.
+     * Connected third-party accounts, kept off the users table.
      *
      * One row per user per service, holding a token and nothing else that could
      * be used to sign in as them. No username, no password — the password is
@@ -40,35 +40,10 @@ return new class extends Migration
             // leaving two rows to disagree about which one is live.
             $table->unique(['user_id', 'service']);
         });
-
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(array_values(array_filter(
-                ['welle_email', 'welle_token', 'welle_last_synced_at', 'welle_last_error'],
-                fn (string $column) => Schema::hasColumn('users', $column),
-            )));
-        });
     }
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            if (! Schema::hasColumn('users', 'welle_email')) {
-                $table->string('welle_email')->nullable()->after('gotyme_number');
-            }
-
-            if (! Schema::hasColumn('users', 'welle_token')) {
-                $table->text('welle_token')->nullable()->after('welle_email');
-            }
-
-            if (! Schema::hasColumn('users', 'welle_last_synced_at')) {
-                $table->timestamp('welle_last_synced_at')->nullable()->after('welle_token');
-            }
-
-            if (! Schema::hasColumn('users', 'welle_last_error')) {
-                $table->string('welle_last_error')->nullable()->after('welle_last_synced_at');
-            }
-        });
-
         Schema::dropIfExists('user_integrations');
     }
 };

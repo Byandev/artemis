@@ -39,8 +39,6 @@ export interface User {
     name: string;
     email: string;
     gotyme_number?: string | null;
-    /** Email of the user's connected Welle account. */
-    welle_email?: string | null;
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
