@@ -76,14 +76,14 @@ function seedAutoAssignDelivery(Workspace $workspace, Page $page, Shop $shop, st
     ], $overrides));
 }
 
-/** @param  array<int, PancakeUser>  $pool */
-function enableAutoAssign(Workspace $workspace, array $pool = []): void
+/** Switch auto-assignment on, pointed at $csr — or at nobody when omitted. */
+function enableAutoAssign(Workspace $workspace, ?PancakeUser $csr = null): void
 {
     $workspace->rmoSetting()->updateOrCreate(
         ['workspace_id' => $workspace->id],
         [
             'enable_auto_assign' => true,
-            'auto_assign_user_ids' => array_map(fn (PancakeUser $csr) => (string) $csr->id, $pool),
+            'auto_assign_user_id' => $csr ? (string) $csr->id : null,
         ],
     );
 }
@@ -114,19 +114,17 @@ beforeEach(function () {
     $this->today = now()->toDateString();
 });
 
-test('the pool is empty until CSRs are configured', function () {
-    expect(RmoAutoAssign::pool($this->workspace))->toBe([]);
+test('nobody is assigned to until a CSR is configured', function () {
+    expect(RmoAutoAssign::assignee($this->workspace))->toBeNull();
 });
 
-test('a CSR who is not on a workspace shop is dropped from the pool', function () {
-    $mine = autoAssignCsr($this->shop, 'Mine');
-
+test('a CSR who is not on a workspace shop is ignored', function () {
     $otherWorkspace = Workspace::factory()->create(['owner_id' => User::factory()->create()->id]);
     $theirs = autoAssignCsr(Shop::factory()->forWorkspace($otherWorkspace)->create(), 'Theirs');
 
-    enableAutoAssign($this->workspace, [$mine, $theirs]);
+    enableAutoAssign($this->workspace, $theirs);
 
-    expect(RmoAutoAssign::pool($this->workspace->fresh()))->toBe([(string) $mine->id]);
+    expect(RmoAutoAssign::assignee($this->workspace->fresh()))->toBeNull();
 });
 
 test('with auto-assignment off, unassigned orders are left alone', function () {
@@ -134,7 +132,7 @@ test('with auto-assignment off, unassigned orders are left alone', function () {
 
     $this->workspace->rmoSetting()->updateOrCreate(
         ['workspace_id' => $this->workspace->id],
-        ['enable_auto_assign' => false, 'auto_assign_user_ids' => [(string) $csr->id]],
+        ['enable_auto_assign' => false, 'auto_assign_user_id' => (string) $csr->id],
     );
 
     $id = seedAutoAssignDelivery($this->workspace, $this->page, $this->shop, $this->today);
@@ -143,7 +141,7 @@ test('with auto-assignment off, unassigned orders are left alone', function () {
     expect(assigneeOf($id))->toBeNull();
 });
 
-test('switched on with an empty pool, nothing is assigned', function () {
+test('switched on with nobody set, nothing is assigned', function () {
     enableAutoAssign($this->workspace);
 
     $id = seedAutoAssignDelivery($this->workspace, $this->page, $this->shop, $this->today);
@@ -152,29 +150,27 @@ test('switched on with an empty pool, nothing is assigned', function () {
     expect(assigneeOf($id))->toBeNull();
 });
 
-test('orders are spread evenly across the pool', function () {
-    $pool = [
-        autoAssignCsr($this->shop, 'Ana'),
-        autoAssignCsr($this->shop, 'Jun'),
-        autoAssignCsr($this->shop, 'Maria'),
-    ];
+test('every unassigned order on the day goes to the one configured CSR', function () {
+    $ana = autoAssignCsr($this->shop, 'Ana');
 
-    enableAutoAssign($this->workspace, $pool);
+    // Jun is assignable but not the one configured, so nothing lands on him.
+    autoAssignCsr($this->shop, 'Jun');
+
+    enableAutoAssign($this->workspace, $ana);
 
     foreach (range(1, 6) as $ignored) {
         seedAutoAssignDelivery($this->workspace, $this->page, $this->shop, $this->today);
     }
 
     expect(RmoAutoAssign::apply($this->workspace->fresh(), $this->today))->toBe(6);
-    expect(assignmentCounts($this->workspace, $this->today))
-        ->toBe(['Ana' => 2, 'Jun' => 2, 'Maria' => 2]);
+    expect(assignmentCounts($this->workspace, $this->today))->toBe(['Ana' => 6]);
 });
 
 test('an assignee set by hand is never overwritten', function () {
     $ana = autoAssignCsr($this->shop, 'Ana');
     $jun = autoAssignCsr($this->shop, 'Jun');
 
-    enableAutoAssign($this->workspace, [$ana, $jun]);
+    enableAutoAssign($this->workspace, $ana);
 
     $claimed = seedAutoAssignDelivery(
         $this->workspace,
@@ -188,21 +184,20 @@ test('an assignee set by hand is never overwritten', function () {
     expect(assigneeOf($claimed))->toBe((string) $jun->id);
 });
 
-test('the rotation levels out a pool that manual assignment left uneven', function () {
+test('rows another CSR already holds stay with them', function () {
     $ana = autoAssignCsr($this->shop, 'Ana');
     $jun = autoAssignCsr($this->shop, 'Jun');
-    $maria = autoAssignCsr($this->shop, 'Maria');
 
-    enableAutoAssign($this->workspace, [$ana, $jun, $maria]);
+    enableAutoAssign($this->workspace, $ana);
 
-    // Ana already holds three, claimed by hand.
+    // Jun claimed three by hand; three more arrive unclaimed.
     foreach (range(1, 3) as $ignored) {
         seedAutoAssignDelivery(
             $this->workspace,
             $this->page,
             $this->shop,
             $this->today,
-            ['assignee_id' => $ana->id],
+            ['assignee_id' => $jun->id],
         );
     }
 
@@ -212,14 +207,14 @@ test('the rotation levels out a pool that manual assignment left uneven', functi
 
     expect(RmoAutoAssign::apply($this->workspace->fresh(), $this->today))->toBe(3);
 
-    // The three new rows go to the two who were behind, not round the houses.
+    // Key order follows the group-by, so compare the counts, not the shape.
     expect(assignmentCounts($this->workspace, $this->today))
-        ->toBe(['Ana' => 3, 'Jun' => 2, 'Maria' => 1]);
+        ->toEqualCanonicalizing(['Ana' => 3, 'Jun' => 3]);
 });
 
 test('another workspace\'s orders are not touched', function () {
     $csr = autoAssignCsr($this->shop, 'Ana');
-    enableAutoAssign($this->workspace, [$csr]);
+    enableAutoAssign($this->workspace, $csr);
 
     $otherWorkspace = Workspace::factory()->create(['owner_id' => User::factory()->create()->id]);
     $otherPage = Page::factory()->forWorkspace($otherWorkspace)->create();
@@ -234,7 +229,7 @@ test('another workspace\'s orders are not touched', function () {
 
 test('re-running assigns nothing once every row is taken', function () {
     $csr = autoAssignCsr($this->shop, 'Ana');
-    enableAutoAssign($this->workspace, [$csr]);
+    enableAutoAssign($this->workspace, $csr);
 
     seedAutoAssignDelivery($this->workspace, $this->page, $this->shop, $this->today);
 
@@ -244,7 +239,7 @@ test('re-running assigns nothing once every row is taken', function () {
 
 test('the command assigns for opted-in workspaces and skips the rest', function () {
     $csr = autoAssignCsr($this->shop, 'Ana');
-    enableAutoAssign($this->workspace, [$csr]);
+    enableAutoAssign($this->workspace, $csr);
 
     $otherWorkspace = Workspace::factory()->create(['owner_id' => User::factory()->create()->id]);
     $otherPage = Page::factory()->forWorkspace($otherWorkspace)->create();
@@ -261,7 +256,7 @@ test('the command assigns for opted-in workspaces and skips the rest', function 
 
 test('the command covers yesterday as well as today by default', function () {
     $csr = autoAssignCsr($this->shop, 'Ana');
-    enableAutoAssign($this->workspace, [$csr]);
+    enableAutoAssign($this->workspace, $csr);
 
     $yesterday = seedAutoAssignDelivery($this->workspace, $this->page, $this->shop, now()->subDay()->toDateString());
     $older = seedAutoAssignDelivery($this->workspace, $this->page, $this->shop, now()->subDays(5)->toDateString());
@@ -274,7 +269,7 @@ test('the command covers yesterday as well as today by default', function () {
 
 test('--date widens the command to an older delivery date', function () {
     $csr = autoAssignCsr($this->shop, 'Ana');
-    enableAutoAssign($this->workspace, [$csr]);
+    enableAutoAssign($this->workspace, $csr);
 
     $older = seedAutoAssignDelivery($this->workspace, $this->page, $this->shop, now()->subDays(5)->toDateString());
 
@@ -286,13 +281,13 @@ test('--date widens the command to an older delivery date', function () {
 
 test('--workspace limits the command to a single workspace', function () {
     $csr = autoAssignCsr($this->shop, 'Ana');
-    enableAutoAssign($this->workspace, [$csr]);
+    enableAutoAssign($this->workspace, $csr);
 
     $otherWorkspace = Workspace::factory()->create(['owner_id' => User::factory()->create()->id]);
     $otherPage = Page::factory()->forWorkspace($otherWorkspace)->create();
     $otherShop = Shop::factory()->forWorkspace($otherWorkspace)->create();
     $otherCsr = autoAssignCsr($otherShop, 'Jun');
-    enableAutoAssign($otherWorkspace, [$otherCsr]);
+    enableAutoAssign($otherWorkspace, $otherCsr);
 
     $mine = seedAutoAssignDelivery($this->workspace, $this->page, $this->shop, $this->today);
     $theirs = seedAutoAssignDelivery($otherWorkspace, $otherPage, $otherShop, $this->today);
@@ -304,15 +299,35 @@ test('--workspace limits the command to a single workspace', function () {
     expect(assigneeOf($theirs))->toBeNull();
 });
 
-test('the command warns when the switch is on but the pool is empty', function () {
+test('the command warns when the switch is on but nobody is set', function () {
     enableAutoAssign($this->workspace);
 
     $this->artisan('rmo:apply-auto-assign')
-        ->expectsOutputToContain('no CSR is in the pool')
+        ->expectsOutputToContain('no CSR is set')
         ->assertSuccessful();
 });
 
-test('the settings page offers the workspace\'s CSRs and saves the pool', function () {
+test('the settings page offers the workspace\'s CSRs and saves the one picked', function () {
+    $ana = autoAssignCsr($this->shop, 'Ana');
+
+    $member = autoAssignMemberWithPermissions($this->workspace, [
+        PermissionEnum::ManageRmoSettings->value,
+    ]);
+
+    $this->actingAs($member)
+        ->put("/workspaces/{$this->workspace->slug}/settings/rmo", [
+            'enable_edit_previous_day' => false,
+            'enable_bulk_status_update' => false,
+            'enable_auto_assign' => true,
+            'auto_assign_user_id' => (string) $ana->id,
+        ])
+        ->assertRedirect();
+
+    expect($this->workspace->fresh()->rmoAutoAssignEnabled())->toBeTrue();
+    expect(RmoAutoAssign::assignee($this->workspace->fresh()))->toBe((string) $ana->id);
+});
+
+test('the settings page rejects more than one CSR', function () {
     $ana = autoAssignCsr($this->shop, 'Ana');
     $jun = autoAssignCsr($this->shop, 'Jun');
 
@@ -325,13 +340,11 @@ test('the settings page offers the workspace\'s CSRs and saves the pool', functi
             'enable_edit_previous_day' => false,
             'enable_bulk_status_update' => false,
             'enable_auto_assign' => true,
-            'auto_assign_user_ids' => [(string) $ana->id, (string) $jun->id],
+            'auto_assign_user_id' => [(string) $ana->id, (string) $jun->id],
         ])
-        ->assertRedirect();
+        ->assertSessionHasErrors('auto_assign_user_id');
 
-    expect($this->workspace->fresh()->rmoAutoAssignEnabled())->toBeTrue();
-    expect(RmoAutoAssign::pool($this->workspace->fresh()))
-        ->toBe([(string) $ana->id, (string) $jun->id]);
+    expect(RmoAutoAssign::assignee($this->workspace->fresh()))->toBeNull();
 });
 
 test('the settings page rejects a CSR from outside the workspace', function () {
@@ -347,11 +360,31 @@ test('the settings page rejects a CSR from outside the workspace', function () {
             'enable_edit_previous_day' => false,
             'enable_bulk_status_update' => false,
             'enable_auto_assign' => true,
-            'auto_assign_user_ids' => [(string) $outsider->id],
+            'auto_assign_user_id' => (string) $outsider->id,
         ])
-        ->assertSessionHasErrors('auto_assign_user_ids.0');
+        ->assertSessionHasErrors('auto_assign_user_id');
 
     expect($this->workspace->fresh()->rmoAutoAssignEnabled())->toBeFalse();
+});
+
+test('an empty picker clears the CSR rather than failing validation', function () {
+    $csr = autoAssignCsr($this->shop, 'Ana');
+    enableAutoAssign($this->workspace, $csr);
+
+    $member = autoAssignMemberWithPermissions($this->workspace, [
+        PermissionEnum::ManageRmoSettings->value,
+    ]);
+
+    $this->actingAs($member)
+        ->put("/workspaces/{$this->workspace->slug}/settings/rmo", [
+            'enable_edit_previous_day' => false,
+            'enable_bulk_status_update' => false,
+            'enable_auto_assign' => true,
+            'auto_assign_user_id' => '',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(RmoAutoAssign::assignee($this->workspace->fresh()))->toBeNull();
 });
 
 test('saving the switch assigns today\'s unassigned orders straight away', function () {
@@ -368,7 +401,7 @@ test('saving the switch assigns today\'s unassigned orders straight away', funct
             'enable_edit_previous_day' => false,
             'enable_bulk_status_update' => false,
             'enable_auto_assign' => true,
-            'auto_assign_user_ids' => [(string) $csr->id],
+            'auto_assign_user_id' => (string) $csr->id,
         ])
         ->assertRedirect();
 
@@ -377,7 +410,7 @@ test('saving the switch assigns today\'s unassigned orders straight away', funct
 
 test('a payload without the auto-assign fields leaves them as they were', function () {
     $csr = autoAssignCsr($this->shop, 'Ana');
-    enableAutoAssign($this->workspace, [$csr]);
+    enableAutoAssign($this->workspace, $csr);
 
     $member = autoAssignMemberWithPermissions($this->workspace, [
         PermissionEnum::ManageRmoSettings->value,
@@ -393,5 +426,5 @@ test('a payload without the auto-assign fields leaves them as they were', functi
     $workspace = $this->workspace->fresh();
 
     expect($workspace->rmoAutoAssignEnabled())->toBeTrue();
-    expect(RmoAutoAssign::pool($workspace))->toBe([(string) $csr->id]);
+    expect(RmoAutoAssign::assignee($workspace))->toBe((string) $csr->id);
 });

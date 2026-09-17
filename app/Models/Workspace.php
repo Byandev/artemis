@@ -492,10 +492,10 @@ class Workspace extends Model
     }
 
     /**
-     * Whether unassigned RMO orders are handed out to a pool of CSRs on their
-     * own, rather than waiting for someone to claim them. Off by default. The
-     * pool itself lives in rmo_settings.auto_assign_user_ids — switched on with
-     * an empty pool, auto-assignment does nothing.
+     * Whether unassigned RMO orders are handed to a CSR on their own, rather
+     * than waiting for someone to claim them. Off by default. Who they go to
+     * lives in rmo_settings.auto_assign_user_id — switched on with nobody set,
+     * auto-assignment does nothing.
      */
     public function rmoAutoAssignEnabled(): bool
     {

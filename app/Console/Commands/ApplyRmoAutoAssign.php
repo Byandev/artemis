@@ -23,7 +23,7 @@ class ApplyRmoAutoAssign extends Command
                             {--days=2 : Number of trailing days to cover when --date is not given. Includes today.}
                             {--workspace= : Limit to one workspace, by id or slug. Defaults to every opted-in workspace.}';
 
-    protected $description = 'Assign unassigned RMO orders to the configured CSR pool for workspaces with auto-assignment enabled.';
+    protected $description = 'Assign unassigned RMO orders to the configured CSR for workspaces with auto-assignment enabled.';
 
     public function handle(): int
     {
@@ -39,10 +39,10 @@ class ApplyRmoAutoAssign extends Command
         $assigned = 0;
 
         foreach ($workspaces as $workspace) {
-            // Switched on with nobody in the pool is a real configuration, and a
-            // silent no-op reads as a bug. Say so once per workspace.
-            if (RmoAutoAssign::pool($workspace) === []) {
-                $this->warn("  {$workspace->slug}: auto-assignment is on but no CSR is in the pool — nothing to assign to.");
+            // Switched on with nobody set is a real configuration, and a silent
+            // no-op reads as a bug. Say so once per workspace.
+            if (RmoAutoAssign::assignee($workspace) === null) {
+                $this->warn("  {$workspace->slug}: auto-assignment is on but no CSR is set — nothing to assign to.");
 
                 continue;
             }

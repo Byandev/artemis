@@ -42,12 +42,12 @@ class RmoSettingController extends Controller
                 'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
                 'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
                 'enable_auto_assign' => $workspace->rmoAutoAssignEnabled(),
-                // The effective pool, not the raw column: a CSR who has since
+                // The effective CSR, not the raw column: one who has since
                 // left the workspace is already ignored when orders are handed
                 // out, so showing them here would promise something that does
                 // not happen — and saving them back would fail validation.
                 // Dropping them from the picker cleans the column up on save.
-                'auto_assign_user_ids' => RmoAutoAssign::pool($workspace),
+                'auto_assign_user_id' => RmoAutoAssign::assignee($workspace),
                 'discord_daily_stats_enabled' => (bool) ($setting->discord_daily_stats_enabled ?? false),
                 'discord_webhook_url' => $setting->discord_webhook_url ?? null,
                 'discord_send_at' => $setting->discord_send_at ?? '18:00',
@@ -59,20 +59,26 @@ class RmoSettingController extends Controller
 
     public function update(Request $request, Workspace $workspace): RedirectResponse
     {
-        // The pool may only name CSRs this workspace could assign by hand —
-        // anything else is rejected rather than stored and quietly ignored.
+        // Auto-assignment may only name a CSR this workspace could assign by
+        // hand — anything else is rejected rather than stored and then quietly
+        // ignored.
         $assignableIds = RmoAutoAssign::assignableUsers($workspace)
             ->pluck('id')
             ->map(fn ($id) => (string) $id)
             ->all();
+
+        // An empty picker means "nobody", which is a null column rather than
+        // an empty string the `in` rule below would reject.
+        if ($request->input('auto_assign_user_id') === '') {
+            $request->merge(['auto_assign_user_id' => null]);
+        }
 
         $data = $request->validate([
             'enable_edit_previous_day' => ['required', 'boolean'],
             'enable_bulk_status_update' => ['required', 'boolean'],
             'enable_auto_tag_status' => ['sometimes', 'boolean'],
             'enable_auto_assign' => ['sometimes', 'boolean'],
-            'auto_assign_user_ids' => ['sometimes', 'array'],
-            'auto_assign_user_ids.*' => ['string', Rule::in($assignableIds)],
+            'auto_assign_user_id' => ['sometimes', 'nullable', 'string', Rule::in($assignableIds)],
             'discord_daily_stats_enabled' => ['sometimes', 'boolean'],
             'discord_webhook_url' => ['nullable', 'string', 'max:512', new DiscordWebhookUrl],
             // Whole-hour send times only (HH:00) — the scheduler runs hourly,
@@ -99,10 +105,10 @@ class RmoSettingController extends Controller
             'enable_auto_assign' => $autoAssignEnabled,
         ];
 
-        if (array_key_exists('auto_assign_user_ids', $data)) {
-            $attributes['auto_assign_user_ids'] = array_values(array_unique(
-                array_map('strval', $data['auto_assign_user_ids']),
-            ));
+        if (array_key_exists('auto_assign_user_id', $data)) {
+            $attributes['auto_assign_user_id'] = $data['auto_assign_user_id'] === null
+                ? null
+                : (string) $data['auto_assign_user_id'];
         }
 
         // Only written by someone who holds the notification permission. A
