@@ -537,7 +537,7 @@ test('preset order tags creates only the tags the shop is missing', function () 
     // Matched on method, so the list read and the creates can't be confused.
     Http::fake(function ($request) {
         if ($request->method() === 'GET') {
-            // The shop already has two of the six presets.
+            // The shop already has two of the seven presets.
             return Http::response([
                 'data' => [
                     ['id' => 1, 'name' => 'Troll'],
@@ -556,7 +556,7 @@ test('preset order tags creates only the tags the shop is missing', function () 
     $response = $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags/presets")
         ->assertOk()
-        ->assertJsonCount(4, 'created')
+        ->assertJsonCount(5, 'created')
         ->assertJsonCount(0, 'failed');
 
     // Name matching is case- and whitespace-insensitive.
@@ -566,10 +566,11 @@ test('preset order tags creates only the tags the shop is missing', function () 
         'Cancel by Customer',
         'Has Returned Orders',
         'Incomplete Details',
+        'With Issue',
     ]);
 
-    // Four creates, each restricted to the right Pancake status code.
-    Http::assertSentCount(5); // 1 list + 4 creates
+    // Five creates, each restricted to the right Pancake status code.
+    Http::assertSentCount(6); // 1 list + 5 creates
 
     $posted = collect();
     Http::recorded(function ($request) use ($posted) {
@@ -580,13 +581,15 @@ test('preset order tags creates only the tags the shop is missing', function () 
         return true;
     });
 
-    expect($posted)->toHaveCount(4);
-    expect($posted->pluck('body.statuses')->all())->toBe([[6], [6], [6], [0]]);
+    expect($posted)->toHaveCount(5);
+    // "With Issue" is the only preset restricted to delivered orders (status 3).
+    expect($posted->pluck('body.statuses')->all())->toBe([[6], [6], [6], [0], [3]]);
     expect($posted->pluck('body.name')->all())->toBe([
         'High RTS',
         'Cancel by Customer',
         'Has Returned Orders',
         'Incomplete Details',
+        'With Issue',
     ]);
     expect($posted->every(fn ($sent) => str_starts_with($sent['body']['tag_color'], '#')))->toBeTrue();
     // Pancake authenticates by query string, so the key has to survive the POST.
@@ -603,6 +606,7 @@ test('preset order tags skips everything when all presets already exist', functi
                 ['id' => 4, 'name' => 'Troll'],
                 ['id' => 5, 'name' => 'Reserved'],
                 ['id' => 6, 'name' => 'Incomplete Details'],
+                ['id' => 7, 'name' => 'With Issue'],
             ],
             'success' => true,
         ], 200),
@@ -615,7 +619,7 @@ test('preset order tags skips everything when all presets already exist', functi
         ->postJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags/presets")
         ->assertOk()
         ->assertJsonCount(0, 'created')
-        ->assertJsonCount(6, 'skipped');
+        ->assertJsonCount(7, 'skipped');
 
     // Only the list call — nothing was created.
     Http::assertSentCount(1);
@@ -631,7 +635,7 @@ test('preset order tags reports a per-tag failure without aborting the rest', fu
 
         $calls++;
 
-        // The second create fails; the remaining four must still be attempted.
+        // The second create fails; the remaining five must still be attempted.
         return $calls === 2
             ? Http::response(['message' => 'Tag limit reached'], 400)
             : Http::response(['data' => ['id' => 10 + $calls], 'success' => true], 200);
@@ -643,7 +647,7 @@ test('preset order tags reports a per-tag failure without aborting the rest', fu
     $response = $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags/presets")
         ->assertOk()
-        ->assertJsonCount(5, 'created')
+        ->assertJsonCount(6, 'created')
         ->assertJsonCount(1, 'failed');
 
     expect($response->json('failed.0.name'))->toBe('Cancel by Customer');

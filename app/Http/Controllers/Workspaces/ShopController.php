@@ -30,9 +30,11 @@ class ShopController extends Controller
 
     /**
      * Pancake order status codes, from the POS API's own `status` enum
-     * (x-enum-descriptions). Only the two the presets below restrict to.
+     * (x-enum-descriptions). Only the three the presets below restrict to.
      */
     private const POS_STATUS_NEW = 0;
+
+    private const POS_STATUS_DELIVERED = 3;
 
     private const POS_STATUS_CANCELED = 6;
 
@@ -50,6 +52,7 @@ class ShopController extends Controller
         ['name' => 'Troll', 'tag_color' => '#722ed1', 'statuses' => [self::POS_STATUS_CANCELED]],
         ['name' => 'Reserved', 'tag_color' => '#096dd9', 'statuses' => [self::POS_STATUS_NEW]],
         ['name' => 'Incomplete Details', 'tag_color' => '#13c2c2', 'statuses' => [self::POS_STATUS_NEW]],
+        ['name' => 'With Issue', 'tag_color' => '#eb2f96', 'statuses' => [self::POS_STATUS_DELIVERED]],
     ];
 
     private function assertShopLimitNotReached(Workspace $workspace): void

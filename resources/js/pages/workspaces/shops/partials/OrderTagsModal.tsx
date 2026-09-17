@@ -316,7 +316,7 @@ export default function OrderTagsModal({
                 {canCreatePresets && (
                     <DialogFooter className="sm:justify-between">
                         <p className="font-mono text-[10px] leading-relaxed text-gray-400 dark:text-gray-500">
-                            Adds the 6 standard tags. Existing ones are left
+                            Adds the 7 standard tags. Existing ones are left
                             untouched.
                         </p>
                         <Button
