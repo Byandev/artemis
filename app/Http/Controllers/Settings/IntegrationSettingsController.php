@@ -68,8 +68,12 @@ class IntegrationSettingsController extends Controller
         try {
             $token = $client->login($validated['welle_email'], $validated['welle_password']);
         } catch (WelleAuthException) {
+            // Welle answers a missing account and a wrong password with the
+            // same error on purpose, so that someone cannot probe which
+            // addresses have accounts. There is nothing here to tell them
+            // apart with, and guessing at one would be wrong half the time.
             throw ValidationException::withMessages([
-                'welle_password' => 'Welle did not accept that email and password.',
+                'welle_password' => 'Incorrect email or password.',
             ]);
         } catch (WelleException) {
             // Welle being unreachable is not the person's mistake, and saying
