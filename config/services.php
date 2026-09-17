@@ -81,4 +81,24 @@ return [
         'base_url' => env('SENDGATE_BASE_URL', 'https://sendgate-test.on-forge.com'),
     ],
 
+    // Welle. Every user connects their own account (users.welle_email /
+    // welle_password), so there is no shared credential here — only where the
+    // API lives, and how long one sign-in is worth reusing.
+    //
+    // The paths are config rather than constants so the client can be pointed
+    // at a staging host, or follow a moved endpoint, without a code change.
+    'welle' => [
+        'base_url' => env('WELLE_BASE_URL'),
+        'timeout' => env('WELLE_TIMEOUT', 30),
+
+        'login_path' => env('WELLE_LOGIN_PATH', 'api/v1/login'),
+        'progress_path' => env('WELLE_PROGRESS_PATH', 'api/v1/progress/week'),
+        'range_path' => env('WELLE_RANGE_PATH', 'api/v1/progress/range'),
+
+        // Welle issues a Sanctum token per device and wants the device named.
+        // Ours says which system is holding it, so a user can tell this apart
+        // from their phone in a token list.
+        'device_name' => env('WELLE_DEVICE_NAME', 'Artemis'),
+    ],
+
 ];

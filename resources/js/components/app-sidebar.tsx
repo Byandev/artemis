@@ -232,6 +232,19 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        // The personal Welle record. Only the workspaces a super admin has
+        // switched Welle on for have the page at all, and the grant is hidden
+        // with the toggle — see Workspace::hiddenPermissionNames().
+        ...(currentWorkspace.welle_module_enabled
+            ? [
+                  {
+                      title: 'My ESC',
+                      href: `/workspaces/${slug}/welle/my-esc`,
+                      icon: Sparkles,
+                      permission: PERMISSIONS.ViewMyEsc,
+                  },
+              ]
+            : []),
         {
             title: 'Shops',
             href: `/workspaces/${slug}/shops`,
