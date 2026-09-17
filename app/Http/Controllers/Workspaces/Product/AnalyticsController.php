@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Workspaces\Product;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Workspace;
-use App\Support\TeamVisibility;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -16,10 +15,7 @@ class AnalyticsController extends Controller
     {
         $user = $request->user();
         $scoped = fn () => Product::where('workspace_id', $workspace->id)
-            ->when(
-                TeamVisibility::shouldScope($user, $workspace),
-                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
-            );
+            ->visibleTo($user, $workspace);
 
         $scalingProductCount = $scoped()->where('status', 'Scaling')->count();
         $testingProductCount = $scoped()->where('status', 'Testing')->count();
@@ -43,10 +39,7 @@ class AnalyticsController extends Controller
         $requestedMetrics = array_filter(explode(',', $request->input('metric', '')));
 
         $query = Product::ofWorkspace($workspace)
-            ->when(
-                TeamVisibility::shouldScope($request->user(), $workspace),
-                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
-            )
+            ->visibleTo($request->user(), $workspace)
             ->select('products.*');
 
         // Apply each requested metric scope

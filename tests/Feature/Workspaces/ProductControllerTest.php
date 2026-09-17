@@ -1,8 +1,12 @@
 <?php
 
+use App\Models\Permission;
 use App\Models\Product;
+use App\Models\Role;
 use App\Models\Shop;
+use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 
 test('owner can view products index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -261,4 +265,43 @@ test('store attaches selected shops from same workspace and ignores foreign shop
     expect($myShop->fresh()->product_id)->toBe($product->id);
     // Foreign shop should NOT have been linked
     expect($foreignShop->fresh()->product_id)->not->toBe($product->id);
+});
+
+/**
+ * Product visibility follows the shops connected to the user's teams
+ * (shops.product_id -> team_shop), not the pages hanging off those shops. A
+ * shop with no page yet still puts its product in front of its team.
+ */
+test('a scoped user sees products of shops connected to their teams, even without pages', function () {
+    $workspace = Workspace::factory()->create();
+    $teamMine = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamOther = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    $mine = Product::factory()->create(['workspace_id' => $workspace->id, 'code' => 'MINE']);
+    $theirs = Product::factory()->create(['workspace_id' => $workspace->id, 'code' => 'THEIRS']);
+    $unassigned = Product::factory()->create(['workspace_id' => $workspace->id, 'code' => 'NOSHOP']);
+
+    // Neither shop has any pages — the old page-based scoping hid both.
+    $myShop = Shop::factory()->forWorkspace($workspace)->create(['product_id' => $mine->id]);
+    $myShop->teams()->attach($teamMine);
+
+    $theirShop = Shop::factory()->forWorkspace($workspace)->create(['product_id' => $theirs->id]);
+    $theirShop->teams()->attach($teamOther);
+
+    $user = User::factory()->create();
+    $role = Role::factory()->create(['workspace_id' => $workspace->id]);
+    $role->permissions()->attach(Permission::where('name', 'View Products')->value('id'));
+    $user->workspaces()->attach($workspace, ['role_id' => $role->id]);
+    $user->teams()->attach($teamMine);
+
+    $this->actingAs($user)
+        ->get("/workspaces/{$workspace->slug}/products/list")
+        ->assertOk()
+        ->assertInertia(function ($page) use ($mine, $theirs, $unassigned) {
+            $ids = collect($page->toArray()['props']['products']['data'])->pluck('id')->all();
+
+            expect($ids)->toContain($mine->id)
+                ->not->toContain($theirs->id)
+                ->not->toContain($unassigned->id);
+        });
 });

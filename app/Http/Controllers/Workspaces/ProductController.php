@@ -8,7 +8,6 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Workspace;
 use App\Services\PostHogService;
-use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,11 +26,7 @@ class ProductController extends Controller
         $user = $request->user();
 
         $products = QueryBuilder::for(
-            Product::ofWorkspace($workspace)
-                ->when(
-                    TeamVisibility::shouldScope($user, $workspace),
-                    fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
-                )
+            Product::ofWorkspace($workspace)->visibleTo($user, $workspace)
         )
             ->with('owner')
             ->allowedFilters([
@@ -57,6 +52,7 @@ class ProductController extends Controller
             ->withQueryString();
 
         $categories = Product::ofWorkspace($workspace)
+            ->visibleTo($user, $workspace)
             ->select('category')
             ->whereNotNull('category')
             ->where('category', '!=', '')
