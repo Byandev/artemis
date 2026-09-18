@@ -414,3 +414,36 @@ test('--sync reports the users that failed and finishes the rest', function () {
     // The failure did not cost the other user their week.
     expect(WelleDailyRecord::count())->toBe(1);
 });
+
+// ── Connecting ──────────────────────────────────────────────────────────────
+
+test('connecting an account fills in the last two months there and then', function () {
+    freezeWelleToday('2026-09-16 09:00:00');
+
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['welle_module_enabled' => true]);
+
+    Http::fake([
+        'welle.test/api/v1/login' => Http::response(['token' => 'welle-token-abc']),
+        'welle.test/api/v1/progress/range*' => Http::sequence()
+            ->push(welleWeek([welleWeekDay('2026-08-04')]))
+            ->push(welleWeek([welleWeekDay('2026-09-15')])),
+    ]);
+
+    $this->actingAs($user)
+        ->put(route('integrations.welle.update', ['workspace' => $workspace->slug]), [
+            'welle_email' => 'integration@example.com',
+            'welle_password' => 'welle-secret',
+        ])
+        ->assertSessionHasNoErrors();
+
+    // The queue is synchronous under test, so the chain queued on connect has
+    // run by the time the redirect lands — one month per call, both stored.
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'start=2026-08-01')
+        && str_contains($request->url(), 'end=2026-08-31'));
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'start=2026-09-01')
+        && str_contains($request->url(), 'end=2026-09-16'));
+
+    expect(WelleDailyRecord::orderBy('date')->pluck('date')->map->toDateString()->all())
+        ->toBe(['2026-08-04', '2026-09-15']);
+});

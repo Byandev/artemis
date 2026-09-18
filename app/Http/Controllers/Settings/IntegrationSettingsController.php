@@ -7,10 +7,14 @@ use App\Exceptions\WelleAuthException;
 use App\Exceptions\WelleException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\WelleIntegrationUpdateRequest;
+use App\Jobs\FetchWelleProgress;
+use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Welle\WelleClient;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -23,6 +27,13 @@ use Inertia\Response;
  */
 class IntegrationSettingsController extends Controller
 {
+    /**
+     * How much history a newly connected account is filled in with, counted in
+     * calendar months and including the month in progress. Two of them is what
+     * My ESC's month picker can reach back to.
+     */
+    private const BACKFILL_MONTHS = 2;
+
     /**
      * Show the user's connected integrations for this workspace.
      */
@@ -92,6 +103,8 @@ class IntegrationSettingsController extends Controller
             ],
         );
 
+        $this->backfill($request->user());
+
         return Redirect::route('integrations.edit', ['workspace' => $workspace->slug])
             ->with('status', 'welle-connected');
     }
@@ -110,6 +123,51 @@ class IntegrationSettingsController extends Controller
 
         return Redirect::route('integrations.edit', ['workspace' => $workspace->slug])
             ->with('status', 'welle-disconnected');
+    }
+
+    /**
+     * Fill in this user's recent Welle history, so My ESC has something to show
+     * before the first unattended run.
+     *
+     * Only the person who just connected: Welle credentials are personal, and
+     * the token stored a moment ago is the only one this request has any
+     * business reading with. Everyone else is reached by the nightly command.
+     *
+     * Worth doing because the unattended run reads `progress/week`, which knows
+     * only the week containing today — so without this, connecting on a Monday
+     * leaves the page empty until tomorrow morning, and the weeks before this
+     * one never arrive at all.
+     *
+     * One job per calendar month, chained rather than dispatched side by side:
+     * nothing settles how wide a window Welle's range endpoint will answer, and
+     * a month is a span the page itself asks for. Chaining also keeps the jobs
+     * off each other's per-user WithoutOverlapping lock, where they would spend
+     * their attempts being released rather than fetching — and a chunk that ran
+     * out of attempts stamps "could not reach Welle" on a connection that is
+     * perfectly fine.
+     *
+     * Re-running a window only corrects the days inside it, so a reconnect
+     * repeating this costs nothing and is usually wanted: a token that had
+     * stopped working left a gap behind it.
+     */
+    private function backfill(User $user): void
+    {
+        $today = CarbonImmutable::today();
+        $firstMonth = $today->startOfMonth()->subMonths(self::BACKFILL_MONTHS - 1);
+
+        $jobs = [];
+
+        for ($month = $firstMonth; $month <= $today; $month = $month->addMonth()) {
+            $jobs[] = new FetchWelleProgress(
+                (int) $user->getKey(),
+                $month->toDateString(),
+                // The month in progress ends today: Welle marks the rest of it
+                // as future days, and the job drops those anyway.
+                $month->endOfMonth()->min($today)->toDateString(),
+            );
+        }
+
+        Bus::chain($jobs)->dispatch();
     }
 
     /** Guard against editing from a workspace the user is not a member of. */
