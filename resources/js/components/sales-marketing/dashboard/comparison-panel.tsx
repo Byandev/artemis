@@ -190,6 +190,11 @@ const DEFAULT_FILL = { light: '#059669', dark: '#059669' };
  * The tick on each bar is that row's previous-period figure, and the dashed rule
  * is the average across everything shown. The caller owns the fetching, the
  * ranking and any folding into an "Others" bar; this owns how the result reads.
+ *
+ * A caller that hands over more rows than fit comfortably passes `visibleRows`
+ * and the rest go behind a scroll rather than behind a "top N" cap — the panel
+ * still plots, averages and scales across all of them, so what you scroll to is
+ * on the same footing as what you land on.
  */
 export default function ComparisonPanel({
     title,
@@ -197,6 +202,7 @@ export default function ComparisonPanel({
     metrics = ALL_METRICS,
     onMetric,
     bars,
+    visibleRows,
     previous,
     loading,
     error,
@@ -212,6 +218,11 @@ export default function ComparisonPanel({
     metrics?: MetricKey[];
     onMetric: (key: MetricKey) => void;
     bars: ComparisonBar[];
+    /**
+     * How many bars stand at rest before the chart scrolls. Left off, every bar
+     * handed over is laid out and the panel never scrolls.
+     */
+    visibleRows?: number;
     /** `[start, end]` of the window the ticks compare against. */
     previous: string[];
     loading: boolean;
@@ -232,6 +243,15 @@ export default function ComparisonPanel({
     const average = bars.length
         ? bars.reduce((sum, b) => sum + b.value, 0) / bars.length
         : 0;
+
+    // Only cap once there is something to scroll to, so a short chart keeps its
+    // natural height and no scrollbar steals width from the bars.
+    const scrolls = visibleRows !== undefined && bars.length > visibleRows;
+    // Exactly `visibleRows` rows and the gaps between them, which leaves the
+    // next row cut off at the fold — the chart's own hint that it carries on.
+    const scrollHeight = scrolls
+        ? `${visibleRows * ROW_H + (visibleRows - 1) * ROW_GAP_Y}rem`
+        : undefined;
 
     // A refetch holds the previous render at reduced opacity rather than
     // flashing back to bones.
@@ -306,45 +326,59 @@ export default function ComparisonPanel({
                         {/* The rows, with the average rule laid over them as a
                             single mark. The overlay is a sibling row using the
                             same column widths, so it tracks the bars without
-                            competing with them for space. */}
-                        <div className="relative space-y-2.5">
-                            {bars.map((bar) => (
-                                <Row
-                                    key={bar.key}
-                                    bar={bar}
-                                    max={max}
-                                    as={spec.as}
-                                    reverse={spec.reverse}
-                                />
-                            ))}
-
-                            {average > 0 && (
-                                <div
-                                    className={cn(
-                                        'pointer-events-none absolute inset-0 flex items-stretch',
-                                        ROW_GAP,
-                                    )}
-                                    aria-hidden
-                                >
-                                    <div className={NAME_COL} />
-                                    <div className="relative flex-1">
-                                        <span
-                                            className="absolute -top-1 -bottom-1 border-l-2 border-dashed border-gray-500 dark:border-gray-300"
-                                            style={{
-                                                left: `${pct(average, max)}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <div className={VALUE_COL} />
-                                </div>
+                            competing with them for space — which is also why it
+                            lives inside the scroll container rather than over
+                            it: same width, same offset, whatever is scrolled. */}
+                        <div
+                            className={cn(
+                                scrolls && 'custom-scrollbar overflow-y-auto',
                             )}
+                            style={{ maxHeight: scrollHeight }}
+                        >
+                            <div className="relative space-y-2.5">
+                                {bars.map((bar) => (
+                                    <Row
+                                        key={bar.key}
+                                        bar={bar}
+                                        max={max}
+                                        as={spec.as}
+                                        reverse={spec.reverse}
+                                    />
+                                ))}
+
+                                {average > 0 && (
+                                    <div
+                                        className={cn(
+                                            'pointer-events-none absolute inset-0 flex items-stretch',
+                                            ROW_GAP,
+                                        )}
+                                        aria-hidden
+                                    >
+                                        <div className={NAME_COL} />
+                                        <div className="relative flex-1">
+                                            <span
+                                                className="absolute -top-1 -bottom-1 border-l-2 border-dashed border-gray-500 dark:border-gray-300"
+                                                style={{
+                                                    left: `${pct(average, max)}%`,
+                                                }}
+                                            />
+                                        </div>
+                                        <div className={VALUE_COL} />
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* The rule's label, on the same column geometry so it
-                            sits directly under the line it names. */}
+                            sits directly under the line it names — including the
+                            width the scrollbar takes off the rows above it. */}
                         {average > 0 && (
                             <div
-                                className={cn('mt-2 flex items-start', ROW_GAP)}
+                                className={cn(
+                                    'mt-2 flex items-start',
+                                    ROW_GAP,
+                                    scrolls && 'pr-1',
+                                )}
                             >
                                 <div className={NAME_COL} />
                                 <div className="relative h-4 flex-1">
@@ -391,6 +425,14 @@ const NAME_COL = 'w-[5.5rem] shrink-0 sm:w-52';
 const VALUE_COL = 'w-32 shrink-0 sm:w-44';
 const ROW_GAP = 'gap-3 sm:gap-4';
 
+/**
+ * A row's height and the gap under it, in rem — `h-6` and `space-y-2.5` stated
+ * as numbers. The row is pinned to that height rather than left to its tallest
+ * child, so a scroll cap of eight rows is eight rows and not an estimate.
+ */
+const ROW_H = 1.5;
+const ROW_GAP_Y = 0.625;
+
 /** One row: name, bar, value. */
 function Row({
     bar,
@@ -410,7 +452,7 @@ function Row({
     const fill = bar.fill ?? DEFAULT_FILL;
 
     return (
-        <div className={cn('flex items-center', ROW_GAP)}>
+        <div className={cn('flex h-6 items-center', ROW_GAP)}>
             <p
                 className={cn(
                     'truncate font-mono text-[11px] text-gray-600 uppercase dark:text-gray-300',
