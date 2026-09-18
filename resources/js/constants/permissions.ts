@@ -172,6 +172,7 @@ export const PERMISSIONS = {
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
     ManageDiscordNotifications: 'Manage Discord Notifications',
+    ManageErpCredentials: 'Manage ERP Credentials',
 
     // Billing
     ViewBillingSettings: 'View Billing Settings',

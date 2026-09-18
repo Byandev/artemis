@@ -160,6 +160,11 @@ class Workspace extends Model
             // My ESC is the only page behind the Welle toggle, so the toggle
             // hides its one grant rather than a whole category.
             $this->welle_module_enabled ? null : PermissionEnum::ViewMyEsc->value,
+            // ERP credentials are only ever read by the Gencys sync pipeline,
+            // so a workspace without Gencys ERP has nothing to point them at —
+            // the grant sits in the Settings category and is hidden on its own
+            // rather than with the whole 'Gencys ERP' category.
+            $this->gencys_module_enabled ? null : PermissionEnum::ManageErpCredentials->value,
             // Gencys partners read page ROAS in Gencys itself, so the tracker is
             // hidden for them even with the rest of the S&M group switched on.
             $this->is_gencys_partner ? PermissionEnum::ViewPageRoasTracker->value : null,
