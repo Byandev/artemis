@@ -184,6 +184,10 @@ enum Permission: string
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
     case ManageDiscordNotifications = 'Manage Discord Notifications';
+    // The ERP credentials the Gencys sync pipeline logs in with. They only
+    // exist for workspaces running Gencys ERP, so the grant rides on that
+    // module toggle — see Workspace::hiddenPermissionNames().
+    case ManageErpCredentials = 'Manage ERP Credentials';
 
     // Billing
     case ViewBillingSettings = 'View Billing Settings';
@@ -356,7 +360,8 @@ enum Permission: string
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys,
-            self::ManageDiscordNotifications => 'Settings',
+            self::ManageDiscordNotifications,
+            self::ManageErpCredentials => 'Settings',
 
             self::ViewBillingSettings,
             self::ManageBillingSettings,

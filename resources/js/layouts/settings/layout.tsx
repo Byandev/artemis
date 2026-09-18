@@ -40,6 +40,9 @@ export default function SettingsLayout({
         PERMISSIONS.ManageDiscordNotifications,
     );
     const canManageRmoSettings = usePermission(PERMISSIONS.ManageRmoSettings);
+    const canManageErpCredentials = usePermission(
+        PERMISSIONS.ManageErpCredentials,
+    );
     const canViewBillingSettings = usePermission(
         PERMISSIONS.ViewBillingSettings,
     );
@@ -69,16 +72,21 @@ export default function SettingsLayout({
     // Automation Configuration is workspace-scoped (each workspace integrates
     // with its own external ERP), so only surface it inside a workspace.
     if (workspace) {
-        groups.push({
-            label: 'Automation Configuration',
-            items: [
-                {
-                    title: 'ERP Credentials',
-                    href: `/workspaces/${workspace.slug}/settings/erp-credentials`,
-                    icon: Server,
-                },
-            ],
-        });
+        // Owners hold '*', so the permission check alone would surface a dead
+        // link on workspaces that don't run Gencys ERP — the credentials are
+        // only ever read by its sync pipeline.
+        if (workspace.gencys_module_enabled && canManageErpCredentials) {
+            groups.push({
+                label: 'Automation Configuration',
+                items: [
+                    {
+                        title: 'ERP Credentials',
+                        href: `/workspaces/${workspace.slug}/settings/erp-credentials`,
+                        icon: Server,
+                    },
+                ],
+            });
+        }
 
         // Welle is the only integration so far, so the whole group rides on
         // its module toggle rather than showing an empty section.
