@@ -1,14 +1,21 @@
 <?php
 
 use App\Enums\IntegrationService;
+use App\Jobs\FetchWelleProgress;
 use App\Models\User;
 use App\Models\UserIntegration;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     config(['services.welle.base_url' => 'https://welle.test']);
+
+    // Connecting now queues a backfill. The queue is synchronous under test, so
+    // without this every connect below would fetch two months inline — turning
+    // assertions about the one login call into assertions about three requests.
+    Bus::fake();
 
     $this->owner = User::factory()->create();
     $this->workspace = Workspace::factory()->create([
@@ -248,4 +255,62 @@ it('disconnects the welle account', function () {
     // The row goes, taking the token and its sync state with it.
     expect(welleIntegration($this->owner))->toBeNull()
         ->and(UserIntegration::count())->toBe(0);
+});
+
+// ── Backfill on connect ─────────────────────────────────────────────────────
+
+it('fills in the last two calendar months for the user who connected', function () {
+    freezeWelleToday('2026-09-16 09:00:00');
+    fakeWelleLogin();
+
+    $this->actingAs($this->owner)
+        ->put($this->updateUrl, $this->payload)
+        ->assertSessionHasNoErrors();
+
+    // One job per month, oldest first: August whole, September only as far as
+    // today — the rest of this month has not happened yet.
+    Bus::assertChained([
+        fn (FetchWelleProgress $job) => $job->userId === $this->owner->id
+            && $job->start === '2026-08-01'
+            && $job->end === '2026-08-31',
+        fn (FetchWelleProgress $job) => $job->userId === $this->owner->id
+            && $job->start === '2026-09-01'
+            && $job->end === '2026-09-16',
+    ]);
+});
+
+it('backfills only the account that was just connected', function () {
+    fakeWelleLogin();
+
+    $member = makeWorkspaceMember($this->workspace);
+    connectWelleAccount($member, 'member-token');
+
+    $this->actingAs($this->owner)->put($this->updateUrl, $this->payload);
+
+    // The member has a connected account of their own, and no part of this
+    // request is entitled to read it — they are reached by the nightly command.
+    Bus::assertDispatchedTimes(FetchWelleProgress::class, 1);
+    Bus::assertDispatched(FetchWelleProgress::class, fn (FetchWelleProgress $job) => $job->userId === $this->owner->id);
+});
+
+it('queues no backfill when the exchange fails', function () {
+    Http::fake(['welle.test/api/v1/login' => Http::response(['message' => 'nope'], 422)]);
+
+    $this->actingAs($this->owner)->put($this->updateUrl, $this->payload);
+
+    // No token was stored, so there is nothing to fetch with.
+    Bus::assertNothingDispatched();
+});
+
+it('backfills again on a reconnect, closing the gap a dead token left', function () {
+    fakeWelleLogin();
+
+    connectWelleAccount($this->owner, 'stale-token')
+        ->forceFill(['last_error' => 'Welle rejected your token.'])->save();
+
+    $this->actingAs($this->owner)->put($this->updateUrl, $this->payload);
+
+    // Re-reading a window corrects its days rather than duplicating them, so
+    // repeating the fetch costs a couple of calls and no consistency.
+    Bus::assertDispatchedTimes(FetchWelleProgress::class, 1);
 });
