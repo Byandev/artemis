@@ -452,7 +452,7 @@ function Row({
     const fill = bar.fill ?? DEFAULT_FILL;
 
     return (
-        <div className={cn('flex items-center', ROW_GAP)}>
+        <div className={cn('flex h-6 items-center', ROW_GAP)}>
             <p
                 className={cn(
                     'truncate font-mono text-[11px] text-gray-600 uppercase dark:text-gray-300',
