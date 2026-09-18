@@ -95,6 +95,19 @@ export default function Integrations({
                         </p>
                     )}
 
+                    {/*
+                     * Connected with nothing synced yet: the backfill queued on
+                     * connect has not landed. Said out loud because My ESC shows
+                     * zeros in the meantime, which otherwise reads as two months
+                     * of missed days rather than a fetch still in flight.
+                     */}
+                    {connected && !welle.last_error && !lastSynced && (
+                        <p className="text-[12px] text-neutral-500 dark:text-neutral-400">
+                            Your recent records are being fetched now. This line
+                            will show the last sync once they land.
+                        </p>
+                    )}
+
                     <Form
                         action={welleUrl}
                         method="put"
