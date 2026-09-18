@@ -12,6 +12,27 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.37.3',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Welle — My ESC',
+                items: [
+                    'Connecting your Welle account fills in the last two months of your record there and then — the month in progress and the one before it, which is as far back as the month picker reaches — so My ESC opens on your own history rather than on a blank month',
+                    'That gap was worth closing because the overnight fetch can only ask Welle about the week containing today: connecting on a Monday left you looking at zeros until the next morning, and the weeks behind that one were never going to arrive at all',
+                    'The months are fetched one after another, oldest first, and the month in progress stops at today rather than counting days that haven’t happened yet',
+                ],
+            },
+            {
+                title: 'Settings — Integrations',
+                items: [
+                    'While that first fetch is still running, the Welle panel says your recent records are being fetched, so the zeros My ESC shows in the meantime read as work in flight rather than as two months of missed days',
+                    'Reconnecting fetches those two months again, which is usually what you want — a token that had quietly stopped working leaves a gap behind it, and re-reading a stretch corrects the days inside it rather than doubling them up',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.37.2',
         date: '2026-09-18',
         sections: [
