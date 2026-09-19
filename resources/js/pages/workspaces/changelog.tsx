@@ -12,6 +12,50 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.37.4',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Sales & Marketing — Product Panels',
+                items: [
+                    'Product comparison and Product breakdown list every product in the window — the Others bar and the Others row are gone, and with them the decision about which products were worth naming. Both panels rest at eight and scroll to the rest, with the next one cut off at the fold to show it carries on and a line beneath saying how many products there are in all',
+                    'Nothing you scroll to is second-class: the dashed average rule, the scale the bars are drawn against, and the sub-total under the table are all taken across every product rather than the eight at rest, so the same figure reads the same wherever it sits in the list',
+                    'The breakdown table keeps its column headings and its sub-total pinned while the rows move, so a figure halfway down still has its heading above it and the total below it',
+                    'Past the eighth product the colours start over rather than turning grey — the swatch is only there to tie a row to its bar, and both panels rank by sales, so a product is the same colour on each',
+                ],
+            },
+            {
+                title: 'Settings — ERP Credentials',
+                items: [
+                    'Setting and clearing the ERP login is behind a grant of its own now, Manage ERP Credentials, where it used to be open to every member of the workspace. Anyone who looks after those credentials will need it added to their role — until it is, the page is out of reach for them',
+                    'The page, and the Automation Configuration group it sits in, only appear on workspaces running Gencys ERP, which is the only thing that ever logs in with them — everywhere else the link is gone rather than leading to a form with nothing behind it',
+                    'The grant sits in the Settings category on the roles screen, and is offered only on the workspaces it can mean anything on',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.37.3',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Welle — My ESC',
+                items: [
+                    'Connecting your Welle account fills in the last two months of your record there and then — the month in progress and the one before it, which is as far back as the month picker reaches — so My ESC opens on your own history rather than on a blank month',
+                    'That gap was worth closing because the overnight fetch can only ask Welle about the week containing today: connecting on a Monday left you looking at zeros until the next morning, and the weeks behind that one were never going to arrive at all',
+                    'The months are fetched one after another, oldest first, and the month in progress stops at today rather than counting days that haven’t happened yet',
+                ],
+            },
+            {
+                title: 'Settings — Integrations',
+                items: [
+                    'While that first fetch is still running, the Welle panel says your recent records are being fetched, so the zeros My ESC shows in the meantime read as work in flight rather than as two months of missed days',
+                    'Reconnecting fetches those two months again, which is usually what you want — a token that had quietly stopped working leaves a gap behind it, and re-reading a stretch corrects the days inside it rather than doubling them up',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.37.2',
         date: '2026-09-18',
         sections: [
