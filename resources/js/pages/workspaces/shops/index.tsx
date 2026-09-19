@@ -197,8 +197,7 @@ const Shops = ({
     const refreshUsers = (shop: Shop) => {
         post(workspaces.shops.refreshUsers.url({ workspace, shop }), {
             onStart: () => toast.info(`Refreshing users for ${shop.name}...`),
-            onSuccess: () =>
-                toast.success(`${shop.name} users queued for refresh.`),
+            onSuccess: () => toast.success(`${shop.name} users refreshed.`),
             onError: () =>
                 toast.error(`Failed to refresh users for ${shop.name}.`),
         });
