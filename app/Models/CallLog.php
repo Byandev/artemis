@@ -18,6 +18,26 @@ class CallLog extends Model
         'call_date' => 'date',
     ];
 
+    /** The handset's word for a call the other end declined before it connected. */
+    public const TYPE_REJECTED = 'rejected';
+
+    /**
+     * The duration to store for a call of this type.
+     *
+     * A rejected call never connected, so there is no talk time in it. Handsets
+     * report one anyway — Android hands back the seconds the phone was ringing —
+     * and left as it comes, that time is summed into talk-time totals and pushes
+     * the call past the three seconds RmoDailyStats counts as connected. Zero is
+     * what it was worth.
+     *
+     * Matched case-insensitively: the app posts REJECTED, the page filters read
+     * rejected.
+     */
+    public static function durationFor(?string $type, int $duration): int
+    {
+        return strtolower((string) $type) === self::TYPE_REJECTED ? 0 : $duration;
+    }
+
     /**
      * The Pancake order the call was about, when it could be matched to one.
      *
