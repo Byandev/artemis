@@ -39,8 +39,7 @@ class CallLogV2Controller extends Controller
                 'assignee_user_id' => $request->input('assignee_user_id'),
                 'phone_number' => $log['phone_number'],
                 'type' => $log['type'],
-                // Zeroed for a rejected call — see CallLog::durationFor().
-                'duration' => CallLog::durationFor($log['type'], (int) $log['duration']),
+                'duration' => $log['duration'],
                 'call_date' => $timestamp->toDateString(),
                 'call_time' => $timestamp->toTimeString(),
                 'created_at' => $now,
