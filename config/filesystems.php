@@ -66,6 +66,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Product Form Media Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where the picture attached to each product-form size/variant is stored.
+    | S3 in every deployed environment; override to "local" on machines with
+    | no AWS credentials. Served through the app via a short-lived signed URL
+    | like the other buckets here, never publicly.
+    |
+    | Named separately rather than relying on media-library's `disk_name`, for
+    | the same reason as the disks above: that env var repoints every other
+    | collection too.
+    |
+    */
+
+    'product_form_media_disk' => env('PRODUCT_FORM_MEDIA_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

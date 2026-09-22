@@ -10,10 +10,17 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 
+/** A delivery format the product can be filed under. */
+interface FormOption {
+    id: number;
+    name: string;
+}
+
 interface PageProps {
     workspace: Workspace;
     product: Product & { shops?: Shop[] };
     shops: Shop[];
+    forms: FormOption[];
 }
 
 const inputClass =
@@ -23,11 +30,12 @@ const labelClass =
 const fieldClass = 'space-y-1.5';
 const errorClass = 'font-mono text-[11px] text-red-500';
 
-const Edit = ({ workspace, product, shops }: PageProps) => {
+const Edit = ({ workspace, product, shops, forms }: PageProps) => {
     const { data, setData, put, processing, errors } = useForm({
         name: product.name || '',
         code: product.code || '',
         category: product.category || '',
+        product_form_id: product.product_form_id?.toString() ?? '',
         status: product.status as ProductStatus,
         winning_date: product.winning_date || '',
         description: product.description || '',
@@ -121,6 +129,31 @@ const Edit = ({ workspace, product, shops }: PageProps) => {
                                 {errors.category && (
                                     <p className={errorClass}>
                                         {errors.category}
+                                    </p>
+                                )}
+                            </div>
+                            <div className={fieldClass}>
+                                <label className={labelClass}>Form</label>
+                                <select
+                                    className={inputClass}
+                                    value={data.product_form_id}
+                                    onChange={(e) =>
+                                        setData(
+                                            'product_form_id',
+                                            e.target.value,
+                                        )
+                                    }
+                                >
+                                    <option value="">No form</option>
+                                    {forms.map((form) => (
+                                        <option key={form.id} value={form.id}>
+                                            {form.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.product_form_id && (
+                                    <p className={errorClass}>
+                                        {errors.product_form_id}
                                     </p>
                                 )}
                             </div>
