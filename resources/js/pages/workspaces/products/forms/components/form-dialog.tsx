@@ -17,7 +17,7 @@ import {
     INPUT,
     LABEL,
     SECTION_BORDER,
-} from '../lib/ui';
+} from '../../lib/ui';
 import { type ProductForm, type VariantImage } from '../types';
 import VariantImageField from './variant-image-field';
 

@@ -1,6 +1,6 @@
 import { ImageUp, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { FIELD_ERROR } from '../lib/ui';
+import { FIELD_ERROR } from '../../lib/ui';
 import { type VariantImage } from '../types';
 
 /** Mirrors the `mimes:` rule on FormController@rules. */

@@ -96,6 +96,7 @@ use Modules\Pancake\Http\Controllers\OrderController;
 use Modules\Products\Http\Controllers\AnalyticsController;
 use Modules\Products\Http\Controllers\FormController as ProductFormController;
 use Modules\Products\Http\Controllers\ProductController;
+use Modules\Products\Http\Controllers\TargetMarketController;
 use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
 use Modules\SimGateway\Http\Controllers\SmsController;
 
@@ -290,6 +291,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/products/forms/variants/{variant}/image/{media}', [ProductFormController::class, 'showVariantImage'])->name('workspaces.products.forms.variant-image');
     Route::put('/workspaces/{workspace}/products/forms/{productForm}', [ProductFormController::class, 'update'])->name('workspaces.products.forms.update');
     Route::delete('/workspaces/{workspace}/products/forms/{productForm}', [ProductFormController::class, 'destroy'])->name('workspaces.products.forms.destroy');
+    Route::get('/workspaces/{workspace}/products/target-markets', [TargetMarketController::class, 'index'])->name('workspaces.products.target-markets.index');
+    Route::post('/workspaces/{workspace}/products/target-markets', [TargetMarketController::class, 'store'])->name('workspaces.products.target-markets.store');
+    Route::put('/workspaces/{workspace}/products/target-markets/{targetMarket}', [TargetMarketController::class, 'update'])->name('workspaces.products.target-markets.update');
+    Route::delete('/workspaces/{workspace}/products/target-markets/{targetMarket}', [TargetMarketController::class, 'destroy'])->name('workspaces.products.target-markets.destroy');
     Route::get('/workspaces/{workspace}/products/analytics/metrics', [AnalyticsController::class, 'metrics'])->name('workspaces-workspace.products.analytics.metrics');
     Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
     Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
