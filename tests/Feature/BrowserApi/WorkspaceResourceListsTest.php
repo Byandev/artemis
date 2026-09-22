@@ -1,10 +1,10 @@
 <?php
 
 use App\Models\Page;
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Team;
 use App\Models\User;
+use Modules\Products\Models\Product;
 
 test('pages list is scoped to the workspace', function () {
     ['user' => $owner, 'workspace' => $a] = makeWorkspaceWithOwner();
@@ -52,6 +52,7 @@ test('teams list is scoped to the workspace', function () {
 test('products list is scoped to the workspace', function () {
     ['user' => $owner, 'workspace' => $a] = makeWorkspaceWithOwner();
     ['workspace' => $b] = makeWorkspaceWithOwner();
+    $a->update(['products_module_enabled' => true]);
 
     Product::factory()->create(['workspace_id' => $a->id, 'owner_id' => $owner->id, 'name' => 'A']);
     Product::factory()->create(['workspace_id' => $b->id, 'owner_id' => $owner->id, 'name' => 'B']);
@@ -190,6 +191,7 @@ test('teams list sort -name', function () {
 
 test('products list filter[search] returns matches', function () {
     ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    $w->update(['products_module_enabled' => true]);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Findable Hat']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Different Thing']);
 

@@ -68,9 +68,9 @@ Every meaningful domain record is scoped to a `Workspace`. Users belong to works
 
 ### nwidart/laravel-modules layout
 
-Feature areas live in `Modules/{AdsManager,Botcake,Pancake,Inventory}/` — each module is a self-contained Laravel mini-app with its own `app/` (Http, Models, Providers), `routes/`, `config/`, `database/migrations/`, `resources/`, `tests/`, and `vite.config.js`. The root `composer.json` uses the `wikimedia/composer-merge-plugin` to merge `Modules/*/composer.json` so module dependencies are installed at the root. Module status is toggled in `modules_statuses.json`. Autoload namespace is `Modules\{Name}\...` → `Modules/{Name}/app/`. When adding migrations/controllers/models that belong to a feature area already owned by a module (e.g. inventory, ads, botcake, pancake), put them inside the module rather than under `app/`.
+Feature areas live in `Modules/{Billing,Botcake,Courses,Creatives,Finance,GencysERP,Inventory,MetaAds,Pancake,Products,SimGateway}/` — each module is a self-contained Laravel mini-app with its own `app/` (Http, Models, Providers), `routes/`, `config/`, `database/migrations/`, `resources/`, `tests/`, and `vite.config.js`. The root `composer.json` uses the `wikimedia/composer-merge-plugin` to merge `Modules/*/composer.json` so module dependencies are installed at the root. Module status is toggled in `modules_statuses.json`. Autoload namespace is `Modules\{Name}\...` → `Modules/{Name}/app/`. When adding migrations/controllers/models that belong to a feature area already owned by a module (e.g. inventory, ads, botcake, pancake, products), put them inside the module rather than under `app/`.
 
-Each module has its own Vite build (`npm`-wise via `vite.config.js` inside the module) that outputs to `public/build-{modulename}/`, separate from the root Vite build (`public/build/`). Most current frontend work still lives at the root `resources/js/`; module-specific JS builds are optional.
+Each module has its own Vite build (`npm`-wise via `vite.config.js` inside the module) that outputs to `public/build-{modulename}/`, separate from the root Vite build (`public/build/`). Most current frontend work still lives at the root `resources/js/`; module-specific JS builds are optional. Modules own PHP only in practice — their Inertia pages stay under `resources/js/pages/workspaces/<area>/`, and their routes are declared in the root `routes/workspaces.php` / `routes/browser-api.php` rather than in the module's own `routes/web.php`.
 
 ### Queries, metrics, jobs, scheduling
 
@@ -98,6 +98,14 @@ Each module has its own Vite build (`npm`-wise via `vite.config.js` inside the m
 ### Auth
 
 Laravel Fortify is the auth backbone (registration, login, 2FA — see `two-factor-setup-modal.tsx`). `App\Providers\FortifyServiceProvider` configures views and rate limits. After login users hit `/dashboard`, which redirects to their current/owned/first workspace or `/workspaces/setup`.
+
+### Per-workspace module toggles
+
+Each module is switched on per workspace by a `*_module_enabled` boolean on `workspaces` (e.g. `products_module_enabled`,
+`courses_module_enabled`). The admin UI is the "Toggle Modules" modal in `resources/js/pages/admin/workspaces/index.tsx`
+(`MODULE_FIELDS` / `MODULE_GROUPS`), validated in `AdminWorkspaceController`. The flag drives the sidebar entry in
+`app-sidebar.tsx`, and every controller in the module has to enforce it too — `abort_unless($workspace->x_module_enabled, 404)`
+— because workspace owners hold `'*'` and would otherwise sail past the permission checks.
 
 ## Conventions worth knowing
 

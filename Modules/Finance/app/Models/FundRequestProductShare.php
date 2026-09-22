@@ -2,9 +2,9 @@
 
 namespace Modules\Finance\Models;
 
-use App\Models\Product;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Products\Models\Product;
 
 /**
  * One product's share of a fund request's amount. The shares of a request always

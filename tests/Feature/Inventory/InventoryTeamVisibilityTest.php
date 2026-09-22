@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Product;
 use App\Models\Role;
 use App\Models\Shop;
 use App\Models\Team;
@@ -14,6 +13,7 @@ use Modules\Inventory\Models\InventoryUnitCodeItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Support\InventoryStockColumns;
+use Modules\Products\Models\Product;
 
 /** A workspace member with a scoped role (no "View All Workspace Data") on the given teams. */
 function scopedInventoryMember(Workspace $workspace, array $teams = []): User

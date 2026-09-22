@@ -1,10 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace Modules\Products\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Workspace;
 use App\Services\PostHogService;
@@ -13,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\Products\Models\Product;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -22,6 +22,7 @@ class ProductController extends Controller
 
     public function index(Request $request, Workspace $workspace)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::ViewProducts->value, $workspace);
 
         $user = $request->user();
@@ -106,6 +107,7 @@ class ProductController extends Controller
 
     public function create(Workspace $workspace)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::CreateProducts->value, $workspace);
         $shops = Shop::where('workspace_id', $workspace->id)
             ->visibleTo(auth()->user(), $workspace)
@@ -121,6 +123,7 @@ class ProductController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::CreateProducts->value, $workspace);
 
         $request->validate([
@@ -173,6 +176,7 @@ class ProductController extends Controller
 
     public function edit(Workspace $workspace, Product $product)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::EditProducts->value, $workspace);
         $shops = Shop::where('workspace_id', $workspace->id)
             ->visibleTo(auth()->user(), $workspace)
@@ -193,6 +197,7 @@ class ProductController extends Controller
 
     public function update(Request $request, Workspace $workspace, Product $product)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::EditProducts->value, $workspace);
 
         if ($product->workspace_id !== $workspace->id) {
@@ -245,6 +250,7 @@ class ProductController extends Controller
 
     public function destroy(Workspace $workspace, Product $product)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::DeleteProducts->value, $workspace);
 
         if ($product->workspace_id !== $workspace->id) {
@@ -254,5 +260,15 @@ class ProductController extends Controller
         $product->delete();
 
         return redirect()->route('workspaces.products.index', $workspace->slug);
+    }
+
+    /**
+     * Products are only reachable in a workspace that has the module switched
+     * on. Owners bypass the permission checks below (they hold '*'), so the
+     * module flag has to be enforced here rather than left to the policy.
+     */
+    private function guardModule(Workspace $workspace): void
+    {
+        abort_unless($workspace->products_module_enabled, 404);
     }
 }

@@ -19,6 +19,7 @@
         -->
         <testsuite name="Modules">
             <directory>Modules/Inventory/tests/Feature</directory>
+            <directory>Modules/Products/tests/Feature</directory>
         </testsuite>
     </testsuites>
     <source>

@@ -2,7 +2,6 @@
 
 use App\Models\Page;
 use App\Models\PageDailyRecord;
-use App\Models\Product;
 use App\Models\Shop;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,6 +16,7 @@ use Modules\GencysERP\Models\GencysDailySalesOrderItem;
 use Modules\GencysERP\Models\Intern;
 use Modules\Inventory\Models\InventoryUnitCode;
 use Modules\Pancake\Models\Order as PancakeOrder;
+use Modules\Products\Models\Product;
 
 function isUrl($workspace, string $path = ''): string
 {

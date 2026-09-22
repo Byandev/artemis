@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Product;
 use Modules\Finance\Models\Account;
+use Modules\Products\Models\Product;
 
 // Charging a transaction to one or more products (with per-product shares) is
 // covered by TransactionProductsTest. This file covers the product *suggestions*

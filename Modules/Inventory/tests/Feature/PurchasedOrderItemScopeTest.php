@@ -1,12 +1,12 @@
 <?php
 
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Inventory\Models\InventoryItem;
+use Modules\Products\Models\Product;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);

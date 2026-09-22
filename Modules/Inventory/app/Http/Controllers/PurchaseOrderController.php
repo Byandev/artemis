@@ -3,10 +3,10 @@
 namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Modules\Products\Models\Product;
 
 class PurchaseOrderController extends Controller
 {
