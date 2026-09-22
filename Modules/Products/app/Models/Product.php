@@ -66,6 +66,7 @@ class Product extends Model implements HasMedia
         'name',
         'code',
         'category',
+        'product_form_id',
         'status',
         'winning_date',
         'description',
@@ -104,6 +105,15 @@ class Product extends Model implements HasMedia
     public function pages(): HasManyThrough
     {
         return $this->hasManyThrough(Page::class, Shop::class, 'product_id', 'shop_id', 'id', 'id');
+    }
+
+    /**
+     * The delivery format this product ships in. Nullable — products that
+     * predate product forms have none.
+     */
+    public function form(): BelongsTo
+    {
+        return $this->belongsTo(ProductForm::class, 'product_form_id');
     }
 
     public function image(): MorphOne

@@ -11,23 +11,6 @@ use Tests\TestCase;
 // covers tests/Feature), so extend the app TestCase explicitly to boot the app.
 uses(TestCase::class, RefreshDatabase::class);
 
-/**
- * A workspace with the Products module switched on.
- *
- * The `products_module_enabled` column defaults to false, and every product
- * route 404s without it, so anything exercising the pages has to turn it on
- * first. See the toggle in the admin workspaces "Toggle Modules" modal.
- *
- * @return array{user: User, workspace: Workspace}
- */
-function makeProductsWorkspace(): array
-{
-    $made = makeWorkspaceWithOwner();
-    $made['workspace']->update(['products_module_enabled' => true]);
-
-    return $made;
-}
-
 test('owner can view products index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
     Product::factory()->create(['workspace_id' => $workspace->id, 'owner_id' => $owner->id]);

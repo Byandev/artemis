@@ -76,6 +76,23 @@ function makeWorkspaceWithOwner(): array
 }
 
 /**
+ * A workspace with the Products module switched on.
+ *
+ * The `products_module_enabled` column defaults to false, and every product
+ * route 404s without it, so anything exercising the pages has to turn it on
+ * first. See the toggle in the admin workspaces "Toggle Modules" modal.
+ *
+ * @return array{user: User, workspace: Workspace}
+ */
+function makeProductsWorkspace(): array
+{
+    $made = makeWorkspaceWithOwner();
+    $made['workspace']->update(['products_module_enabled' => true]);
+
+    return $made;
+}
+
+/**
  * The same, for a Gencys-partner workspace.
  *
  * The partner flag decides where inventory figures come from: a partner's items
