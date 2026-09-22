@@ -1,19 +1,21 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces\Product;
+namespace Modules\Products\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Modules\Products\Models\Product;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class AnalyticsController extends Controller
 {
     public function index(Workspace $workspace, Request $request)
     {
+        abort_unless($workspace->products_module_enabled, 404);
+
         $user = $request->user();
         $scoped = fn () => Product::where('workspace_id', $workspace->id)
             ->when(
@@ -39,6 +41,8 @@ class AnalyticsController extends Controller
 
     public function metrics(Workspace $workspace, Request $request)
     {
+        abort_unless($workspace->products_module_enabled, 404);
+
         $allowedMetrics = ['advertising_sales', 'ad_spent', 'sales', 'roas', 'rts'];
         $requestedMetrics = array_filter(explode(',', $request->input('metric', '')));
 

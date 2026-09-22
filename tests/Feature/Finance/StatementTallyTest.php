@@ -2,7 +2,6 @@
 
 use App\Models\Page;
 use App\Models\PageDailyRecord;
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\Carbon;
@@ -17,6 +16,7 @@ use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Services\UserProductIncomeStatementService;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
 use Modules\Pancake\Models\Order as PancakeOrder;
+use Modules\Products\Models\Product;
 
 /**
  * The three slices are the same month cut three ways, so they have to come to

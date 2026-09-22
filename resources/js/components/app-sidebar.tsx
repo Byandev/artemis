@@ -272,10 +272,17 @@ export function AppSidebar() {
         ...(currentWorkspace.products_module_enabled
             ? [
                   {
-                      title: 'Products',
-                      href: `/workspaces/${slug}/products/list`,
+                      title: 'Product Management',
                       icon: Package,
-                      permission: PERMISSIONS.ViewProducts,
+                      anyOf: [PERMISSIONS.ViewProducts],
+                      items: [
+                          {
+                              title: 'Manage',
+                              href: `/workspaces/${slug}/products/list`,
+                              icon: Package,
+                              permission: PERMISSIONS.ViewProducts,
+                          },
+                      ],
                   },
               ]
             : []),

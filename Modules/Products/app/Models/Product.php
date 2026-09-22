@@ -1,8 +1,12 @@
 <?php
 
-namespace App\Models;
+namespace Modules\Products\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
+use App\Models\Page;
+use App\Models\Shop;
+use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Modules\Products\Database\Factories\ProductFactory;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -17,6 +22,15 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Product extends Model implements HasMedia
 {
     use HasFactory, InteractsWithMedia, ScopesToVisibleTeams;
+
+    /**
+     * The factory lives in the module, so the default App\Models -> Database\Factories
+     * resolver can no longer find it.
+     */
+    protected static function newFactory(): ProductFactory
+    {
+        return ProductFactory::new();
+    }
 
     /**
      * A product reaches its teams through the shops that sell it

@@ -1,11 +1,11 @@
 <?php
 
-namespace Database\Factories;
+namespace Modules\Products\Database\Factories;
 
-use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Modules\Products\Models\Product;
 
 /**
  * @extends Factory<Product>
