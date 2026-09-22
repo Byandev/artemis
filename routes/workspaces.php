@@ -94,6 +94,7 @@ use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use Modules\Pancake\Http\Controllers\OrderController;
 use Modules\Products\Http\Controllers\AnalyticsController;
+use Modules\Products\Http\Controllers\FormController as ProductFormController;
 use Modules\Products\Http\Controllers\ProductController;
 use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
 use Modules\SimGateway\Http\Controllers\SmsController;
@@ -282,6 +283,13 @@ Route::middleware(['auth'])->group(function () {
     })->name('workspaces.products');
     Route::get('/workspaces/{workspace}/products/list', [ProductController::class, 'index'])->name('workspaces.products.index');
     Route::get('/workspaces/{workspace}/products/analytics', [AnalyticsController::class, 'index'])->name('workspaces.products.analytics');
+    Route::get('/workspaces/{workspace}/products/forms', [ProductFormController::class, 'index'])->name('workspaces.products.forms.index');
+    Route::post('/workspaces/{workspace}/products/forms', [ProductFormController::class, 'store'])->name('workspaces.products.forms.store');
+    // Declared before the {productForm} routes so "variants" is never taken as
+    // a form id.
+    Route::get('/workspaces/{workspace}/products/forms/variants/{variant}/image/{media}', [ProductFormController::class, 'showVariantImage'])->name('workspaces.products.forms.variant-image');
+    Route::put('/workspaces/{workspace}/products/forms/{productForm}', [ProductFormController::class, 'update'])->name('workspaces.products.forms.update');
+    Route::delete('/workspaces/{workspace}/products/forms/{productForm}', [ProductFormController::class, 'destroy'])->name('workspaces.products.forms.destroy');
     Route::get('/workspaces/{workspace}/products/analytics/metrics', [AnalyticsController::class, 'metrics'])->name('workspaces-workspace.products.analytics.metrics');
     Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
     Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');

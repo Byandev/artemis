@@ -8,11 +8,13 @@ use App\Models\Shop;
 use App\Models\Workspace;
 use App\Services\PostHogService;
 use App\Support\TeamVisibility;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Products\Models\Product;
+use Modules\Products\Models\ProductForm;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -118,6 +120,7 @@ class ProductController extends Controller
         return Inertia::render('workspaces/products/create', [
             'workspace' => $workspace,
             'shops' => $shops,
+            'forms' => $this->formOptions($workspace),
         ]);
     }
 
@@ -130,6 +133,12 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code,NULL,id,workspace_id,'.$workspace->id,
             'category' => 'required|string|max:255',
+            // Scoped to this workspace so a form id from another one can't be
+            // pinned onto the product.
+            'product_form_id' => [
+                'nullable',
+                Rule::exists('product_forms', 'id')->where('workspace_id', $workspace->id),
+            ],
             'status' => ['required', Rule::in(Product::STATUSES)],
             'winning_date' => 'nullable|date',
             'description' => 'nullable|string',
@@ -145,6 +154,7 @@ class ProductController extends Controller
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
+            'product_form_id' => $request->input('product_form_id') ?: null,
             'status' => $request->status,
             'winning_date' => $request->winning_date ?: null,
             'description' => $request->description,
@@ -192,6 +202,7 @@ class ProductController extends Controller
             'workspace' => $workspace,
             'product' => $product,
             'shops' => $shops,
+            'forms' => $this->formOptions($workspace),
         ]);
     }
 
@@ -208,6 +219,12 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code,'.$product->id.',id,workspace_id,'.$workspace->id,
             'category' => 'required|string|max:255',
+            // Scoped to this workspace so a form id from another one can't be
+            // pinned onto the product.
+            'product_form_id' => [
+                'nullable',
+                Rule::exists('product_forms', 'id')->where('workspace_id', $workspace->id),
+            ],
             'status' => ['required', Rule::in(Product::STATUSES)],
             'winning_date' => 'nullable|date',
             'description' => 'nullable|string',
@@ -221,6 +238,7 @@ class ProductController extends Controller
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
+            'product_form_id' => $request->input('product_form_id') ?: null,
             'status' => $request->status,
             'winning_date' => $request->winning_date ?: null,
             'description' => $request->description,
@@ -267,6 +285,20 @@ class ProductController extends Controller
      * on. Owners bypass the permission checks below (they hold '*'), so the
      * module flag has to be enforced here rather than left to the policy.
      */
+    /**
+     * The delivery formats this workspace has defined, for the picker on the
+     * create and edit screens.
+     *
+     * @return Collection<int, ProductForm>
+     */
+    private function formOptions(Workspace $workspace)
+    {
+        return ProductForm::ofWorkspace($workspace)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+    }
+
     private function guardModule(Workspace $workspace): void
     {
         abort_unless($workspace->products_module_enabled, 404);

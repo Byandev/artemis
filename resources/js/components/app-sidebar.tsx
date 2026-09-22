@@ -274,13 +274,22 @@ export function AppSidebar() {
                   {
                       title: 'Product Management',
                       icon: Package,
-                      anyOf: [PERMISSIONS.ViewProducts],
+                      anyOf: [
+                          PERMISSIONS.ViewProducts,
+                          PERMISSIONS.ViewProductForms,
+                      ],
                       items: [
                           {
                               title: 'Manage',
                               href: `/workspaces/${slug}/products/list`,
                               icon: Package,
                               permission: PERMISSIONS.ViewProducts,
+                          },
+                          {
+                              title: 'Product Forms',
+                              href: `/workspaces/${slug}/products/forms`,
+                              icon: Tags,
+                              permission: PERMISSIONS.ViewProductForms,
                           },
                       ],
                   },
