@@ -413,7 +413,11 @@ class CSRController extends Controller
                 ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
-            'systemUsers' => User::whereHas('workspaces', fn ($query) => $query->where('workspace_id', $workspace->id))->get(),
+            // Only what the assign picker reads: the name it lists and the
+            // email it also matches a search against.
+            'systemUsers' => User::whereHas('workspaces', fn ($query) => $query->where('workspace_id', $workspace->id))
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']),
         ]);
     }
 

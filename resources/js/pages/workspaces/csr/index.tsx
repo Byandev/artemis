@@ -10,7 +10,10 @@ import {
 import { PERMISSIONS } from '@/constants/permissions';
 import CsrAwareLayout from '@/layouts/csr-aware-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { EmployeeFormDialog } from '@/pages/workspaces/employees/components/employee-form-dialog';
+import {
+    EmployeeFormDialog,
+    SystemUserOption,
+} from '@/pages/workspaces/employees/components/employee-form-dialog';
 import { PaginatedData } from '@/types';
 import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
@@ -23,7 +26,7 @@ import { useEffect, useMemo, useState } from 'react';
 interface Props {
     workspace: Workspace;
     employees: PaginatedData<User>;
-    systemUsers: { id: string; name: string }[];
+    systemUsers: SystemUserOption[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
