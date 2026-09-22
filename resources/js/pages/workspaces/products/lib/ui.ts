@@ -1,7 +1,8 @@
 /**
- * The class strings this page shares between its table and its dialog. Kept in
- * one place so the two can't drift on border radius, label size or button
- * height — the same reasoning as resources/js/pages/workspaces/courses/lib/ui.ts.
+ * The class strings the product pages share between their tables and their
+ * dialogs. Kept in one place so they can't drift on border radius, label size
+ * or button height — the same reasoning as
+ * resources/js/pages/workspaces/courses/lib/ui.ts.
  */
 
 /** Label / column header: mono, uppercase, tracked out. */

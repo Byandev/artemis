@@ -277,6 +277,7 @@ export function AppSidebar() {
                       anyOf: [
                           PERMISSIONS.ViewProducts,
                           PERMISSIONS.ViewProductForms,
+                          PERMISSIONS.ViewTargetMarkets,
                       ],
                       items: [
                           {
@@ -290,6 +291,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/products/forms`,
                               icon: Tags,
                               permission: PERMISSIONS.ViewProductForms,
+                          },
+                          {
+                              title: 'Target Market',
+                              href: `/workspaces/${slug}/products/target-markets`,
+                              icon: Target,
+                              permission: PERMISSIONS.ViewTargetMarkets,
                           },
                       ],
                   },
