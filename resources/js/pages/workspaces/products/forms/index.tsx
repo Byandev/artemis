@@ -15,7 +15,6 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, useForm } from '@inertiajs/react';
 import { ImageOff, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import ProductFormDialog from './components/form-dialog';
 import {
     BTN_PRIMARY,
     CARD,
@@ -26,7 +25,8 @@ import {
     PILL_OUTLINE,
     ROW_DIVIDE,
     SECTION_BORDER,
-} from './lib/ui';
+} from '../lib/ui';
+import ProductFormDialog from './components/form-dialog';
 import { type ProductForm } from './types';
 
 interface Props {
