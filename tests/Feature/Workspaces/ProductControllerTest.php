@@ -262,3 +262,52 @@ test('store attaches selected shops from same workspace and ignores foreign shop
     // Foreign shop should NOT have been linked
     expect($foreignShop->fresh()->product_id)->not->toBe($product->id);
 });
+
+function productPropsFromInertia($response): array
+{
+    return $response->getOriginalContent()->getData()['page']['props'];
+}
+
+test('products index returns summary counts per lifecycle stage', function () {
+    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    Product::factory()->count(2)->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'status' => 'Scaling']);
+    Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'status' => 'Testing']);
+    Product::factory()->count(3)->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'status' => 'Inactive']);
+
+    $props = productPropsFromInertia(
+        $this->actingAs($owner)->get("/workspaces/{$w->slug}/products/list")->assertOk()
+    );
+
+    expect($props['summary'])->toMatchArray([
+        'total_product_count' => 6,
+        'scaling_product_count' => 2,
+        'testing_product_count' => 1,
+        'inactive_product_count' => 3,
+    ]);
+
+    // Every stage is present so the tabs can render a count even at zero.
+    expect(collect($props['statusCounts'])->all())
+        ->toHaveKeys(Product::STATUSES)
+        ->and(collect($props['statusCounts'])['Failed'])->toBe(0);
+});
+
+test('products index summary ignores the status filter but honours search', function () {
+    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Findable Hat', 'status' => 'Scaling']);
+    Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Findable Cap', 'status' => 'Testing']);
+    Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Unrelated', 'status' => 'Scaling']);
+
+    // Selecting a tab must not collapse the other tabs' counts to zero.
+    $props = productPropsFromInertia(
+        $this->actingAs($owner)->get("/workspaces/{$w->slug}/products/list?filter[status]=Scaling")->assertOk()
+    );
+    expect($props['summary']['total_product_count'])->toBe(3)
+        ->and(collect($props['statusCounts'])['Testing'])->toBe(1);
+
+    // Search does narrow them, so the cards describe the listed slice.
+    $props = productPropsFromInertia(
+        $this->actingAs($owner)->get("/workspaces/{$w->slug}/products/list?filter[search]=findable")->assertOk()
+    );
+    expect($props['summary']['total_product_count'])->toBe(2)
+        ->and($props['summary']['scaling_product_count'])->toBe(1);
+});

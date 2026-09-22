@@ -26,13 +26,13 @@ class ProductController extends Controller
 
         $user = $request->user();
 
-        $products = QueryBuilder::for(
-            Product::ofWorkspace($workspace)
-                ->when(
-                    TeamVisibility::shouldScope($user, $workspace),
-                    fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
-                )
-        )
+        $scoped = fn () => Product::ofWorkspace($workspace)
+            ->when(
+                TeamVisibility::shouldScope($user, $workspace),
+                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
+            );
+
+        $products = QueryBuilder::for($scoped())
             ->with('owner')
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -63,6 +63,28 @@ class ProductController extends Controller
             ->distinct()
             ->pluck('category');
 
+        // Headline counts and the per-status tab counts. Deliberately ignores the
+        // status filter — the tabs have to keep showing every stage's total while
+        // one of them is selected — but honours search/category so the numbers
+        // describe the same slice the table is paginating through.
+        $filters = (array) $request->input('filter', []);
+        $search = $filters['search'] ?? null;
+        $category = $filters['category'] ?? null;
+
+        $summaryQuery = $scoped()
+            ->when($search, fn ($q, $value) => $q->where(fn ($inner) => $inner
+                ->where('name', 'like', "%{$value}%")
+                ->orWhere('code', 'like', "%{$value}%")))
+            ->when($category, fn ($q, $value) => $q->where('category', $value));
+
+        $countsByStatus = (clone $summaryQuery)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $statusCounts = collect(Product::STATUSES)
+            ->mapWithKeys(fn ($status) => [$status => (int) ($countsByStatus[$status] ?? 0)]);
+
         return Inertia::render('workspaces/products/index', [
             'products' => $products,
             'workspace' => $workspace,
@@ -72,6 +94,13 @@ class ProductController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'categories' => $categories,
+            'statusCounts' => $statusCounts,
+            'summary' => [
+                'total_product_count' => (int) (clone $summaryQuery)->count(),
+                'scaling_product_count' => $statusCounts['Scaling'],
+                'testing_product_count' => $statusCounts['Testing'],
+                'inactive_product_count' => $statusCounts['Inactive'],
+            ],
         ]);
     }
 
