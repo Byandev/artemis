@@ -13,10 +13,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Only the voice and the constraints are editable. The rules that keep the
  * answer usable — one sentence of reasoning per name, varied angles, never
  * naming a delivery form the brief did not ask for — are appended by
- * RdpNameSuggester and cannot be edited away, because the "Pick a name" grid
+ * ProductResearchNameSuggester and cannot be edited away, because the "Pick a name" grid
  * depends on them.
  */
-class RdpPromptSetting extends Model
+class ProductResearchPromptSetting extends Model
 {
     /** What the dialog's "Reset to default" puts back. */
     public const DEFAULT_PROMPT = 'You name over-the-counter health products for a Philippine direct-response brand. Names are 2–4 words, plain English, no trademarks, no medical claims of cure.';

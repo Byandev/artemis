@@ -12,16 +12,16 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Modules\Products\Exceptions\RdpSuggestionFailed;
+use Modules\Products\Exceptions\ProductResearchSuggestionFailed;
 use Modules\Products\Models\ProductForm;
 use Modules\Products\Models\ProductResearch;
-use Modules\Products\Models\RdpPromptSetting;
+use Modules\Products\Models\ProductResearchPromptSetting;
 use Modules\Products\Models\TargetMarket;
-use Modules\Products\Services\RdpNameSuggester;
-use Modules\Products\Services\RdpPackshotGenerator;
+use Modules\Products\Services\ProductResearchNameSuggester;
+use Modules\Products\Services\ProductResearchPackshotGenerator;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class RdpBuilderController extends Controller
+class ProductResearchController extends Controller
 {
     use AuthorizesRequests;
 
@@ -29,27 +29,27 @@ class RdpBuilderController extends Controller
     public function index(Workspace $workspace)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ViewRdpBuilder->value, $workspace);
+        $this->authorize(Permission::ViewProductResearch->value, $workspace);
 
-        $rdps = ProductResearch::ofWorkspace($workspace)
+        $productResearches = ProductResearch::ofWorkspace($workspace)
             ->with(['form:id,name', 'targetMarket:id,name', 'targetMarketSub:id,name', 'creator:id,name'])
             ->latest()
             ->get()
-            ->map(fn (ProductResearch $rdp) => [
-                'id' => $rdp->id,
-                'name' => $rdp->name,
-                'form' => $rdp->form?->name,
+            ->map(fn (ProductResearch $productResearch) => [
+                'id' => $productResearch->id,
+                'name' => $productResearch->name,
+                'form' => $productResearch->form?->name,
                 // The list shows the sub category — "Back Pain", not
                 // "Musculoskeletal" — falling back to the category when the
                 // brief was filed without one.
-                'target_market' => $rdp->targetMarketSub?->name ?? $rdp->targetMarket?->name,
-                'date' => $rdp->created_at?->toDateString(),
-                'created_by' => $rdp->creator?->name,
+                'target_market' => $productResearch->targetMarketSub?->name ?? $productResearch->targetMarket?->name,
+                'date' => $productResearch->created_at?->toDateString(),
+                'created_by' => $productResearch->creator?->name,
             ]);
 
-        return Inertia::render('workspaces/products/rdp-builder/index', [
+        return Inertia::render('workspaces/products/product-research/index', [
             'workspace' => $workspace,
-            'rdps' => $rdps,
+            'productResearches' => $productResearches,
         ]);
     }
 
@@ -57,35 +57,35 @@ class RdpBuilderController extends Controller
     public function create(Workspace $workspace)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ManageRdpBuilder->value, $workspace);
+        $this->authorize(Permission::ManageProductResearch->value, $workspace);
 
-        return Inertia::render('workspaces/products/rdp-builder/builder', [
+        return Inertia::render('workspaces/products/product-research/builder', [
             'workspace' => $workspace,
-            'rdp' => null,
+            'productResearch' => null,
             ...$this->options($workspace),
         ]);
     }
 
     /** The builder, on a brief already filed. */
-    public function edit(Workspace $workspace, ProductResearch $rdp)
+    public function edit(Workspace $workspace, ProductResearch $productResearch)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ViewRdpBuilder->value, $workspace);
-        $this->guard($workspace, $rdp);
+        $this->authorize(Permission::ViewProductResearch->value, $workspace);
+        $this->guard($workspace, $productResearch);
 
-        return Inertia::render('workspaces/products/rdp-builder/builder', [
+        return Inertia::render('workspaces/products/product-research/builder', [
             'workspace' => $workspace,
-            'rdp' => [
-                'id' => $rdp->id,
-                'product_form_id' => $rdp->product_form_id,
-                'target_market_id' => $rdp->target_market_id,
-                'target_market_sub_id' => $rdp->target_market_sub_id,
-                'name' => $rdp->name,
-                'positioning' => $rdp->positioning,
-                'claims' => $rdp->claims,
-                'active_ingredients' => $rdp->active_ingredients,
-                'additional_instruction' => $rdp->additional_instruction,
-                ...$this->packshotPayload($workspace, $rdp),
+            'productResearch' => [
+                'id' => $productResearch->id,
+                'product_form_id' => $productResearch->product_form_id,
+                'target_market_id' => $productResearch->target_market_id,
+                'target_market_sub_id' => $productResearch->target_market_sub_id,
+                'name' => $productResearch->name,
+                'positioning' => $productResearch->positioning,
+                'claims' => $productResearch->claims,
+                'active_ingredients' => $productResearch->active_ingredients,
+                'additional_instruction' => $productResearch->additional_instruction,
+                ...$this->packshotPayload($workspace, $productResearch),
             ],
             ...$this->options($workspace),
         ]);
@@ -94,50 +94,50 @@ class RdpBuilderController extends Controller
     public function store(Request $request, Workspace $workspace)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ManageRdpBuilder->value, $workspace);
+        $this->authorize(Permission::ManageProductResearch->value, $workspace);
 
         $validated = $request->validate($this->rules($request, $workspace));
 
-        $rdp = ProductResearch::create([
+        $productResearch = ProductResearch::create([
             ...$validated,
             'workspace_id' => $workspace->id,
             'created_by' => $request->user()->id,
         ]);
 
         return redirect()
-            ->route('workspaces.products.rdp-builder.index', $workspace)
-            ->with('success', "\"{$rdp->name}\" saved to RDPs.");
+            ->route('workspaces.products.product-research.index', $workspace)
+            ->with('success', "\"{$productResearch->name}\" saved to RDPs.");
     }
 
-    public function update(Request $request, Workspace $workspace, ProductResearch $rdp)
+    public function update(Request $request, Workspace $workspace, ProductResearch $productResearch)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ManageRdpBuilder->value, $workspace);
-        $this->guard($workspace, $rdp);
+        $this->authorize(Permission::ManageProductResearch->value, $workspace);
+        $this->guard($workspace, $productResearch);
 
-        $rdp->update($request->validate($this->rules($request, $workspace)));
+        $productResearch->update($request->validate($this->rules($request, $workspace)));
 
         return redirect()
-            ->route('workspaces.products.rdp-builder.index', $workspace)
-            ->with('success', "\"{$rdp->name}\" updated.");
+            ->route('workspaces.products.product-research.index', $workspace)
+            ->with('success', "\"{$productResearch->name}\" updated.");
     }
 
     /**
      * Candidate names and a positioning line for the brief so far — as many as
      * the workspace asked for in the Configure prompt dialog.
      *
-     * Gated on ManageRdpBuilder rather than ViewRdpBuilder: every press of the
+     * Gated on ManageProductResearch rather than ViewProductResearch: every press of the
      * button is a paid call, so someone who may only read the list must not be
      * able to spend against the workspace's account.
      */
-    public function suggestNames(Request $request, Workspace $workspace, RdpNameSuggester $suggester)
+    public function suggestNames(Request $request, Workspace $workspace, ProductResearchNameSuggester $suggester)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ManageRdpBuilder->value, $workspace);
+        $this->authorize(Permission::ManageProductResearch->value, $workspace);
 
         $validated = $request->validate($this->briefRules($request, $workspace));
 
-        if (! RdpNameSuggester::isConfigured()) {
+        if (! ProductResearchNameSuggester::isConfigured()) {
             return response()->json([
                 'message' => "Name suggestions aren't configured yet. Set OPENAI_API_KEY to switch this on.",
             ], 503);
@@ -151,7 +151,7 @@ class RdpBuilderController extends Controller
             ? TargetMarket::ofWorkspace($workspace)->find($validated['target_market_sub_id'])
             : null;
 
-        $settings = RdpPromptSetting::forWorkspace($workspace);
+        $settings = ProductResearchPromptSetting::forWorkspace($workspace);
 
         try {
             return response()->json(
@@ -163,7 +163,7 @@ class RdpBuilderController extends Controller
                     $settings->count(),
                 )
             );
-        } catch (RdpSuggestionFailed $e) {
+        } catch (ProductResearchSuggestionFailed $e) {
             // The exception's message is written for the person who pressed the
             // button; the provider's own words stayed in the log.
             return response()->json(['message' => $e->getMessage()], 502);
@@ -176,14 +176,14 @@ class RdpBuilderController extends Controller
      * Only for a saved one: the options are files, and files need an owner. The
      * panel says so rather than silently disabling itself.
      */
-    public function generatePackshots(Request $request, Workspace $workspace, RdpPackshotGenerator $generator)
+    public function generatePackshots(Request $request, Workspace $workspace, ProductResearchPackshotGenerator $generator)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ManageRdpBuilder->value, $workspace);
+        $this->authorize(Permission::ManageProductResearch->value, $workspace);
 
-        $rdp = $this->resolveRdp($request, $workspace);
+        $productResearch = $this->resolveProductResearch($request, $workspace);
 
-        if (! RdpPackshotGenerator::isConfigured()) {
+        if (! ProductResearchPackshotGenerator::isConfigured()) {
             return response()->json([
                 'message' => "Packshot generation isn't configured yet. Set OPENAI_API_KEY to switch this on.",
             ], 503);
@@ -196,80 +196,80 @@ class RdpBuilderController extends Controller
         // first and the failure arrives as a readable message.
         set_time_limit((int) config('openai.packshot_timeout', 180) + 30);
 
-        $rdp->loadMissing(['form', 'targetMarket', 'targetMarketSub']);
-        $settings = RdpPromptSetting::forWorkspace($workspace);
+        $productResearch->loadMissing(['form', 'targetMarket', 'targetMarketSub']);
+        $settings = ProductResearchPromptSetting::forWorkspace($workspace);
 
         try {
             $images = $generator->generate(
-                $rdp->name,
-                $rdp->form?->name ?? 'product',
+                $productResearch->name,
+                $productResearch->form?->name ?? 'product',
                 // The form says how it is packaged; the generator no longer
                 // guesses from the name.
-                $rdp->form?->packshotDescription() ?? 'the product in its retail packaging',
+                $productResearch->form?->packshotDescription() ?? 'the product in its retail packaging',
                 // Category and sub category stay separate: the category picks
                 // the palette, the sub category says what it treats.
-                $rdp->targetMarket?->name ?? 'general wellness',
-                $rdp->targetMarketSub?->name,
+                $productResearch->targetMarket?->name ?? 'general wellness',
+                $productResearch->targetMarketSub?->name,
                 $settings->packshotPrompt(),
                 $settings->packshotCount(),
             );
-        } catch (RdpSuggestionFailed $e) {
+        } catch (ProductResearchSuggestionFailed $e) {
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
         // A fresh run replaces the previous options rather than piling up: the
         // grid shows one set, and the old files would otherwise sit in the
         // bucket unreachable.
-        $rdp->clearMediaCollection(ProductResearch::PACKSHOT_OPTIONS_COLLECTION);
+        $productResearch->clearMediaCollection(ProductResearch::PACKSHOT_OPTIONS_COLLECTION);
 
         foreach ($images as $index => $image) {
-            $rdp->addMediaFromString($image['data'])
-                ->usingFileName(Str::slug($rdp->name ?: 'packshot')."-{$index}.".$this->extensionFor($image['mime']))
+            $productResearch->addMediaFromString($image['data'])
+                ->usingFileName(Str::slug($productResearch->name ?: 'packshot')."-{$index}.".$this->extensionFor($image['mime']))
                 ->toMediaCollection(ProductResearch::PACKSHOT_OPTIONS_COLLECTION);
         }
 
-        return response()->json($this->packshotPayload($workspace, $rdp->refresh()));
+        return response()->json($this->packshotPayload($workspace, $productResearch->refresh()));
     }
 
     /** Someone's own render, used instead of a generated one. */
     public function uploadPackshot(Request $request, Workspace $workspace)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ManageRdpBuilder->value, $workspace);
+        $this->authorize(Permission::ManageProductResearch->value, $workspace);
 
         $request->validate([
             'packshot' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,heic,heif,svg', 'max:10240'],
         ]);
 
-        $rdp = $this->resolveRdp($request, $workspace);
+        $productResearch = $this->resolveProductResearch($request, $workspace);
 
         // singleFile(), so this replaces whatever was there.
-        $rdp->addMediaFromRequest('packshot')->toMediaCollection(ProductResearch::PACKSHOT_COLLECTION);
+        $productResearch->addMediaFromRequest('packshot')->toMediaCollection(ProductResearch::PACKSHOT_COLLECTION);
 
-        return response()->json($this->packshotPayload($workspace, $rdp->refresh()));
+        return response()->json($this->packshotPayload($workspace, $productResearch->refresh()));
     }
 
     /** Promote one of the generated options to be the brief's packshot. */
-    public function selectPackshot(Request $request, Workspace $workspace, ProductResearch $rdp)
+    public function selectPackshot(Request $request, Workspace $workspace, ProductResearch $productResearch)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ManageRdpBuilder->value, $workspace);
-        $this->guard($workspace, $rdp);
+        $this->authorize(Permission::ManageProductResearch->value, $workspace);
+        $this->guard($workspace, $productResearch);
 
         $validated = $request->validate(['media_id' => ['required', 'integer']]);
 
         // Looked up through the brief's own options rather than by id alone, so
         // another brief's file cannot be adopted.
-        $option = $rdp->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION)
+        $option = $productResearch->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION)
             ->firstWhere('id', $validated['media_id']);
 
         abort_unless($option !== null, 404);
 
         // Copied rather than moved: the option stays in the grid so a different
         // one can be picked afterwards.
-        $option->copy($rdp, ProductResearch::PACKSHOT_COLLECTION, $option->disk);
+        $option->copy($productResearch, ProductResearch::PACKSHOT_COLLECTION, $option->disk);
 
-        return response()->json($this->packshotPayload($workspace, $rdp->refresh()));
+        return response()->json($this->packshotPayload($workspace, $productResearch->refresh()));
     }
 
     /**
@@ -282,13 +282,13 @@ class RdpBuilderController extends Controller
      * there is nothing to wait for: the draft is saved on the way through and
      * the builder switches to editing it.
      */
-    private function resolveRdp(Request $request, Workspace $workspace): ProductResearch
+    private function resolveProductResearch(Request $request, Workspace $workspace): ProductResearch
     {
-        if ($request->filled('rdp_id')) {
-            $rdp = ProductResearch::find($request->integer('rdp_id'));
-            $this->guard($workspace, $rdp ?? new ProductResearch);
+        if ($request->filled('product_research_id')) {
+            $productResearch = ProductResearch::find($request->integer('product_research_id'));
+            $this->guard($workspace, $productResearch ?? new ProductResearch);
 
-            return $rdp;
+            return $productResearch;
         }
 
         $validated = $request->validate($this->rules($request, $workspace));
@@ -305,14 +305,14 @@ class RdpBuilderController extends Controller
      * hands out a short-lived signed URL, or streams the bytes when the disk
      * cannot sign one.
      */
-    public function showPackshotImage(Workspace $workspace, ProductResearch $rdp, Media $media)
+    public function showPackshotImage(Workspace $workspace, ProductResearch $productResearch, Media $media)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ViewRdpBuilder->value, $workspace);
-        $this->guard($workspace, $rdp);
+        $this->authorize(Permission::ViewProductResearch->value, $workspace);
+        $this->guard($workspace, $productResearch);
 
         abort_unless(
-            $media->model_type === $rdp->getMorphClass() && $media->model_id === $rdp->getKey(),
+            $media->model_type === $productResearch->getMorphClass() && $media->model_id === $productResearch->getKey(),
             404,
         );
 
@@ -333,22 +333,22 @@ class RdpBuilderController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function packshotPayload(Workspace $workspace, ProductResearch $rdp): array
+    private function packshotPayload(Workspace $workspace, ProductResearch $productResearch): array
     {
-        $url = fn (Media $media) => route('workspaces.products.rdp-builder.packshot-image', [
+        $url = fn (Media $media) => route('workspaces.products.product-research.packshot-image', [
             'workspace' => $workspace,
-            'rdp' => $rdp->id,
+            'productResearch' => $productResearch->id,
             'media' => $media->id,
         ]);
 
-        $packshot = $rdp->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION);
+        $packshot = $productResearch->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION);
 
         return [
             // Handed back so a builder that was still a draft knows which
             // brief it is now editing.
-            'rdp_id' => $rdp->id,
+            'product_research_id' => $productResearch->id,
             'packshot' => $packshot ? ['id' => $packshot->id, 'url' => $url($packshot)] : null,
-            'packshot_options' => $rdp->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION)
+            'packshot_options' => $productResearch->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION)
                 ->map(fn (Media $media) => ['id' => $media->id, 'url' => $url($media)])
                 ->values()
                 ->all(),
@@ -374,7 +374,7 @@ class RdpBuilderController extends Controller
     public function updatePromptSettings(Request $request, Workspace $workspace)
     {
         $this->guardModule($workspace);
-        $this->authorize(Permission::ManageRdpBuilder->value, $workspace);
+        $this->authorize(Permission::ManageProductResearch->value, $workspace);
 
         // `sometimes` throughout: the dialog sends both halves, but a caller
         // changing only the naming settings must not have to restate the
@@ -383,12 +383,12 @@ class RdpBuilderController extends Controller
             // Null is "reset to default" — the model falls back rather than
             // storing a copy of the default that would then never track it.
             'naming_prompt' => ['sometimes', 'nullable', 'string', 'max:4000'],
-            'name_count' => ['sometimes', 'required', 'integer', 'min:1', 'max:'.RdpPromptSetting::MAX_COUNT],
+            'name_count' => ['sometimes', 'required', 'integer', 'min:1', 'max:'.ProductResearchPromptSetting::MAX_COUNT],
             'packshot_prompt' => ['sometimes', 'nullable', 'string', 'max:4000'],
-            'packshot_count' => ['sometimes', 'required', 'integer', 'min:1', 'max:'.RdpPromptSetting::MAX_PACKSHOT_COUNT],
+            'packshot_count' => ['sometimes', 'required', 'integer', 'min:1', 'max:'.ProductResearchPromptSetting::MAX_PACKSHOT_COUNT],
         ]);
 
-        $settings = RdpPromptSetting::forWorkspace($workspace);
+        $settings = ProductResearchPromptSetting::forWorkspace($workspace);
 
         // Storing the default verbatim would freeze the workspace on today's
         // wording, so it is normalised back to null.
@@ -401,14 +401,14 @@ class RdpBuilderController extends Controller
         if (array_key_exists('naming_prompt', $validated)) {
             $settings->naming_prompt = $normalise(
                 (string) $validated['naming_prompt'],
-                RdpPromptSetting::DEFAULT_PROMPT
+                ProductResearchPromptSetting::DEFAULT_PROMPT
             );
         }
 
         if (array_key_exists('packshot_prompt', $validated)) {
             $settings->packshot_prompt = $normalise(
                 (string) $validated['packshot_prompt'],
-                RdpPromptSetting::DEFAULT_PACKSHOT_PROMPT
+                ProductResearchPromptSetting::DEFAULT_PACKSHOT_PROMPT
             );
         }
 
@@ -428,18 +428,18 @@ class RdpBuilderController extends Controller
      */
     private function promptSettings(Workspace $workspace): array
     {
-        $settings = RdpPromptSetting::forWorkspace($workspace);
+        $settings = ProductResearchPromptSetting::forWorkspace($workspace);
 
         return [
             'naming_prompt' => $settings->prompt(),
             'name_count' => $settings->count(),
-            'default_prompt' => RdpPromptSetting::DEFAULT_PROMPT,
-            'max_count' => RdpPromptSetting::MAX_COUNT,
+            'default_prompt' => ProductResearchPromptSetting::DEFAULT_PROMPT,
+            'max_count' => ProductResearchPromptSetting::MAX_COUNT,
             'is_default' => blank($settings->naming_prompt),
             'packshot_prompt' => $settings->packshotPrompt(),
             'packshot_count' => $settings->packshotCount(),
-            'default_packshot_prompt' => RdpPromptSetting::DEFAULT_PACKSHOT_PROMPT,
-            'max_packshot_count' => RdpPromptSetting::MAX_PACKSHOT_COUNT,
+            'default_packshot_prompt' => ProductResearchPromptSetting::DEFAULT_PACKSHOT_PROMPT,
+            'max_packshot_count' => ProductResearchPromptSetting::MAX_PACKSHOT_COUNT,
             'packshot_is_default' => blank($settings->packshot_prompt),
         ];
     }
@@ -457,9 +457,9 @@ class RdpBuilderController extends Controller
      * Route-model binding resolves a brief by id alone, so a member of one
      * workspace could otherwise open another workspace's.
      */
-    private function guard(Workspace $workspace, ?ProductResearch $rdp): void
+    private function guard(Workspace $workspace, ?ProductResearch $productResearch): void
     {
-        abort_unless($rdp !== null && $rdp->workspace_id === $workspace->id, 404);
+        abort_unless($productResearch !== null && $productResearch->workspace_id === $workspace->id, 404);
     }
 
     /**

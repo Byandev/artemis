@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('rdp_prompt_settings', function (Blueprint $table) {
+        Schema::create('product_research_prompt_settings', function (Blueprint $table) {
             $table->id();
             // One row per workspace, created the first time someone presses
             // Done in the Configure prompt dialog. Everyone else reads the
@@ -28,6 +28,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('rdp_prompt_settings');
+        Schema::dropIfExists('product_research_prompt_settings');
     }
 };

@@ -96,7 +96,7 @@ use Modules\Pancake\Http\Controllers\OrderController;
 use Modules\Products\Http\Controllers\AnalyticsController;
 use Modules\Products\Http\Controllers\FormController as ProductFormController;
 use Modules\Products\Http\Controllers\ProductController;
-use Modules\Products\Http\Controllers\RdpBuilderController;
+use Modules\Products\Http\Controllers\ProductResearchController;
 use Modules\Products\Http\Controllers\TargetMarketController;
 use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
 use Modules\SimGateway\Http\Controllers\SmsController;
@@ -296,26 +296,26 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/products/target-markets', [TargetMarketController::class, 'store'])->name('workspaces.products.target-markets.store');
     Route::put('/workspaces/{workspace}/products/target-markets/{targetMarket}', [TargetMarketController::class, 'update'])->name('workspaces.products.target-markets.update');
     Route::delete('/workspaces/{workspace}/products/target-markets/{targetMarket}', [TargetMarketController::class, 'destroy'])->name('workspaces.products.target-markets.destroy');
-    Route::get('/workspaces/{workspace}/products/rdp-builder', [RdpBuilderController::class, 'index'])->name('workspaces.products.rdp-builder.index');
-    Route::get('/workspaces/{workspace}/products/rdp-builder/create', [RdpBuilderController::class, 'create'])->name('workspaces.products.rdp-builder.create');
-    // Declared before the {rdp} routes so "suggest-names" is never read as an
-    // id. Throttled because each call is a paid one — see the rdp-suggestions
+    Route::get('/workspaces/{workspace}/products/product-research', [ProductResearchController::class, 'index'])->name('workspaces.products.product-research.index');
+    Route::get('/workspaces/{workspace}/products/product-research/create', [ProductResearchController::class, 'create'])->name('workspaces.products.product-research.create');
+    // Declared before the {productResearch} routes so "suggest-names" is never read as an
+    // id. Throttled because each call is a paid one — see the product-research-suggestions
     // limiter in AppServiceProvider.
-    Route::put('/workspaces/{workspace}/products/rdp-builder/prompt-settings', [RdpBuilderController::class, 'updatePromptSettings'])->name('workspaces.products.rdp-builder.prompt-settings');
-    Route::post('/workspaces/{workspace}/products/rdp-builder/suggest-names', [RdpBuilderController::class, 'suggestNames'])
-        ->middleware('throttle:rdp-suggestions')
-        ->name('workspaces.products.rdp-builder.suggest-names');
-    Route::post('/workspaces/{workspace}/products/rdp-builder', [RdpBuilderController::class, 'store'])->name('workspaces.products.rdp-builder.store');
-    Route::get('/workspaces/{workspace}/products/rdp-builder/{rdp}/edit', [RdpBuilderController::class, 'edit'])->name('workspaces.products.rdp-builder.edit');
-    // No {rdp}: a draft that has not been filed yet is saved on the way
+    Route::put('/workspaces/{workspace}/products/product-research/prompt-settings', [ProductResearchController::class, 'updatePromptSettings'])->name('workspaces.products.product-research.prompt-settings');
+    Route::post('/workspaces/{workspace}/products/product-research/suggest-names', [ProductResearchController::class, 'suggestNames'])
+        ->middleware('throttle:product-research-suggestions')
+        ->name('workspaces.products.product-research.suggest-names');
+    Route::post('/workspaces/{workspace}/products/product-research', [ProductResearchController::class, 'store'])->name('workspaces.products.product-research.store');
+    Route::get('/workspaces/{workspace}/products/product-research/{productResearch}/edit', [ProductResearchController::class, 'edit'])->name('workspaces.products.product-research.edit');
+    // No {productResearch}: a draft that has not been filed yet is saved on the way
     // through, so Step 3 does not have to wait on Save to RDPs.
-    Route::post('/workspaces/{workspace}/products/rdp-builder/packshots', [RdpBuilderController::class, 'generatePackshots'])
-        ->middleware('throttle:rdp-suggestions')
-        ->name('workspaces.products.rdp-builder.packshots');
-    Route::post('/workspaces/{workspace}/products/rdp-builder/packshot', [RdpBuilderController::class, 'uploadPackshot'])->name('workspaces.products.rdp-builder.packshot-upload');
-    Route::post('/workspaces/{workspace}/products/rdp-builder/{rdp}/packshot/select', [RdpBuilderController::class, 'selectPackshot'])->name('workspaces.products.rdp-builder.packshot-select');
-    Route::get('/workspaces/{workspace}/products/rdp-builder/{rdp}/packshot/{media}', [RdpBuilderController::class, 'showPackshotImage'])->name('workspaces.products.rdp-builder.packshot-image');
-    Route::put('/workspaces/{workspace}/products/rdp-builder/{rdp}', [RdpBuilderController::class, 'update'])->name('workspaces.products.rdp-builder.update');
+    Route::post('/workspaces/{workspace}/products/product-research/packshots', [ProductResearchController::class, 'generatePackshots'])
+        ->middleware('throttle:product-research-suggestions')
+        ->name('workspaces.products.product-research.packshots');
+    Route::post('/workspaces/{workspace}/products/product-research/packshot', [ProductResearchController::class, 'uploadPackshot'])->name('workspaces.products.product-research.packshot-upload');
+    Route::post('/workspaces/{workspace}/products/product-research/{productResearch}/packshot/select', [ProductResearchController::class, 'selectPackshot'])->name('workspaces.products.product-research.packshot-select');
+    Route::get('/workspaces/{workspace}/products/product-research/{productResearch}/packshot/{media}', [ProductResearchController::class, 'showPackshotImage'])->name('workspaces.products.product-research.packshot-image');
+    Route::put('/workspaces/{workspace}/products/product-research/{productResearch}', [ProductResearchController::class, 'update'])->name('workspaces.products.product-research.update');
     Route::get('/workspaces/{workspace}/products/analytics/metrics', [AnalyticsController::class, 'metrics'])->name('workspaces-workspace.products.analytics.metrics');
     Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
     Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');

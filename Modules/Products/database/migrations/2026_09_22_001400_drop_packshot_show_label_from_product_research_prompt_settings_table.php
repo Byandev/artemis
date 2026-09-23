@@ -14,14 +14,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('rdp_prompt_settings', function (Blueprint $table) {
+        Schema::table('product_research_prompt_settings', function (Blueprint $table) {
             $table->dropColumn('packshot_show_label');
         });
     }
 
     public function down(): void
     {
-        Schema::table('rdp_prompt_settings', function (Blueprint $table) {
+        Schema::table('product_research_prompt_settings', function (Blueprint $table) {
             $table->boolean('packshot_show_label')->default(true)->after('packshot_count');
         });
     }

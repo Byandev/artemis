@@ -12,7 +12,7 @@ use Exception;
  * body can quote the prompt back, and the prompt carries the workspace's brief.
  * The detail goes to the log instead.
  */
-class RdpSuggestionFailed extends Exception
+class ProductResearchSuggestionFailed extends Exception
 {
     public static function upstream(int $status): self
     {

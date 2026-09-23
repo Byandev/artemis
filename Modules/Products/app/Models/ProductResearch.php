@@ -24,13 +24,13 @@ class ProductResearch extends Model implements HasMedia
     use InteractsWithMedia;
 
     /** The packshot that was chosen or uploaded — what goes to the lab. */
-    public const PACKSHOT_COLLECTION = 'RDP_PACKSHOT';
+    public const PACKSHOT_COLLECTION = 'PRODUCT_RESEARCH_PACKSHOT';
 
     /**
      * The options the generator produced, kept so the grid survives a reload
      * and so a rejected option can still be picked later.
      */
-    public const PACKSHOT_OPTIONS_COLLECTION = 'RDP_PACKSHOT_OPTIONS';
+    public const PACKSHOT_OPTIONS_COLLECTION = 'PRODUCT_RESEARCH_PACKSHOT_OPTIONS';
 
     protected $table = 'product_research';
 
@@ -80,10 +80,10 @@ class ProductResearch extends Model implements HasMedia
         // than leaving orphans in the bucket.
         $this->addMediaCollection(static::PACKSHOT_COLLECTION)
             ->singleFile()
-            ->useDisk(config('filesystems.rdp_media_disk'));
+            ->useDisk(config('filesystems.product_research_media_disk'));
 
         $this->addMediaCollection(static::PACKSHOT_OPTIONS_COLLECTION)
-            ->useDisk(config('filesystems.rdp_media_disk'));
+            ->useDisk(config('filesystems.product_research_media_disk'));
     }
 
     public function packshot(): ?Media

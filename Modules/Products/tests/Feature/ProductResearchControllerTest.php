@@ -19,7 +19,7 @@ uses(TestCase::class, RefreshDatabase::class);
  *
  * @return array{user: User, workspace: Workspace, form: ProductForm, category: TargetMarket, sub: TargetMarket}
  */
-function rdpFixtures(): array
+function productResearchFixtures(): array
 {
     ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
 
@@ -35,19 +35,19 @@ function rdpFixtures(): array
 }
 
 test('owner can view the RDPs list and open the builder', function () {
-    ['user' => $owner, 'workspace' => $workspace] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace] = productResearchFixtures();
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder")
+        ->get("/workspaces/{$workspace->slug}/products/product-research")
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->component('workspaces/products/rdp-builder/index'));
+        ->assertInertia(fn ($page) => $page->component('workspaces/products/product-research/index'));
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder/create")
+        ->get("/workspaces/{$workspace->slug}/products/product-research/create")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('workspaces/products/rdp-builder/builder')
-            ->where('rdp', null)
+            ->component('workspaces/products/product-research/builder')
+            ->where('productResearch', null)
             ->count('forms', 1)
             // The markets carry their sub categories so the third select can
             // narrow without another round trip.
@@ -61,43 +61,43 @@ test('the pages 404 for a workspace without the products module', function () {
 
     // Owners hold '*', so the permission checks alone would wave them through.
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder")
+        ->get("/workspaces/{$workspace->slug}/products/product-research")
         ->assertNotFound();
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder/create")
+        ->get("/workspaces/{$workspace->slug}/products/product-research/create")
         ->assertNotFound();
 });
 
 test('non-member cannot reach the RDPs list', function () {
-    ['workspace' => $workspace] = rdpFixtures();
+    ['workspace' => $workspace] = productResearchFixtures();
     $stranger = User::factory()->create();
 
     $this->actingAs($stranger)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder")
+        ->get("/workspaces/{$workspace->slug}/products/product-research")
         ->assertForbidden();
 });
 
 test('reading and building are separate permissions', function () {
-    ['workspace' => $workspace, 'form' => $form, 'category' => $category] = rdpFixtures();
+    ['workspace' => $workspace, 'form' => $form, 'category' => $category] = productResearchFixtures();
 
     $reader = makeMemberWithPermissions(
         $workspace,
-        [Permission::ViewRdpBuilder->value],
+        [Permission::ViewProductResearch->value],
         'Products',
     );
 
     $this->actingAs($reader)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder")
+        ->get("/workspaces/{$workspace->slug}/products/product-research")
         ->assertOk();
 
     // The builder itself writes, so reading the list is not enough to open it.
     $this->actingAs($reader)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder/create")
+        ->get("/workspaces/{$workspace->slug}/products/product-research/create")
         ->assertForbidden();
 
     $this->actingAs($reader)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder", [
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [
             'name' => 'Back Ease Balm',
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
@@ -106,10 +106,10 @@ test('reading and building are separate permissions', function () {
 });
 
 test('a brief is saved with its brief, name and lab notes', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = productResearchFixtures();
 
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder", [
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [
             'name' => 'Back Ease Balm',
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
@@ -118,30 +118,30 @@ test('a brief is saved with its brief, name and lab notes', function () {
             'active_ingredients' => "Menthol\nCamphor",
             'additional_instruction' => 'Keep the scent light.',
         ])
-        ->assertRedirect("/workspaces/{$workspace->slug}/products/rdp-builder");
+        ->assertRedirect("/workspaces/{$workspace->slug}/products/product-research");
 
-    $rdp = ProductResearch::ofWorkspace($workspace)->firstOrFail();
+    $productResearch = ProductResearch::ofWorkspace($workspace)->firstOrFail();
 
-    expect($rdp->name)->toBe('Back Ease Balm')
-        ->and($rdp->product_form_id)->toBe($form->id)
-        ->and($rdp->target_market_sub_id)->toBe($sub->id)
+    expect($productResearch->name)->toBe('Back Ease Balm')
+        ->and($productResearch->product_form_id)->toBe($form->id)
+        ->and($productResearch->target_market_sub_id)->toBe($sub->id)
         // The multi-line fields are stored as typed, one item per line.
-        ->and($rdp->claims)->toBe("Fast relief\nNon-greasy")
-        ->and($rdp->additional_instruction)->toBe('Keep the scent light.')
+        ->and($productResearch->claims)->toBe("Fast relief\nNon-greasy")
+        ->and($productResearch->additional_instruction)->toBe('Keep the scent light.')
         // Stamped with whoever built it — the list has a column for it.
-        ->and($rdp->created_by)->toBe($owner->id);
+        ->and($productResearch->created_by)->toBe($owner->id);
 });
 
 test('store requires a name, a form and a market', function () {
-    ['user' => $owner, 'workspace' => $workspace] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace] = productResearchFixtures();
 
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder", [])
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [])
         ->assertSessionHasErrors(['name', 'product_form_id', 'target_market_id']);
 });
 
 test('the sub category has to belong to the market picked beside it', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = productResearchFixtures();
 
     $otherCategory = TargetMarket::create(['workspace_id' => $workspace->id, 'name' => 'Respiratory']);
     $otherSub = TargetMarket::create([
@@ -153,7 +153,7 @@ test('the sub category has to belong to the market picked beside it', function (
     // Asthma under Musculoskeletal would render a chip that pairs two
     // unrelated names.
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder", [
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [
             'name' => 'Back Ease Balm',
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
@@ -163,7 +163,7 @@ test('the sub category has to belong to the market picked beside it', function (
 
     // A category with nothing under it saves without one.
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder", [
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [
             'name' => 'Clear Air Drops',
             'product_form_id' => $form->id,
             'target_market_id' => $otherCategory->id,
@@ -172,7 +172,7 @@ test('the sub category has to belong to the market picked beside it', function (
 });
 
 test('a market must be a top-level one, and from this workspace', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'sub' => $sub] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'sub' => $sub] = productResearchFixtures();
     ['workspace' => $other] = makeProductsWorkspace();
 
     $foreign = TargetMarket::create(['workspace_id' => $other->id, 'name' => 'Cardiovascular']);
@@ -181,7 +181,7 @@ test('a market must be a top-level one, and from this workspace', function () {
     // A sub category in the "Target market" slot would make the header chip
     // nonsense and orphan the third select.
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder", [
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [
             'name' => 'Back Ease Balm',
             'product_form_id' => $form->id,
             'target_market_id' => $sub->id,
@@ -189,7 +189,7 @@ test('a market must be a top-level one, and from this workspace', function () {
         ->assertSessionHasErrors('target_market_id');
 
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder", [
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [
             'name' => 'Back Ease Balm',
             'product_form_id' => $foreignForm->id,
             'target_market_id' => $foreign->id,
@@ -198,9 +198,9 @@ test('a market must be a top-level one, and from this workspace', function () {
 });
 
 test('opening a saved brief loads it back into the builder', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = productResearchFixtures();
 
-    $rdp = ProductResearch::create([
+    $productResearch = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -211,20 +211,20 @@ test('opening a saved brief loads it back into the builder', function () {
     ]);
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder/{$rdp->id}/edit")
+        ->get("/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}/edit")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('workspaces/products/rdp-builder/builder')
-            ->where('rdp.name', 'Back Ease Balm')
-            ->where('rdp.claims', 'Fast relief')
-            ->where('rdp.target_market_sub_id', $sub->id)
+            ->component('workspaces/products/product-research/builder')
+            ->where('productResearch.name', 'Back Ease Balm')
+            ->where('productResearch.claims', 'Fast relief')
+            ->where('productResearch.target_market_sub_id', $sub->id)
         );
 });
 
 test('update saves over the brief without filing a second one', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = productResearchFixtures();
 
-    $rdp = ProductResearch::create([
+    $productResearch = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -233,22 +233,22 @@ test('update saves over the brief without filing a second one', function () {
     ]);
 
     $this->actingAs($owner)
-        ->put("/workspaces/{$workspace->slug}/products/rdp-builder/{$rdp->id}", [
+        ->put("/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}", [
             'name' => 'Back Ease Balm Plus',
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
             'additional_instruction' => 'Bigger tub.',
         ])
-        ->assertRedirect("/workspaces/{$workspace->slug}/products/rdp-builder");
+        ->assertRedirect("/workspaces/{$workspace->slug}/products/product-research");
 
     expect(ProductResearch::ofWorkspace($workspace)->count())->toBe(1)
-        ->and($rdp->refresh()->name)->toBe('Back Ease Balm Plus')
-        ->and($rdp->additional_instruction)->toBe('Bigger tub.');
+        ->and($productResearch->refresh()->name)->toBe('Back Ease Balm Plus')
+        ->and($productResearch->additional_instruction)->toBe('Bigger tub.');
 });
 
 test('a brief from another workspace is not reachable', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = rdpFixtures();
-    ['user' => $stranger, 'workspace' => $other, 'form' => $otherForm, 'category' => $otherCategory] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = productResearchFixtures();
+    ['user' => $stranger, 'workspace' => $other, 'form' => $otherForm, 'category' => $otherCategory] = productResearchFixtures();
 
     $foreign = ProductResearch::create([
         'workspace_id' => $other->id,
@@ -259,11 +259,11 @@ test('a brief from another workspace is not reachable', function () {
     ]);
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder/{$foreign->id}/edit")
+        ->get("/workspaces/{$workspace->slug}/products/product-research/{$foreign->id}/edit")
         ->assertNotFound();
 
     $this->actingAs($owner)
-        ->put("/workspaces/{$workspace->slug}/products/rdp-builder/{$foreign->id}", [
+        ->put("/workspaces/{$workspace->slug}/products/product-research/{$foreign->id}", [
             'name' => 'Mine now',
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
@@ -272,9 +272,9 @@ test('a brief from another workspace is not reachable', function () {
 });
 
 test('the list shows the sub category, the date and who built it', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = productResearchFixtures();
 
-    $rdp = ProductResearch::create([
+    $productResearch = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -284,22 +284,22 @@ test('the list shows the sub category, the date and who built it', function () {
     ]);
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder")
+        ->get("/workspaces/{$workspace->slug}/products/product-research")
         ->assertInertia(fn ($page) => $page
-            ->count('rdps', 1)
-            ->where('rdps.0.name', 'Back Ease Balm')
-            ->where('rdps.0.form', 'Balm')
+            ->count('productResearches', 1)
+            ->where('productResearches.0.name', 'Back Ease Balm')
+            ->where('productResearches.0.form', 'Balm')
             // Back Pain, not Musculoskeletal.
-            ->where('rdps.0.target_market', 'Back Pain')
-            ->where('rdps.0.date', $rdp->created_at->toDateString())
-            ->where('rdps.0.created_by', $owner->name)
+            ->where('productResearches.0.target_market', 'Back Pain')
+            ->where('productResearches.0.date', $productResearch->created_at->toDateString())
+            ->where('productResearches.0.created_by', $owner->name)
         );
 });
 
 test('a brief outlives the taxonomy it was filed under', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = rdpFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = productResearchFixtures();
 
-    $rdp = ProductResearch::create([
+    $productResearch = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -313,17 +313,17 @@ test('a brief outlives the taxonomy it was filed under', function () {
     $category->delete();
     $form->delete();
 
-    expect($rdp->refresh()->exists)->toBeTrue()
-        ->and($rdp->target_market_id)->toBeNull()
-        ->and($rdp->target_market_sub_id)->toBeNull()
-        ->and($rdp->product_form_id)->toBeNull();
+    expect($productResearch->refresh()->exists)->toBeTrue()
+        ->and($productResearch->target_market_id)->toBeNull()
+        ->and($productResearch->target_market_sub_id)->toBeNull()
+        ->and($productResearch->product_form_id)->toBeNull();
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder")
+        ->get("/workspaces/{$workspace->slug}/products/product-research")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('rdps.0.name', 'Back Ease Balm')
-            ->where('rdps.0.form', null)
-            ->where('rdps.0.target_market', null)
+            ->where('productResearches.0.name', 'Back Ease Balm')
+            ->where('productResearches.0.form', null)
+            ->where('productResearches.0.target_market', null)
         );
 });

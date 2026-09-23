@@ -41,8 +41,8 @@ export const PERMISSIONS = {
     ManageProductForms: 'Manage Product Forms',
     ViewTargetMarkets: 'View Target Markets',
     ManageTargetMarkets: 'Manage Target Markets',
-    ViewRdpBuilder: 'View RDP Builder',
-    ManageRdpBuilder: 'Manage RDP Builder',
+    ViewProductResearch: 'View RDP Builder',
+    ManageProductResearch: 'Manage RDP Builder',
 
     // Teams
     ViewTeams: 'View Teams',

@@ -19,23 +19,24 @@ import {
     TD_PRIMARY,
     TH,
 } from '../lib/ui';
-import { type RdpRecord } from './types';
+import { type ProductResearchRecord } from './types';
 
 interface Props {
     workspace: Workspace;
-    rdps: RdpRecord[];
+    productResearches: ProductResearchRecord[];
 }
 
 /** Nothing recorded for a column reads as a dash, not an empty cell. */
 const Dash = () => <span className="text-gray-300 dark:text-gray-600">—</span>;
 
-const Index = ({ workspace, rdps }: Props) => {
-    const baseUrl = `/workspaces/${workspace.slug}/products/rdp-builder`;
-    const canManage = usePermission(PERMISSIONS.ManageRdpBuilder);
+const Index = ({ workspace, productResearches }: Props) => {
+    const baseUrl = `/workspaces/${workspace.slug}/products/product-research`;
+    const canManage = usePermission(PERMISSIONS.ManageProductResearch);
 
     const count = useMemo(
-        () => `${rdps.length} ${rdps.length === 1 ? 'record' : 'records'}`,
-        [rdps.length],
+        () =>
+            `${productResearches.length} ${productResearches.length === 1 ? 'record' : 'records'}`,
+        [productResearches.length],
     );
 
     return (
@@ -53,7 +54,7 @@ const Index = ({ workspace, rdps }: Props) => {
         >
             <Head title={`${workspace.name} - RDPs`} />
 
-            {rdps.length === 0 ? (
+            {productResearches.length === 0 ? (
                 <div className={EMPTY}>
                     <p className={MUTED}>No RDPs yet.</p>
                     <p className="text-[12px] text-gray-400 dark:text-gray-500">
@@ -82,26 +83,33 @@ const Index = ({ workspace, rdps }: Props) => {
                                 </tr>
                             </thead>
                             <tbody className={ROW_DIVIDE}>
-                                {rdps.map((rdp) => (
-                                    <tr key={rdp.id} className={ROW_HOVER}>
+                                {productResearches.map((productResearch) => (
+                                    <tr
+                                        key={productResearch.id}
+                                        className={ROW_HOVER}
+                                    >
                                         <td className={TD_PRIMARY}>
-                                            {rdp.name}
+                                            {productResearch.name}
                                         </td>
                                         <td className={TD}>
-                                            {rdp.form ?? <Dash />}
+                                            {productResearch.form ?? <Dash />}
                                         </td>
                                         <td className={TD}>
-                                            {rdp.target_market ?? <Dash />}
+                                            {productResearch.target_market ?? (
+                                                <Dash />
+                                            )}
                                         </td>
                                         <td className={TD_NUM}>
-                                            {rdp.date ?? <Dash />}
+                                            {productResearch.date ?? <Dash />}
                                         </td>
                                         <td className={TD}>
-                                            {rdp.created_by ?? <Dash />}
+                                            {productResearch.created_by ?? (
+                                                <Dash />
+                                            )}
                                         </td>
                                         <td className={`${TD} text-right`}>
                                             <Link
-                                                href={`${baseUrl}/${rdp.id}/edit`}
+                                                href={`${baseUrl}/${productResearch.id}/edit`}
                                                 className={BTN_SECONDARY}
                                             >
                                                 Open

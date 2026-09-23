@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Modules\Products\Models\ProductForm;
 use Modules\Products\Models\ProductResearch;
-use Modules\Products\Models\RdpPromptSetting;
+use Modules\Products\Models\ProductResearchPromptSetting;
 use Modules\Products\Models\TargetMarket;
 use Tests\TestCase;
 
@@ -28,7 +28,7 @@ beforeEach(function () {
         'openai.referer' => null,
         'openai.title' => null,
         'openai.packshot_model' => 'openai/gpt-image-2',
-        'filesystems.rdp_media_disk' => 's3',
+        'filesystems.product_research_media_disk' => 's3',
     ]);
 
     Storage::fake('s3');
@@ -37,7 +37,7 @@ beforeEach(function () {
 /**
  * A saved brief with a name, a form and a market — what Step 3 needs.
  *
- * @return array{user: User, workspace: Workspace, rdp: ProductResearch}
+ * @return array{user: User, workspace: Workspace, productResearch: ProductResearch}
  */
 function packshotFixtures(): array
 {
@@ -46,7 +46,7 @@ function packshotFixtures(): array
     $form = ProductForm::create(['workspace_id' => $workspace->id, 'name' => 'Spray']);
     $category = TargetMarket::create(['workspace_id' => $workspace->id, 'name' => 'Cardiovascular']);
 
-    $rdp = ProductResearch::create([
+    $productResearch = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -54,7 +54,7 @@ function packshotFixtures(): array
         'name' => 'Cardio Vitality Spray',
     ]);
 
-    return compact('owner', 'workspace', 'rdp') + ['user' => $owner];
+    return compact('owner', 'workspace', 'productResearch') + ['user' => $owner];
 }
 
 /**
@@ -72,12 +72,12 @@ function fakePackshotBody(int $count = 1): array
 }
 
 test('it draws the configured number of options and files them on the brief', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $response = $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk();
 
     // Five options means five calls, each asking for one image.
@@ -86,7 +86,7 @@ test('it draws the configured number of options and files them on the brief', fu
     expect($response->json('packshot_options'))->toHaveCount(5)
         // Nothing is chosen until someone picks one.
         ->and($response->json('packshot'))->toBeNull()
-        ->and($rdp->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(5);
+        ->and($productResearch->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(5);
 
     Http::assertSent(function ($request) {
         return str_ends_with($request->url(), '/images')
@@ -103,27 +103,27 @@ test('it draws the configured number of options and files them on the brief', fu
 });
 
 test('re-drawing replaces the previous set rather than piling up', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
-    RdpPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 3]);
+    ProductResearchPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 3]);
 
     foreach (range(1, 2) as $ignored) {
         $this->actingAs($owner)
-            ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+            ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
             ->assertOk();
     }
 
     // Two runs of three, not six — the grid shows one set, and the old files
     // would otherwise sit in the bucket unreachable.
-    expect($rdp->refresh()->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(3);
+    expect($productResearch->refresh()->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(3);
 });
 
 test('the workspace style note and count reach the generator', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    RdpPromptSetting::create([
+    ProductResearchPromptSetting::create([
         'workspace_id' => $workspace->id,
         'packshot_prompt' => 'Watercolour illustration on cream paper.',
         'packshot_count' => 2,
@@ -132,7 +132,7 @@ test('the workspace style note and count reach the generator', function () {
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk()
         ->assertJsonCount(2, 'packshot_options');
 
@@ -141,17 +141,17 @@ test('the workspace style note and count reach the generator', function () {
 });
 
 test('picking an option sets the packshot and leaves the option in the grid', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
-    RdpPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 3]);
+    ProductResearchPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 3]);
 
     $options = $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->json('packshot_options');
 
     $response = $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/{$rdp->id}/packshot/select", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}/packshot/select", [
             'media_id' => $options[1]['id'],
         ])
         ->assertOk();
@@ -162,37 +162,37 @@ test('picking an option sets the packshot and leaves the option in the grid', fu
 });
 
 test('an option belonging to another brief cannot be adopted', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
-    ['rdp' => $otherRdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
+    ['productResearch' => $otherProductResearch] = packshotFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
-    $otherRdp->addMediaFromString('not-really-an-image')
+    $otherProductResearch->addMediaFromString('not-really-an-image')
         ->usingFileName('theirs.png')
         ->toMediaCollection(ProductResearch::PACKSHOT_OPTIONS_COLLECTION);
 
-    $theirs = $otherRdp->getFirstMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION);
+    $theirs = $otherProductResearch->getFirstMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/{$rdp->id}/packshot/select", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}/packshot/select", [
             'media_id' => $theirs->id,
         ])
         ->assertNotFound();
 });
 
 test('someone can upload their own render instead', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     $response = $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder/packshot", [
-            'rdp_id' => $rdp->id,
+        ->post("/workspaces/{$workspace->slug}/products/product-research/packshot", [
+            'product_research_id' => $productResearch->id,
             'packshot' => UploadedFile::fake()->image('render.png'),
         ])
         ->assertOk();
 
     expect($response->json('packshot'))->not->toBeNull();
 
-    $media = $rdp->refresh()->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION);
+    $media = $productResearch->refresh()->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION);
     expect($media->disk)->toBe('s3');
     Storage::disk('s3')->assertExists($media->getPathRelativeToRoot());
 
@@ -201,102 +201,102 @@ test('someone can upload their own render instead', function () {
 });
 
 test('uploading a second render replaces the first', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     foreach (['first.png', 'second.png'] as $name) {
         $this->actingAs($owner)
-            ->post("/workspaces/{$workspace->slug}/products/rdp-builder/packshot", [
-                'rdp_id' => $rdp->id,
+            ->post("/workspaces/{$workspace->slug}/products/product-research/packshot", [
+                'product_research_id' => $productResearch->id,
                 'packshot' => UploadedFile::fake()->image($name),
             ])
             ->assertOk();
     }
 
-    expect($rdp->refresh()->getMedia(ProductResearch::PACKSHOT_COLLECTION))->toHaveCount(1)
-        ->and($rdp->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION)->file_name)->toBe('second.png');
+    expect($productResearch->refresh()->getMedia(ProductResearch::PACKSHOT_COLLECTION))->toHaveCount(1)
+        ->and($productResearch->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION)->file_name)->toBe('second.png');
 });
 
 test('a non-image upload is refused', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder/packshot", [
-            'rdp_id' => $rdp->id,
+        ->post("/workspaces/{$workspace->slug}/products/product-research/packshot", [
+            'product_research_id' => $productResearch->id,
             'packshot' => UploadedFile::fake()->create('brief.pdf', 12, 'application/pdf'),
         ])
         ->assertSessionHasErrors('packshot');
 });
 
 test('with no api key it says so and never calls the provider', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     config(['openai.api_key' => null]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertStatus(503);
 
     Http::assertNothingSent();
 });
 
 test('an upstream failure is reported without leaking the provider error', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(['error' => 'secret upstream detail'], 500)]);
 
     $response = $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertStatus(502);
 
     expect($response->json('message'))->not->toContain('secret upstream detail')
         // A failed run leaves the previous set alone.
-        ->and($rdp->refresh()->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(0);
+        ->and($productResearch->refresh()->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(0);
 });
 
 test('a 200 carrying no usable image is refused', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(['data' => [['b64_json' => '']]])]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertStatus(502);
 });
 
 test('drawing needs the manage permission, and the module', function () {
-    ['workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     $viewer = makeMemberWithPermissions(
         $workspace,
-        [Permission::ViewRdpBuilder->value],
+        [Permission::ViewProductResearch->value],
         'Products',
     );
 
     $this->actingAs($viewer)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertForbidden();
 
     $workspace->update(['products_module_enabled' => false]);
 
     $this->actingAs($viewer)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertNotFound();
 
     Http::assertNothingSent();
 });
 
 test('a packshot is served through the app, and not across workspaces', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
     ['user' => $stranger] = packshotFixtures();
 
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder/packshot", [
-            'rdp_id' => $rdp->id,
+        ->post("/workspaces/{$workspace->slug}/products/product-research/packshot", [
+            'product_research_id' => $productResearch->id,
             'packshot' => UploadedFile::fake()->image('render.png'),
         ])->assertOk();
 
-    $media = $rdp->refresh()->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION);
-    $url = "/workspaces/{$workspace->slug}/products/rdp-builder/{$rdp->id}/packshot/{$media->id}";
+    $media = $productResearch->refresh()->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION);
+    $url = "/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}/packshot/{$media->id}";
 
     // A bucket that can sign hands back a 302 to the short-lived URL.
     $this->actingAs($owner)->get($url)->assertRedirect();
@@ -304,33 +304,33 @@ test('a packshot is served through the app, and not across workspaces', function
 });
 
 test('opening a saved brief carries its packshot into the builder', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/products/rdp-builder/packshot", [
-            'rdp_id' => $rdp->id,
+        ->post("/workspaces/{$workspace->slug}/products/product-research/packshot", [
+            'product_research_id' => $productResearch->id,
             'packshot' => UploadedFile::fake()->image('render.png'),
         ])->assertOk();
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder/{$rdp->id}/edit")
+        ->get("/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}/edit")
         ->assertInertia(fn ($page) => $page
-            ->has('rdp.packshot')
-            ->has('rdp.packshot_options')
+            ->has('productResearch.packshot')
+            ->has('productResearch.packshot_options')
         );
 });
 
 test('the prompt describes the delivery form, not a generic container', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     // No description typed, so the standard one for the name applies.
     $patch = ProductForm::create(['workspace_id' => $workspace->id, 'name' => 'Patch']);
-    $rdp->update(['product_form_id' => $patch->id]);
+    $productResearch->update(['product_form_id' => $patch->id]);
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk();
 
     Http::assertSent(function ($request) {
@@ -345,15 +345,15 @@ test('the prompt describes the delivery form, not a generic container', function
 });
 
 test('a form the catalog added later still gets a usable prompt', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     $lozenge = ProductForm::create(['workspace_id' => $workspace->id, 'name' => 'Lozenge']);
-    $rdp->update(['product_form_id' => $lozenge->id]);
+    $productResearch->update(['product_form_id' => $lozenge->id]);
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk();
 
     // Vaguer than a known form, but never wrong.
@@ -364,19 +364,19 @@ test('a form the catalog added later still gets a usable prompt', function () {
 });
 
 test('the market sets the palette and the sub category says what it treats', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     $sub = TargetMarket::create([
         'workspace_id' => $workspace->id,
-        'parent_id' => $rdp->target_market_id,
+        'parent_id' => $productResearch->target_market_id,
         'name' => 'Hypertension',
     ]);
-    $rdp->update(['target_market_sub_id' => $sub->id]);
+    $productResearch->update(['target_market_sub_id' => $sub->id]);
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk();
 
     Http::assertSent(function ($request) {
@@ -392,15 +392,15 @@ test('the market sets the palette and the sub category says what it treats', fun
 });
 
 test('a market with no palette of its own still avoids the default brown', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     $odd = TargetMarket::create(['workspace_id' => $workspace->id, 'name' => 'Sleep']);
-    $rdp->update(['target_market_id' => $odd->id, 'target_market_sub_id' => null]);
+    $productResearch->update(['target_market_id' => $odd->id, 'target_market_sub_id' => null]);
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk();
 
     Http::assertSent(fn ($request) => str_contains(
@@ -410,9 +410,9 @@ test('a market with no palette of its own still avoids the default brown', funct
 });
 
 test('an image prompt that asks for no label still gets the spelling guard', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    RdpPromptSetting::create([
+    ProductResearchPromptSetting::create([
         'workspace_id' => $workspace->id,
         'packshot_prompt' => 'Blank unbranded packaging, no label of any kind.',
     ]);
@@ -420,7 +420,7 @@ test('an image prompt that asks for no label still gets the spelling guard', fun
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk();
 
     Http::assertSent(function ($request) {
@@ -434,14 +434,14 @@ test('an image prompt that asks for no label still gets the spelling guard', fun
 });
 
 test('a model that ignores n still yields the full set', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     // seedream answers every call with exactly one image whatever `n` says.
     // Asking once per option is what makes the count portable.
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody(1))]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk()
         ->assertJsonCount(5, 'packshot_options');
 
@@ -449,9 +449,9 @@ test('a model that ignores n still yields the full set', function () {
 });
 
 test('a partial failure still returns the options that came back', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    RdpPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 4]);
+    ProductResearchPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 4]);
 
     // Two of the four calls fail. A partial set beats an error the user can do
     // nothing about — the grid wraps.
@@ -465,18 +465,18 @@ test('a partial failure still returns the options that came back', function () {
     });
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk()
         ->assertJsonCount(2, 'packshot_options');
 });
 
 test('every option is seeded differently so the set is not one image repeated', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk();
 
     $seeds = [];
@@ -490,7 +490,7 @@ test('every option is seeded differently so the set is not one image repeated', 
 });
 
 test('a description typed on the form is what gets drawn', function () {
-    ['user' => $owner, 'workspace' => $workspace, 'rdp' => $rdp] = packshotFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     // A workspace that packs its balm in a sachet rather than a tin has to be
     // able to say so, and be believed over the standard description.
@@ -499,12 +499,12 @@ test('a description typed on the form is what gets drawn', function () {
         'name' => 'Balm',
         'packshot_description' => 'a flat resealable sachet with a tear notch',
     ]);
-    $rdp->update(['product_form_id' => $balm->id]);
+    $productResearch->update(['product_form_id' => $balm->id]);
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $rdp->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
         ->assertOk();
 
     Http::assertSent(fn ($request) => str_contains($request['prompt'], 'a flat resealable sachet with a tear notch')
@@ -544,10 +544,10 @@ test('a draft that has never been saved can still generate', function () {
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
-    // No rdp_id: the brief is filed on the way through, so Step 3 does not
+    // No product_research_id: the brief is filed on the way through, so Step 3 does not
     // have to wait on Save to RDPs.
     $response = $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", [
             'name' => 'Cardio Vitality Spray',
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
@@ -555,12 +555,12 @@ test('a draft that has never been saved can still generate', function () {
         ->assertOk()
         ->assertJsonCount(5, 'packshot_options');
 
-    $rdp = ProductResearch::ofWorkspace($workspace)->firstOrFail();
+    $productResearch = ProductResearch::ofWorkspace($workspace)->firstOrFail();
 
     // The id comes back so the builder knows what it is now editing.
-    expect($response->json('rdp_id'))->toBe($rdp->id)
-        ->and($rdp->name)->toBe('Cardio Vitality Spray')
-        ->and($rdp->created_by)->toBe($owner->id);
+    expect($response->json('product_research_id'))->toBe($productResearch->id)
+        ->and($productResearch->name)->toBe('Cardio Vitality Spray')
+        ->and($productResearch->created_by)->toBe($owner->id);
 });
 
 test('a draft is filed once, not once per generate', function () {
@@ -572,16 +572,16 @@ test('a draft is filed once, not once per generate', function () {
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
     $first = $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", [
             'name' => 'Cardio Vitality Spray',
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
-        ->json('rdp_id');
+        ->json('product_research_id');
 
     // The builder sends the id it was given back on the next press.
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $first])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $first])
         ->assertOk();
 
     expect(ProductResearch::ofWorkspace($workspace)->count())->toBe(1);
@@ -591,19 +591,19 @@ test('an unsaved draft missing its brief is refused rather than half filed', fun
     ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", [])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", [])
         ->assertJsonValidationErrors(['name', 'product_form_id', 'target_market_id']);
 
     expect(ProductResearch::ofWorkspace($workspace)->count())->toBe(0);
     Http::assertNothingSent();
 });
 
-test('an rdp_id from another workspace is refused', function () {
+test('an product_research_id from another workspace is refused', function () {
     ['user' => $owner, 'workspace' => $workspace] = packshotFixtures();
-    ['rdp' => $foreign] = packshotFixtures();
+    ['productResearch' => $foreign] = packshotFixtures();
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $foreign->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $foreign->id])
         ->assertNotFound();
 
     Http::assertNothingSent();

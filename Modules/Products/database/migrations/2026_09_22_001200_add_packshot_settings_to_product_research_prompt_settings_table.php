@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('rdp_prompt_settings', function (Blueprint $table) {
+        Schema::table('product_research_prompt_settings', function (Blueprint $table) {
             // The packshot step has its own Configure prompt dialog, so it gets
             // its own pair rather than sharing the naming one — the two ask for
             // very different things.
@@ -19,7 +19,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('rdp_prompt_settings', function (Blueprint $table) {
+        Schema::table('product_research_prompt_settings', function (Blueprint $table) {
             $table->dropColumn(['packshot_prompt', 'packshot_count']);
         });
     }

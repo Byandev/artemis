@@ -14,14 +14,14 @@ import { type PackshotResponse, type PackshotState } from '../types';
 interface Props {
     baseUrl: string;
     /** Null while the brief is still a draft; set once it has been filed. */
-    rdpId: number | null;
+    productResearchId: number | null;
     /**
-     * The brief so far, sent when there is no rdpId yet so the server can file
+     * The brief so far, sent when there is no productResearchId yet so the server can file
      * it — a packshot is a file and a file needs an owner.
      */
     brief: Record<string, string>;
     /** Told the id the draft was filed under, so later calls reuse it. */
-    onFiled: (rdpId: number) => void;
+    onFiled: (productResearchId: number) => void;
     name: string;
     /** "Spray · Cardiovascular", under the name. */
     chip: string;
@@ -37,7 +37,7 @@ interface Props {
  */
 export default function PackshotPanel({
     baseUrl,
-    rdpId,
+    productResearchId,
     brief,
     onFiled,
     name,
@@ -53,14 +53,17 @@ export default function PackshotPanel({
     const [error, setError] = useState<string | null>(null);
 
     /** Either the filed brief, or the fields the server needs to file it. */
-    const identity = rdpId !== null ? { rdp_id: String(rdpId) } : brief;
+    const identity =
+        productResearchId !== null
+            ? { product_research_id: String(productResearchId) }
+            : brief;
 
     function absorb(data: PackshotResponse) {
         onChange({
             packshot: data.packshot,
             packshot_options: data.packshot_options,
         });
-        onFiled(data.rdp_id);
+        onFiled(data.product_research_id);
     }
 
     function fail(e: unknown, fallback: string) {
@@ -118,12 +121,12 @@ export default function PackshotPanel({
 
     async function pick(mediaId: number) {
         // Only reachable once options exist, which means the brief is filed.
-        if (rdpId === null || busy) return;
+        if (productResearchId === null || busy) return;
         setError(null);
 
         try {
             const response = await axios.post<PackshotState>(
-                `${baseUrl}/${rdpId}/packshot/select`,
+                `${baseUrl}/${productResearchId}/packshot/select`,
                 { media_id: mediaId },
             );
             onChange(response.data);

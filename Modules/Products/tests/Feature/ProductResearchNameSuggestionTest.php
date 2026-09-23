@@ -7,7 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Modules\Products\Models\ProductForm;
-use Modules\Products\Models\RdpPromptSetting;
+use Modules\Products\Models\ProductResearchPromptSetting;
 use Modules\Products\Models\TargetMarket;
 use Tests\TestCase;
 
@@ -28,7 +28,7 @@ beforeEach(function () {
     // below would fire at whatever the developer happens to be using.
     config([
         'openai.api_key' => 'sk-test',
-        'openai.rdp_model' => 'gpt-4o-mini',
+        'openai.product_research_model' => 'gpt-4o-mini',
         'openai.base_uri' => null,
         'openai.referer' => null,
         'openai.title' => null,
@@ -87,7 +87,7 @@ test('it returns a positioning line and ten names', function () {
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
 
     $response = $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
             'target_market_sub_id' => $sub->id,
@@ -105,7 +105,7 @@ test('the outbound call carries the key, the model and the strict schema', funct
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
             'target_market_sub_id' => $sub->id,
@@ -134,7 +134,7 @@ test('a brief with no sub category still generates', function () {
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -150,7 +150,7 @@ test('with no api key it says so and never calls the provider', function () {
     config(['openai.api_key' => null]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -166,7 +166,7 @@ test('an upstream failure is reported without leaking the provider error', funct
     Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'secret upstream detail']], 500)]);
 
     $response = $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -183,7 +183,7 @@ test('a throttled provider asks the user to wait rather than to retry now', func
     Http::fake(['api.openai.com/*' => Http::response([], 429)]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -197,7 +197,7 @@ test('a timeout is reported rather than surfacing as a crash', function () {
     Http::fake(fn () => throw new ConnectionException('timed out'));
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -214,7 +214,7 @@ test('a 200 carrying an unusable answer is refused, not half-rendered', function
     ])]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -230,7 +230,7 @@ test('fewer names than asked for are still shown', function () {
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody(4))]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -245,12 +245,12 @@ test('generating needs the manage permission, not just view', function () {
     // not be able to spend against the workspace's account.
     $viewer = makeMemberWithPermissions(
         $workspace,
-        [Permission::ViewRdpBuilder->value],
+        [Permission::ViewProductResearch->value],
         'Products',
     );
 
     $this->actingAs($viewer)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -264,7 +264,7 @@ test('it 404s for a workspace without the products module', function () {
 
     // Owners hold '*', so the permission check alone would wave them through.
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [])
         ->assertNotFound();
 
     Http::assertNothingSent();
@@ -279,12 +279,12 @@ test('it refuses a brief that saving would refuse', function () {
 
     // Missing entirely.
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [])
         ->assertJsonValidationErrors(['product_form_id', 'target_market_id']);
 
     // A form from another workspace.
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $foreignForm->id,
             'target_market_id' => $category->id,
         ])
@@ -293,7 +293,7 @@ test('it refuses a brief that saving would refuse', function () {
     // A sub category that does not belong to the market beside it — the
     // generator must not be handed a pairing the brief could not be saved with.
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $otherCategory->id,
             'target_market_sub_id' => $sub->id,
@@ -302,7 +302,7 @@ test('it refuses a brief that saving would refuse', function () {
 
     // A sub category in the market slot.
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $sub->id,
         ])
@@ -318,7 +318,7 @@ test('it talks to an OpenAI-compatible gateway when the base url points at one',
     // namespaced model slugs.
     config([
         'openai.base_uri' => 'https://openrouter.ai/api/v1',
-        'openai.rdp_model' => 'openai/gpt-4o-mini',
+        'openai.product_research_model' => 'openai/gpt-4o-mini',
         'openai.referer' => 'https://artemis.test',
         'openai.title' => 'Artemis',
         'openai.require_provider_parameters' => true,
@@ -327,7 +327,7 @@ test('it talks to an OpenAI-compatible gateway when the base url points at one',
     Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -353,7 +353,7 @@ test('the provider routing key is left off for OpenAI, which rejects it', functi
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -366,7 +366,7 @@ test('the provider routing key is left off for OpenAI, which rejects it', functi
 test('the workspace prompt and count reach the model', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    RdpPromptSetting::create([
+    ProductResearchPromptSetting::create([
         'workspace_id' => $workspace->id,
         'naming_prompt' => 'You name premium herbal products for Cebu pharmacies.',
         'name_count' => 4,
@@ -375,7 +375,7 @@ test('the workspace prompt and count reach the model', function () {
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody(4))]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -401,7 +401,7 @@ test('a workspace that never opened the dialog generates on the defaults', funct
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/suggest-names", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
         ])
@@ -409,7 +409,7 @@ test('a workspace that never opened the dialog generates on the defaults', funct
 
     Http::assertSent(fn ($request) => str_contains(
         $request['messages'][0]['content'],
-        RdpPromptSetting::DEFAULT_PROMPT
+        ProductResearchPromptSetting::DEFAULT_PROMPT
     ));
 });
 
@@ -417,7 +417,7 @@ test('the configure dialog saves the prompt and the count', function () {
     ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
 
     $this->actingAs($owner)
-        ->putJson("/workspaces/{$workspace->slug}/products/rdp-builder/prompt-settings", [
+        ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
             'naming_prompt' => 'Short, punchy names only.',
             'name_count' => 6,
         ])
@@ -426,14 +426,14 @@ test('the configure dialog saves the prompt and the count', function () {
         ->assertJsonPath('name_count', 6)
         ->assertJsonPath('is_default', false);
 
-    $settings = RdpPromptSetting::where('workspace_id', $workspace->id)->firstOrFail();
+    $settings = ProductResearchPromptSetting::where('workspace_id', $workspace->id)->firstOrFail();
     expect($settings->naming_prompt)->toBe('Short, punchy names only.');
 });
 
 test('resetting to the default stores nothing rather than a copy of it', function () {
     ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
 
-    RdpPromptSetting::create([
+    ProductResearchPromptSetting::create([
         'workspace_id' => $workspace->id,
         'naming_prompt' => 'Something custom.',
         'name_count' => 10,
@@ -442,22 +442,22 @@ test('resetting to the default stores nothing rather than a copy of it', functio
     // Saving the default back has to clear the column, not store a copy that
     // would then never track a change to the default.
     $this->actingAs($owner)
-        ->putJson("/workspaces/{$workspace->slug}/products/rdp-builder/prompt-settings", [
-            'naming_prompt' => RdpPromptSetting::DEFAULT_PROMPT,
+        ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
+            'naming_prompt' => ProductResearchPromptSetting::DEFAULT_PROMPT,
             'name_count' => 10,
         ])
         ->assertOk()
         ->assertJsonPath('is_default', true);
 
-    expect(RdpPromptSetting::where('workspace_id', $workspace->id)->first()->naming_prompt)->toBeNull();
+    expect(ProductResearchPromptSetting::where('workspace_id', $workspace->id)->first()->naming_prompt)->toBeNull();
 });
 
 test('the count is capped, and saving needs the manage permission', function () {
     ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
 
-    foreach ([0, RdpPromptSetting::MAX_COUNT + 1] as $bad) {
+    foreach ([0, ProductResearchPromptSetting::MAX_COUNT + 1] as $bad) {
         $this->actingAs($owner)
-            ->putJson("/workspaces/{$workspace->slug}/products/rdp-builder/prompt-settings", [
+            ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
                 'name_count' => $bad,
             ])
             ->assertJsonValidationErrors('name_count');
@@ -465,12 +465,12 @@ test('the count is capped, and saving needs the manage permission', function () 
 
     $viewer = makeMemberWithPermissions(
         $workspace,
-        [Permission::ViewRdpBuilder->value],
+        [Permission::ViewProductResearch->value],
         'Products',
     );
 
     $this->actingAs($viewer)
-        ->putJson("/workspaces/{$workspace->slug}/products/rdp-builder/prompt-settings", [
+        ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
             'name_count' => 5,
         ])
         ->assertForbidden();
@@ -479,19 +479,19 @@ test('the count is capped, and saving needs the manage permission', function () 
 test('the builder page opens the dialog on the saved settings', function () {
     ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
 
-    RdpPromptSetting::create([
+    ProductResearchPromptSetting::create([
         'workspace_id' => $workspace->id,
         'naming_prompt' => 'House voice.',
         'name_count' => 7,
     ]);
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/rdp-builder/create")
+        ->get("/workspaces/{$workspace->slug}/products/product-research/create")
         ->assertInertia(fn ($page) => $page
             ->where('promptSettings.naming_prompt', 'House voice.')
             ->where('promptSettings.name_count', 7)
-            ->where('promptSettings.max_count', RdpPromptSetting::MAX_COUNT)
-            ->where('promptSettings.default_prompt', RdpPromptSetting::DEFAULT_PROMPT)
+            ->where('promptSettings.max_count', ProductResearchPromptSetting::MAX_COUNT)
+            ->where('promptSettings.default_prompt', ProductResearchPromptSetting::DEFAULT_PROMPT)
             ->where('promptSettings.is_default', false)
         );
 });
@@ -499,7 +499,7 @@ test('the builder page opens the dialog on the saved settings', function () {
 test('changing one half of the settings leaves the other alone', function () {
     ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
 
-    RdpPromptSetting::create([
+    ProductResearchPromptSetting::create([
         'workspace_id' => $workspace->id,
         'naming_prompt' => 'House voice.',
         'name_count' => 7,
@@ -509,7 +509,7 @@ test('changing one half of the settings leaves the other alone', function () {
 
     // The naming half only — the packshot settings are not restated.
     $this->actingAs($owner)
-        ->putJson("/workspaces/{$workspace->slug}/products/rdp-builder/prompt-settings", [
+        ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
             'naming_prompt' => 'New voice.',
             'name_count' => 4,
         ])

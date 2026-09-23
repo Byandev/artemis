@@ -58,12 +58,12 @@ return [
     |
     | Whatever this points at has to support strict structured outputs
     | (response_format: json_schema): the grid needs exactly ten
-    | {name, rationale} pairs, and Modules\Products\Services\RdpNameSuggester
+    | {name, rationale} pairs, and Modules\Products\Services\ProductResearchNameSuggester
     | pins that with a schema rather than parsing prose.
     |
     */
 
-    'rdp_model' => env('OPENAI_RDP_MODEL', 'gpt-4o-mini'),
+    'product_research_model' => env('OPENAI_PRODUCT_RESEARCH_MODEL', 'gpt-4o-mini'),
 
     /*
     |--------------------------------------------------------------------------
@@ -81,7 +81,7 @@ return [
     | `require_provider_parameters` matters more than it looks. OpenRouter
     | serves one model through several provider endpoints and only some of them
     | support strict structured outputs; routed to one that does not, the
-    | request fails outright rather than degrading — and RdpNameSuggester
+    | request fails outright rather than degrading — and ProductResearchNameSuggester
     | depends on that schema. Turning this on tells OpenRouter to only route to
     | endpoints that support every parameter sent. It is off by default because
     | OpenAI rejects the unknown `provider` key.

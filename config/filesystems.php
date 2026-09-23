@@ -93,7 +93,7 @@ return [
     |
     */
 
-    'rdp_media_disk' => env('RDP_MEDIA_DISK', 's3'),
+    'product_research_media_disk' => env('PRODUCT_RESEARCH_MEDIA_DISK', 's3'),
 
     /*
     |--------------------------------------------------------------------------

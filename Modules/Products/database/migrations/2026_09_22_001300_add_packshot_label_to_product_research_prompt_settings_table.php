@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('rdp_prompt_settings', function (Blueprint $table) {
+        Schema::table('product_research_prompt_settings', function (Blueprint $table) {
             // Whether the render carries the product's own branding.
             //
             // On by default: the point of the step is to see the actual
@@ -22,7 +22,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('rdp_prompt_settings', function (Blueprint $table) {
+        Schema::table('product_research_prompt_settings', function (Blueprint $table) {
             $table->dropColumn('packshot_show_label');
         });
     }

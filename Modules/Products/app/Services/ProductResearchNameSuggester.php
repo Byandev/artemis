@@ -6,7 +6,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Modules\Products\Exceptions\RdpSuggestionFailed;
+use Modules\Products\Exceptions\ProductResearchSuggestionFailed;
 
 /**
  * Names a product for the RDP Builder's "Suggest 10 names" step.
@@ -24,7 +24,7 @@ use Modules\Products\Exceptions\RdpSuggestionFailed;
  * which this repo has never actually had installed — see config/openai.php and
  * the note in App\Http\Controllers\Workspaces\AskDataController.
  */
-class RdpNameSuggester
+class ProductResearchNameSuggester
 {
     private string $model;
 
@@ -32,7 +32,7 @@ class RdpNameSuggester
 
     public function __construct()
     {
-        $this->model = (string) config('openai.rdp_model', 'gpt-4o-mini');
+        $this->model = (string) config('openai.product_research_model', 'gpt-4o-mini');
         $this->timeout = (int) config('openai.request_timeout', 30);
     }
 
@@ -48,7 +48,7 @@ class RdpNameSuggester
     /**
      * @return array{positioning: string, names: list<array{name: string, rationale: string}>}
      *
-     * @throws RdpSuggestionFailed
+     * @throws ProductResearchSuggestionFailed
      */
     public function suggest(
         string $form,
@@ -62,11 +62,11 @@ class RdpNameSuggester
         $content = data_get($response, 'choices.0.message.content');
 
         if (! is_string($content) || $content === '') {
-            Log::warning('RDP name suggestions: no content in the answer.', [
+            Log::warning('Product research name suggestions: no content in the answer.', [
                 'finish_reason' => data_get($response, 'choices.0.finish_reason'),
             ]);
 
-            throw RdpSuggestionFailed::unusableAnswer();
+            throw ProductResearchSuggestionFailed::unusableAnswer();
         }
 
         return $this->parse($content, $count);
@@ -76,7 +76,7 @@ class RdpNameSuggester
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      *
-     * @throws RdpSuggestionFailed
+     * @throws ProductResearchSuggestionFailed
      */
     private function send(array $payload): array
     {
@@ -85,22 +85,22 @@ class RdpNameSuggester
         } catch (ConnectionException $e) {
             // A timeout or a DNS failure. Logged with the message only — the
             // trace would carry the request body, and that carries the brief.
-            Log::warning('RDP name suggestions: could not reach the provider.', [
+            Log::warning('Product research name suggestions: could not reach the provider.', [
                 'reason' => $e->getMessage(),
             ]);
 
-            throw RdpSuggestionFailed::unreachable();
+            throw ProductResearchSuggestionFailed::unreachable();
         }
 
         if (! $response->successful()) {
             // The body is deliberately kept out of the exception and truncated
             // here: a provider error can echo the prompt back.
-            Log::warning('RDP name suggestions: the provider refused the request.', [
+            Log::warning('Product research name suggestions: the provider refused the request.', [
                 'status' => $response->status(),
                 'body' => mb_substr($response->body(), 0, 500),
             ]);
 
-            throw RdpSuggestionFailed::upstream($response->status());
+            throw ProductResearchSuggestionFailed::upstream($response->status());
         }
 
         return (array) $response->json();
@@ -138,16 +138,16 @@ class RdpNameSuggester
      *
      * @return array{positioning: string, names: list<array{name: string, rationale: string}>}
      *
-     * @throws RdpSuggestionFailed
+     * @throws ProductResearchSuggestionFailed
      */
     private function parse(string $content, int $count): array
     {
         $decoded = json_decode($content, true);
 
         if (! is_array($decoded)) {
-            Log::warning('RDP name suggestions: the answer was not JSON.');
+            Log::warning('Product research name suggestions: the answer was not JSON.');
 
-            throw RdpSuggestionFailed::unusableAnswer();
+            throw ProductResearchSuggestionFailed::unusableAnswer();
         }
 
         $names = [];
@@ -164,9 +164,9 @@ class RdpNameSuggester
         }
 
         if ($names === []) {
-            Log::warning('RDP name suggestions: the answer carried no usable names.');
+            Log::warning('Product research name suggestions: the answer carried no usable names.');
 
-            throw RdpSuggestionFailed::unusableAnswer();
+            throw ProductResearchSuggestionFailed::unusableAnswer();
         }
 
         return [
@@ -209,7 +209,7 @@ class RdpNameSuggester
             'response_format' => [
                 'type' => 'json_schema',
                 'json_schema' => [
-                    'name' => 'rdp_name_suggestions',
+                    'name' => 'product_research_name_suggestions',
                     'strict' => true,
                     'schema' => [
                         'type' => 'object',

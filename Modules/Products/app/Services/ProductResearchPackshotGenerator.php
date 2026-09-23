@@ -8,7 +8,7 @@ use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Modules\Products\Exceptions\RdpSuggestionFailed;
+use Modules\Products\Exceptions\ProductResearchSuggestionFailed;
 
 /**
  * Draws packshot options for an RDP.
@@ -25,7 +25,7 @@ use Modules\Products\Exceptions\RdpSuggestionFailed;
  * a URL — so the bytes are handed straight to media-library and never fetched
  * a second time.
  */
-class RdpPackshotGenerator
+class ProductResearchPackshotGenerator
 {
     /**
      * A palette cue per target market.
@@ -77,7 +77,7 @@ class RdpPackshotGenerator
     /**
      * @return list<array{data: string, mime: string}> raw image bytes, decoded
      *
-     * @throws RdpSuggestionFailed
+     * @throws ProductResearchSuggestionFailed
      */
     public function generate(
         string $name,
@@ -116,26 +116,26 @@ class RdpPackshotGenerator
         foreach ($responses as $response) {
             // A pooled request hands back the exception rather than throwing.
             if ($response instanceof ConnectionException) {
-                Log::warning('RDP packshots: could not reach the provider.', [
+                Log::warning('Product research packshots: could not reach the provider.', [
                     'reason' => $response->getMessage(),
                 ]);
-                $failure ??= RdpSuggestionFailed::unreachable();
+                $failure ??= ProductResearchSuggestionFailed::unreachable();
 
                 continue;
             }
 
             if (! $response instanceof Response) {
-                $failure ??= RdpSuggestionFailed::unusableAnswer();
+                $failure ??= ProductResearchSuggestionFailed::unusableAnswer();
 
                 continue;
             }
 
             if (! $response->successful()) {
-                Log::warning('RDP packshots: the provider refused the request.', [
+                Log::warning('Product research packshots: the provider refused the request.', [
                     'status' => $response->status(),
                     'body' => mb_substr($response->body(), 0, 500),
                 ]);
-                $failure ??= RdpSuggestionFailed::upstream($response->status());
+                $failure ??= ProductResearchSuggestionFailed::upstream($response->status());
 
                 continue;
             }
@@ -148,7 +148,7 @@ class RdpPackshotGenerator
         }
 
         if ($images === []) {
-            throw $failure ?? RdpSuggestionFailed::unusableAnswer();
+            throw $failure ?? ProductResearchSuggestionFailed::unusableAnswer();
         }
 
         // Some back is better than none — the grid wraps, and a partial set is
@@ -184,7 +184,7 @@ class RdpPackshotGenerator
         }
 
         if ($images === []) {
-            Log::warning('RDP packshots: an answer carried no usable image.');
+            Log::warning('Product research packshots: an answer carried no usable image.');
         }
 
         return $images;

@@ -1,5 +1,5 @@
 /** A row on the RDPs list — already flattened by the controller. */
-export interface RdpRecord {
+export interface ProductResearchRecord {
     id: number;
     name: string;
     form: string | null;
@@ -10,7 +10,7 @@ export interface RdpRecord {
 }
 
 /** The brief the builder edits. Null on a new one. */
-export interface Rdp extends Partial<PackshotState> {
+export interface ProductResearch extends Partial<PackshotState> {
     id: number;
     product_form_id: number | null;
     target_market_id: number | null;
@@ -76,5 +76,5 @@ export interface PackshotState {
 
 /** The same, plus the brief it belongs to — a draft gets filed on generate. */
 export interface PackshotResponse extends PackshotState {
-    rdp_id: number;
+    product_research_id: number;
 }

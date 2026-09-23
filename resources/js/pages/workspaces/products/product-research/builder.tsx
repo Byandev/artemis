@@ -31,15 +31,15 @@ import {
     type FormOption,
     type NameSuggestion,
     type PackshotState,
+    type ProductResearch,
     type PromptSettings,
-    type Rdp,
     type TargetMarketOption,
 } from './types';
 
 interface Props {
     workspace: Workspace;
     /** Null when building a brief that has not been filed yet. */
-    rdp: Rdp | null;
+    productResearch: ProductResearch | null;
     forms: FormOption[];
     targetMarkets: TargetMarketOption[];
     promptSettings: PromptSettings;
@@ -85,32 +85,37 @@ function csvCell(value: string): string {
 
 const Builder = ({
     workspace,
-    rdp,
+    productResearch,
     forms,
     targetMarkets,
     promptSettings,
 }: Props) => {
-    const baseUrl = `/workspaces/${workspace.slug}/products/rdp-builder`;
+    const baseUrl = `/workspaces/${workspace.slug}/products/product-research`;
 
     /**
      * The brief's id once it exists. Step 3 files a draft on the way through —
      * a packshot is a file and a file needs an owner — so this can start null
      * and fill in without a reload.
      */
-    const [rdpId, setRdpId] = useState<number | null>(rdp?.id ?? null);
-    const editing = rdpId !== null;
-    const canManage = usePermission(PERMISSIONS.ManageRdpBuilder);
+    const [productResearchId, setProductResearchId] = useState<number | null>(
+        productResearch?.id ?? null,
+    );
+    const editing = productResearchId !== null;
+    const canManage = usePermission(PERMISSIONS.ManageProductResearch);
 
     const { data, setData, post, put, processing, errors } =
         useForm<FormValues>({
-            product_form_id: rdp?.product_form_id?.toString() ?? '',
-            target_market_id: rdp?.target_market_id?.toString() ?? '',
-            target_market_sub_id: rdp?.target_market_sub_id?.toString() ?? '',
-            name: rdp?.name ?? '',
-            positioning: rdp?.positioning ?? '',
-            claims: rdp?.claims ?? '',
-            active_ingredients: rdp?.active_ingredients ?? '',
-            additional_instruction: rdp?.additional_instruction ?? '',
+            product_form_id: productResearch?.product_form_id?.toString() ?? '',
+            target_market_id:
+                productResearch?.target_market_id?.toString() ?? '',
+            target_market_sub_id:
+                productResearch?.target_market_sub_id?.toString() ?? '',
+            name: productResearch?.name ?? '',
+            positioning: productResearch?.positioning ?? '',
+            claims: productResearch?.claims ?? '',
+            active_ingredients: productResearch?.active_ingredients ?? '',
+            additional_instruction:
+                productResearch?.additional_instruction ?? '',
         });
 
     // Held locally so saving the dialog updates the button without a reload.
@@ -121,8 +126,8 @@ const Builder = ({
     const [imagePromptOpen, setImagePromptOpen] = useState(false);
 
     const [packshots, setPackshots] = useState<PackshotState>({
-        packshot: rdp?.packshot ?? null,
-        packshot_options: rdp?.packshot_options ?? [],
+        packshot: productResearch?.packshot ?? null,
+        packshot_options: productResearch?.packshot_options ?? [],
     });
 
     const [suggestions, setSuggestions] = useState<NameSuggestion[]>([]);
@@ -195,7 +200,7 @@ const Builder = ({
 
     function handleSave() {
         if (editing) {
-            put(`${baseUrl}/${rdpId}`);
+            put(`${baseUrl}/${productResearchId}`);
             return;
         }
         post(baseUrl);
@@ -225,7 +230,7 @@ const Builder = ({
         );
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${(data.name || 'untitled-product').replace(/[^\w-]+/g, '-').toLowerCase()}-rdp.csv`;
+        link.download = `${(data.name || 'untitled-product').replace(/[^\w-]+/g, '-').toLowerCase()}-productResearch.csv`;
         link.click();
         URL.revokeObjectURL(url);
     }
@@ -495,14 +500,14 @@ const Builder = ({
                     {data.name ? (
                         <PackshotPanel
                             baseUrl={baseUrl}
-                            rdpId={rdpId}
+                            productResearchId={productResearchId}
                             brief={{
                                 name: data.name,
                                 product_form_id: data.product_form_id,
                                 target_market_id: data.target_market_id,
                                 target_market_sub_id: data.target_market_sub_id,
                             }}
-                            onFiled={setRdpId}
+                            onFiled={setProductResearchId}
                             name={data.name}
                             chip={chip}
                             state={packshots}

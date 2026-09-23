@@ -91,7 +91,7 @@ class AppServiceProvider extends ServiceProvider
         // guards a bill rather than a database. Keyed on the user as well as
         // the workspace: the point is to stop one person leaning on the button,
         // and the endpoint is behind auth so there is always a user.
-        RateLimiter::for('rdp-suggestions', function (Request $request) {
+        RateLimiter::for('product-research-suggestions', function (Request $request) {
             $workspace = $request->route('workspace');
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');
 
