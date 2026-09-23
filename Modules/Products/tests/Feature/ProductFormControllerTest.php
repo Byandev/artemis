@@ -5,6 +5,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Modules\Products\Database\Seeders\ProductFormSeeder;
 use Modules\Products\Models\Product;
 use Modules\Products\Models\ProductForm;
 use Modules\Products\Models\ProductFormVariant;
@@ -374,4 +375,30 @@ test('a product can be filed under a form, and only one from its own workspace',
             'product_form_id' => $theirs->id,
         ])
         ->assertSessionHasErrors('product_form_id');
+});
+
+test('the seeder fills a products workspace with the standard delivery formats', function () {
+    ['workspace' => $workspace] = makeProductsWorkspace();
+    ['workspace' => $without] = makeWorkspaceWithOwner();
+
+    (new ProductFormSeeder)->run();
+
+    expect(ProductForm::ofWorkspace($workspace)->orderBy('id')->pluck('name')->all())
+        ->toBe(ProductFormSeeder::FORMS)
+        // A workspace without the module is left alone.
+        ->and(ProductForm::where('workspace_id', $without->id)->count())->toBe(0);
+});
+
+test('re-running the form seeder leaves edited forms and their sizes alone', function () {
+    ['workspace' => $workspace] = makeProductsWorkspace();
+
+    (new ProductFormSeeder)->run();
+
+    $oil = ProductForm::ofWorkspace($workspace)->where('name', 'Oil')->firstOrFail();
+    $oil->variants()->create(['name' => '30ml', 'position' => 0]);
+
+    (new ProductFormSeeder)->run();
+
+    expect(ProductForm::ofWorkspace($workspace)->count())->toBe(count(ProductFormSeeder::FORMS))
+        ->and($oil->refresh()->variants()->pluck('name')->all())->toBe(['30ml']);
 });

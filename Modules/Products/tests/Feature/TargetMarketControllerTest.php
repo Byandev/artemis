@@ -364,16 +364,44 @@ test('the seeder fills a products workspace with the standard categories, in ord
         ->and(TargetMarket::where('workspace_id', $without->id)->count())->toBe(0);
 });
 
+test('the seeder files the known sub categories under their category', function () {
+    ['workspace' => $workspace] = makeProductsWorkspace();
+
+    (new TargetMarketSeeder)->run();
+
+    $musculoskeletal = TargetMarket::ofWorkspace($workspace)
+        ->where('name', 'Musculoskeletal')
+        ->firstOrFail();
+
+    $cardiovascular = TargetMarket::ofWorkspace($workspace)
+        ->where('name', 'Cardiovascular')
+        ->firstOrFail();
+
+    expect($musculoskeletal->children()->pluck('name')->all())
+        ->toBe(TargetMarketSeeder::SUB_CATEGORIES['Musculoskeletal'])
+        ->and($cardiovascular->children()->pluck('name')->all())
+        ->toBe(TargetMarketSeeder::SUB_CATEGORIES['Cardiovascular'])
+        // A category we have no list for is seeded bare rather than guessed at.
+        ->and(
+            TargetMarket::ofWorkspace($workspace)->where('name', 'Oncology')->firstOrFail()->children()->count()
+        )->toBe(0);
+});
+
 test('re-running the seeder disturbs nothing that has been edited since', function () {
     ['workspace' => $workspace] = makeProductsWorkspace();
 
     (new TargetMarketSeeder)->run();
 
     $cardio = TargetMarket::ofWorkspace($workspace)->where('name', 'Cardiovascular')->firstOrFail();
+    $seeded = $cardio->children()->count();
+
+    // Deliberately a name the seeder does not own: the point is that a row
+    // somebody typed survives a re-run, and reusing a seeded name would only
+    // prove firstOrCreate matched it.
     $cardio->children()->create([
         'workspace_id' => $workspace->id,
-        'name' => 'Hypertension',
-        'position' => 0,
+        'name' => 'Custom Condition',
+        'position' => 99,
     ]);
     $cardio->update(['position' => 99]);
 
@@ -381,8 +409,10 @@ test('re-running the seeder disturbs nothing that has been edited since', functi
 
     expect(TargetMarket::ofWorkspace($workspace)->categories()->count())
         ->toBe(count(TargetMarketSeeder::CATEGORIES))
-        // The sub category survives, and the moved category stays where it was
-        // put rather than snapping back to its seeded position.
+        // The hand-added sub category survives alongside the seeded ones, and
+        // the moved category stays where it was put rather than snapping back
+        // to its seeded position.
         ->and($cardio->refresh()->position)->toBe(99)
-        ->and($cardio->children()->pluck('name')->all())->toBe(['Hypertension']);
+        ->and($cardio->children()->count())->toBe($seeded + 1)
+        ->and($cardio->children()->pluck('name')->all())->toContain('Custom Condition');
 });

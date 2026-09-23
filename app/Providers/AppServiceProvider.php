@@ -86,6 +86,20 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // The RDP Builder's "Suggest 10 names" button. Every press is a paid
+        // call to the model provider, so unlike the limiters above this one
+        // guards a bill rather than a database. Keyed on the user as well as
+        // the workspace: the point is to stop one person leaning on the button,
+        // and the endpoint is behind auth so there is always a user.
+        RateLimiter::for('rdp-suggestions', function (Request $request) {
+            $workspace = $request->route('workspace');
+            $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');
+
+            return [
+                Limit::perMinute(10)->by(($request->user()?->id ?? $request->ip()).'|'.$workspaceKey),
+            ];
+        });
+
         Gate::policy(Workspace::class, MetricSettingPolicy::class);
 
         Gate::before(function ($user, $ability, $params) {

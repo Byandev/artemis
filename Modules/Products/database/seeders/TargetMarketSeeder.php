@@ -28,6 +28,29 @@ class TargetMarketSeeder extends Seeder
     ];
 
     /**
+     * The sub categories under each category, keyed by the category's name.
+     * Only the ones we have been given — a category missing here is seeded
+     * with no children, and they get filed on the page.
+     *
+     * @var array<string, list<string>>
+     */
+    public const SUB_CATEGORIES = [
+        'Cardiovascular' => [
+            'Hypertension',
+            'Coronary Artery Disease',
+            'Heart Failure',
+            'Heart Attack',
+            'Arrhythmia',
+        ],
+        'Musculoskeletal' => [
+            'Sports Injuries',
+            'Back Pain',
+            'Osteoporosis',
+            'Arthritis',
+        ],
+    ];
+
+    /**
      * Seeds every workspace with the products module switched on.
      *
      * Idempotent: a category already there is left as it is, including any sub
@@ -62,11 +85,26 @@ class TargetMarketSeeder extends Seeder
                 if ($market->wasRecentlyCreated) {
                     $added++;
                 }
+
+                foreach (self::SUB_CATEGORIES[$name] ?? [] as $childPosition => $childName) {
+                    $child = TargetMarket::firstOrCreate(
+                        [
+                            'workspace_id' => $workspace->id,
+                            'parent_id' => $market->id,
+                            'name' => $childName,
+                        ],
+                        ['position' => $childPosition],
+                    );
+
+                    if ($child->wasRecentlyCreated) {
+                        $added++;
+                    }
+                }
             }
         }
 
         $this->command?->info(sprintf(
-            'Target markets: %d added across %d workspace(s).',
+            'Target markets: %d row(s) added across %d workspace(s).',
             $added,
             $workspaces->count(),
         ));

@@ -32,13 +32,19 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
+    BADGE_NEUTRAL,
     BTN_PRIMARY,
     BTN_SECONDARY,
     CARD,
     EMPTY,
+    ICON_BTN,
+    ICON_BTN_DANGER,
     INPUT,
+    INSET,
     LABEL,
+    MUTED,
     ROW_DIVIDE,
+    ROW_HOVER,
     SECTION_BORDER,
 } from '../lib/ui';
 import TargetMarketEntryDialog from './components/entry-dialog';
@@ -58,9 +64,6 @@ interface Props {
 
 /** Mirrors TargetMarketController::PER_PAGE. */
 const PER_PAGE = [10, 25, 50, 100, 500];
-
-const ICON_BTN =
-    'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500';
 
 const Index = ({ workspace, categories, summary, parents, query }: Props) => {
     const baseUrl = `/workspaces/${workspace.slug}/products/target-markets`;
@@ -185,7 +188,7 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
 
             {rows.length === 0 ? (
                 <div className={EMPTY}>
-                    <p className="text-[13px] text-gray-500 dark:text-gray-400">
+                    <p className={MUTED}>
                         {query.search
                             ? `Nothing matches "${query.search}".`
                             : 'No target markets yet.'}
@@ -199,7 +202,7 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
             ) : (
                 <div className={`overflow-hidden ${CARD}`}>
                     <div
-                        className={`flex items-center justify-between border-b ${SECTION_BORDER} px-5 py-3.5`}
+                        className={`flex items-center justify-between border-b ${SECTION_BORDER} px-4 py-3`}
                     >
                         <p className={LABEL}>Category</p>
                         <p className={LABEL}>
@@ -220,13 +223,15 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
 
                             return (
                                 <div key={category.id}>
-                                    <div className="flex items-center gap-2 px-5 py-3">
+                                    <div
+                                        className={`flex items-center gap-2 px-4 py-3 ${ROW_HOVER}`}
+                                    >
                                         <button
                                             type="button"
                                             onClick={() => toggle(category.id)}
                                             aria-expanded={isOpen}
                                             aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${category.name}`}
-                                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-stone-100 hover:text-gray-700 dark:hover:bg-zinc-800 dark:hover:text-gray-200"
+                                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-black/[0.03] hover:text-gray-600 dark:hover:bg-white/[0.04] dark:hover:text-gray-300"
                                         >
                                             {isOpen ? (
                                                 <ChevronDown className="h-4 w-4" />
@@ -240,10 +245,12 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                             onClick={() => toggle(category.id)}
                                             className="min-w-0 flex-1 text-left"
                                         >
-                                            <span className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">
+                                            <span className="text-[13px] font-medium text-gray-800 dark:text-gray-100">
                                                 {category.name}
                                             </span>
-                                            <span className="ml-2 rounded-md bg-stone-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500 tabular-nums dark:bg-zinc-800 dark:text-gray-400">
+                                            <span
+                                                className={`ml-2 ${BADGE_NEUTRAL} px-2 py-0.5 font-mono tabular-nums`}
+                                            >
                                                 {category.children_count}
                                             </span>
                                         </button>
@@ -256,7 +263,7 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                                         openCreate(category.id)
                                                     }
                                                     aria-label={`Add a sub category under ${category.name}`}
-                                                    className={`${ICON_BTN} border-black/8 text-gray-500 hover:bg-stone-100 hover:text-gray-800 dark:border-white/8 dark:text-gray-400 dark:hover:bg-zinc-800`}
+                                                    className={ICON_BTN}
                                                 >
                                                     <Plus className="h-3.5 w-3.5" />
                                                 </button>
@@ -270,7 +277,7 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                                         })
                                                     }
                                                     aria-label={`Rename ${category.name}`}
-                                                    className={`${ICON_BTN} border-black/8 text-gray-500 hover:bg-stone-100 hover:text-gray-800 dark:border-white/8 dark:text-gray-400 dark:hover:bg-zinc-800`}
+                                                    className={ICON_BTN}
                                                 >
                                                     <Pencil className="h-3.5 w-3.5" />
                                                 </button>
@@ -286,7 +293,7 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                                         })
                                                     }
                                                     aria-label={`Delete ${category.name}`}
-                                                    className={`${ICON_BTN} border-red-600/20 text-red-600 hover:bg-red-50 dark:border-red-400/20 dark:text-red-400 dark:hover:bg-red-950/30`}
+                                                    className={ICON_BTN_DANGER}
                                                 >
                                                     <X className="h-3.5 w-3.5" />
                                                 </button>
@@ -295,9 +302,11 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                     </div>
 
                                     {isOpen && (
-                                        <div className="border-t border-black/4 bg-stone-50/60 dark:border-white/4 dark:bg-zinc-800/30">
+                                        <div
+                                            className={`border-t ${SECTION_BORDER} ${INSET}`}
+                                        >
                                             {category.children.length === 0 ? (
-                                                <p className="py-3 pr-5 pl-[52px] text-[12px] text-gray-400 dark:text-gray-500">
+                                                <p className="py-3 pr-4 pl-[48px] text-[12px] text-gray-400 dark:text-gray-500">
                                                     No sub categories yet.
                                                 </p>
                                             ) : (
@@ -305,9 +314,9 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                                     (child) => (
                                                         <div
                                                             key={child.id}
-                                                            className="flex items-center gap-2 py-2.5 pr-5 pl-[52px]"
+                                                            className="flex items-center gap-2 py-2.5 pr-4 pl-[48px]"
                                                         >
-                                                            <span className="min-w-0 flex-1 text-[13px] text-gray-600 dark:text-gray-300">
+                                                            <span className="min-w-0 flex-1 text-[13px] text-gray-500 dark:text-gray-400">
                                                                 {child.name}
                                                             </span>
 
@@ -321,7 +330,7 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                                                             )
                                                                         }
                                                                         aria-label={`Rename ${child.name}`}
-                                                                        className={`${ICON_BTN} border-black/8 text-gray-500 hover:bg-white hover:text-gray-800 dark:border-white/8 dark:text-gray-400 dark:hover:bg-zinc-900`}
+                                                                        className={`bg-white dark:bg-zinc-900 ${ICON_BTN}`}
                                                                     >
                                                                         <Pencil className="h-3.5 w-3.5" />
                                                                     </button>
@@ -333,7 +342,9 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                                                             )
                                                                         }
                                                                         aria-label={`Delete ${child.name}`}
-                                                                        className={`${ICON_BTN} border-red-600/20 text-red-600 hover:bg-red-50 dark:border-red-400/20 dark:text-red-400 dark:hover:bg-red-950/30`}
+                                                                        className={
+                                                                            ICON_BTN_DANGER
+                                                                        }
                                                                     >
                                                                         <X className="h-3.5 w-3.5" />
                                                                     </button>
@@ -364,7 +375,7 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                             })
                                         }
                                     >
-                                        <SelectTrigger className="h-7 w-[72px] rounded-lg border border-black/6 bg-stone-50 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                        <SelectTrigger className="h-7 w-[72px] rounded-lg border border-black/6 bg-stone-100 px-2.5 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="min-w-[72px]">
@@ -381,7 +392,7 @@ const Index = ({ workspace, categories, summary, parents, query }: Props) => {
                                     </Select>
                                 </div>
                                 <div className="h-4 w-px bg-black/6 dark:bg-white/6" />
-                                <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                <p className="font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
                                     Showing {categories.from ?? 0} to{' '}
                                     {categories.to ?? 0} of{' '}
                                     {categories.total.toLocaleString()} entries

@@ -13,6 +13,7 @@ class ProductsDatabaseSeeder extends Seeder
     {
         $this->call([
             ProductSeeder::class,
+            ProductFormSeeder::class,
             TargetMarketSeeder::class,
         ]);
     }
