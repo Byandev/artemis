@@ -4,24 +4,20 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import axios from 'axios';
 import { Minus, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
     BTN_PRIMARY,
-    FIELD_ERROR,
     ICON_BTN,
     INPUT,
     LABEL,
     SECTION_BORDER,
     TEXTAREA,
 } from '../../lib/ui';
-import { type PromptSettings } from '../types';
 
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    baseUrl: string;
     /** The small caps line above the title — "Name generation", "Product image". */
     eyebrow: string;
     promptLabel: string;
@@ -30,10 +26,7 @@ interface Props {
     defaultPrompt: string;
     count: number;
     maxCount: number;
-    /** The two settings keys this dialog owns; the other pair is left alone. */
-    promptKey: 'naming_prompt' | 'packshot_prompt';
-    countKey: 'name_count' | 'packshot_count';
-    onSaved: (settings: PromptSettings) => void;
+    onDone: (prompt: string, count: number) => void;
 }
 
 /**
@@ -41,14 +34,17 @@ interface Props {
  *
  * Deliberately one dialog per step rather than one holding both: the naming
  * prompt and the image prompt are opened from different places and ask for
- * unrelated things, so seeing the other one is only noise. The settings live
- * in a single row, and the endpoint takes partial updates, so each dialog
- * sends only its own pair.
+ * unrelated things, so seeing the other one is only noise.
+ *
+ * The prompts belong to the brief being built, not to the workspace, so this
+ * writes nothing on its own — Done hands the pair back to the builder, which
+ * carries it on the form and persists it when the brief is saved. That also
+ * makes it behave like every other field on the page: nothing is committed
+ * until Save.
  */
 export default function ConfigurePromptDialog({
     open,
     onOpenChange,
-    baseUrl,
     eyebrow,
     promptLabel,
     countLabel,
@@ -56,22 +52,17 @@ export default function ConfigurePromptDialog({
     defaultPrompt,
     count: savedCount,
     maxCount,
-    promptKey,
-    countKey,
-    onSaved,
+    onDone,
 }: Props) {
     const [prompt, setPrompt] = useState(savedPrompt);
     const [count, setCount] = useState(savedCount);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
-    // Reopening has to reload from what was last saved, or an abandoned edit
-    // would look like it stuck.
+    // Reopening has to reload from what the brief currently carries, or an
+    // abandoned edit would look like it stuck.
     useEffect(() => {
         if (!open) return;
         setPrompt(savedPrompt);
         setCount(savedCount);
-        setError(null);
     }, [open, savedPrompt, savedCount]);
 
     const onDefault = prompt.trim() === defaultPrompt.trim();
@@ -80,23 +71,9 @@ export default function ConfigurePromptDialog({
         setCount((prev) => Math.min(maxCount, Math.max(1, prev + by)));
     }
 
-    async function save() {
-        setSaving(true);
-        setError(null);
-
-        try {
-            const response = await axios.put<PromptSettings>(
-                `${baseUrl}/prompt-settings`,
-                { [promptKey]: prompt, [countKey]: count },
-            );
-
-            onSaved(response.data);
-            onOpenChange(false);
-        } catch {
-            setError('Could not save. Try again.');
-        } finally {
-            setSaving(false);
-        }
+    function done() {
+        onDone(prompt, count);
+        onOpenChange(false);
     }
 
     return (
@@ -178,8 +155,6 @@ export default function ConfigurePromptDialog({
                             <span className={LABEL}>Max {maxCount}</span>
                         </div>
                     </div>
-
-                    {error && <p className={FIELD_ERROR}>{error}</p>}
                 </div>
 
                 <div
@@ -187,11 +162,10 @@ export default function ConfigurePromptDialog({
                 >
                     <button
                         type="button"
-                        onClick={save}
-                        disabled={saving}
+                        onClick={done}
                         className={BTN_PRIMARY}
                     >
-                        {saving ? 'Saving…' : 'Done'}
+                        Done
                     </button>
                 </div>
             </DialogContent>

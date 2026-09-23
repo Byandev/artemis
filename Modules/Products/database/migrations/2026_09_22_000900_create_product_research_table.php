@@ -32,6 +32,19 @@ return new class extends Migration
             $table->text('active_ingredients')->nullable();
             $table->text('additional_instruction')->nullable();
 
+            // How this brief wants its names and its packshots asked for.
+            //
+            // Per brief rather than per workspace: a spray for back pain wants
+            // different wording from a capsule, and the image prompt more so.
+            // Null means "still on the default" — what "Reset to default" puts
+            // back — so the wording can be improved in code without freezing
+            // anyone on today's text. The counts are how many the step asks
+            // for; see the ceilings on the ProductResearch model.
+            $table->text('naming_prompt')->nullable();
+            $table->unsignedTinyInteger('name_count')->default(10);
+            $table->text('packshot_prompt')->nullable();
+            $table->unsignedTinyInteger('packshot_count')->default(5);
+
             $table->timestamps();
 
             // How the list reads: a workspace's briefs, newest first.

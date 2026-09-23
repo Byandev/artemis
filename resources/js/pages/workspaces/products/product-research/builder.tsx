@@ -55,6 +55,14 @@ interface FormValues {
     claims: string;
     active_ingredients: string;
     additional_instruction: string;
+    /**
+     * The prompts belong to this brief, so they ride on the form and are
+     * persisted by Save alongside everything else.
+     */
+    naming_prompt: string;
+    name_count: number;
+    packshot_prompt: string;
+    packshot_count: number;
 }
 
 /** A numbered step heading with the rule running off to the right. */
@@ -116,10 +124,12 @@ const Builder = ({
             active_ingredients: productResearch?.active_ingredients ?? '',
             additional_instruction:
                 productResearch?.additional_instruction ?? '',
+            naming_prompt: promptSettings.naming_prompt,
+            name_count: promptSettings.name_count,
+            packshot_prompt: promptSettings.packshot_prompt,
+            packshot_count: promptSettings.packshot_count,
         });
 
-    // Held locally so saving the dialog updates the button without a reload.
-    const [settings, setSettings] = useState(promptSettings);
     // One per step: the naming prompt and the image prompt are opened from
     // different places and have nothing to say to each other.
     const [namePromptOpen, setNamePromptOpen] = useState(false);
@@ -175,6 +185,8 @@ const Builder = ({
                 product_form_id: data.product_form_id,
                 target_market_id: data.target_market_id,
                 target_market_sub_id: data.target_market_sub_id || null,
+                naming_prompt: data.naming_prompt,
+                name_count: data.name_count,
             });
 
             setSuggestions(response.data.names);
@@ -429,8 +441,8 @@ const Builder = ({
                                         <Sparkles className="h-3.5 w-3.5" />
                                     )}
                                     {suggestions.length > 0 && !suggesting
-                                        ? `Suggest ${settings.name_count} more`
-                                        : `Suggest ${settings.name_count} names`}
+                                        ? `Suggest ${data.name_count} more`
+                                        : `Suggest ${data.name_count} names`}
                                 </button>
 
                                 <button
@@ -464,17 +476,20 @@ const Builder = ({
                         <ConfigurePromptDialog
                             open={namePromptOpen}
                             onOpenChange={setNamePromptOpen}
-                            baseUrl={baseUrl}
                             eyebrow="Name generation"
                             promptLabel="Naming prompt"
                             countLabel="How many names"
-                            prompt={settings.naming_prompt}
-                            defaultPrompt={settings.default_prompt}
-                            count={settings.name_count}
-                            maxCount={settings.max_count}
-                            promptKey="naming_prompt"
-                            countKey="name_count"
-                            onSaved={setSettings}
+                            prompt={data.naming_prompt}
+                            defaultPrompt={promptSettings.default_prompt}
+                            count={data.name_count}
+                            maxCount={promptSettings.max_count}
+                            onDone={(prompt, count) => {
+                                setData((current) => ({
+                                    ...current,
+                                    naming_prompt: prompt,
+                                    name_count: count,
+                                }));
+                            }}
                         />
                     </div>
 
@@ -512,7 +527,11 @@ const Builder = ({
                             chip={chip}
                             state={packshots}
                             onChange={setPackshots}
-                            count={settings.packshot_count}
+                            count={data.packshot_count}
+                            prompt={{
+                                packshot_prompt: data.packshot_prompt,
+                                packshot_count: String(data.packshot_count),
+                            }}
                             onConfigure={() => setImagePromptOpen(true)}
                         />
                     ) : (
@@ -527,17 +546,20 @@ const Builder = ({
                     <ConfigurePromptDialog
                         open={imagePromptOpen}
                         onOpenChange={setImagePromptOpen}
-                        baseUrl={baseUrl}
                         eyebrow="Product image"
                         promptLabel="Image prompt"
                         countLabel="How many images"
-                        prompt={settings.packshot_prompt}
-                        defaultPrompt={settings.default_packshot_prompt}
-                        count={settings.packshot_count}
-                        maxCount={settings.max_packshot_count}
-                        promptKey="packshot_prompt"
-                        countKey="packshot_count"
-                        onSaved={setSettings}
+                        prompt={data.packshot_prompt}
+                        defaultPrompt={promptSettings.default_packshot_prompt}
+                        count={data.packshot_count}
+                        maxCount={promptSettings.max_packshot_count}
+                        onDone={(prompt, count) => {
+                            setData((current) => ({
+                                ...current,
+                                packshot_prompt: prompt,
+                                packshot_count: count,
+                            }));
+                        }}
                     />
                 </section>
 

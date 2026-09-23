@@ -301,7 +301,6 @@ Route::middleware(['auth'])->group(function () {
     // Declared before the {productResearch} routes so "suggest-names" is never read as an
     // id. Throttled because each call is a paid one — see the product-research-suggestions
     // limiter in AppServiceProvider.
-    Route::put('/workspaces/{workspace}/products/product-research/prompt-settings', [ProductResearchController::class, 'updatePromptSettings'])->name('workspaces.products.product-research.prompt-settings');
     Route::post('/workspaces/{workspace}/products/product-research/suggest-names', [ProductResearchController::class, 'suggestNames'])
         ->middleware('throttle:product-research-suggestions')
         ->name('workspaces.products.product-research.suggest-names');

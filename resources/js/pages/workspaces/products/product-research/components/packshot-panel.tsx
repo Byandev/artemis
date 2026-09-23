@@ -22,6 +22,12 @@ interface Props {
     brief: Record<string, string>;
     /** Told the id the draft was filed under, so later calls reuse it. */
     onFiled: (productResearchId: number) => void;
+    /**
+     * The image prompt this brief is set to, sent with every call so the
+     * server draws with what the dialog is showing — and, on a draft, files it
+     * onto the brief it creates.
+     */
+    prompt: Record<string, string>;
     name: string;
     /** "Spray · Cardiovascular", under the name. */
     chip: string;
@@ -40,6 +46,7 @@ export default function PackshotPanel({
     productResearchId,
     brief,
     onFiled,
+    prompt,
     name,
     chip,
     state,
@@ -53,10 +60,12 @@ export default function PackshotPanel({
     const [error, setError] = useState<string | null>(null);
 
     /** Either the filed brief, or the fields the server needs to file it. */
-    const identity =
-        productResearchId !== null
+    const identity = {
+        ...(productResearchId !== null
             ? { product_research_id: String(productResearchId) }
-            : brief;
+            : brief),
+        ...prompt,
+    };
 
     function absorb(data: PackshotResponse) {
         onChange({

@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Modules\Products\Models\ProductForm;
 use Modules\Products\Models\ProductResearch;
-use Modules\Products\Models\ProductResearchPromptSetting;
 use Modules\Products\Models\TargetMarket;
 use Tests\TestCase;
 
@@ -107,7 +106,7 @@ test('re-drawing replaces the previous set rather than piling up', function () {
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
-    ProductResearchPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 3]);
+    $productResearch->update(['packshot_count' => 3]);
 
     foreach (range(1, 2) as $ignored) {
         $this->actingAs($owner)
@@ -120,31 +119,61 @@ test('re-drawing replaces the previous set rather than piling up', function () {
     expect($productResearch->refresh()->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(3);
 });
 
-test('the workspace style note and count reach the generator', function () {
+test("the brief's style note and count reach the generator, and are remembered", function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
-
-    ProductResearchPromptSetting::create([
-        'workspace_id' => $workspace->id,
-        'packshot_prompt' => 'Watercolour illustration on cream paper.',
-        'packshot_count' => 2,
-    ]);
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
+    // Sent with the call rather than read off a workspace row, so the images
+    // are drawn with what the Configure prompt dialog is showing.
     $this->actingAs($owner)
-        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", [
+            'product_research_id' => $productResearch->id,
+            'packshot_prompt' => 'Watercolour illustration on cream paper.',
+            'packshot_count' => 2,
+        ])
         ->assertOk()
         ->assertJsonCount(2, 'packshot_options');
 
     Http::assertSentCount(2);
     Http::assertSent(fn ($request) => str_contains($request['prompt'], 'Watercolour illustration'));
+
+    // And kept on the brief, so reopening it shows what these were drawn with.
+    expect($productResearch->refresh()->packshot_prompt)->toBe('Watercolour illustration on cream paper.')
+        ->and($productResearch->packshot_count)->toBe(2);
+});
+
+test('one brief\'s image prompt does not follow another around the workspace', function () {
+    ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
+
+    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+
+    $productResearch->update(['packshot_prompt' => 'Watercolour illustration on cream paper.']);
+
+    $other = ProductResearch::create([
+        'workspace_id' => $workspace->id,
+        'name' => 'Joint Relief Spray',
+        'product_form_id' => $productResearch->product_form_id,
+        'target_market_id' => $productResearch->target_market_id,
+    ]);
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", [
+            'product_research_id' => $other->id,
+            'packshot_count' => 1,
+        ])
+        ->assertOk();
+
+    // The sibling brief is on the default, not on the first one's wording.
+    Http::assertSent(fn ($request) => ! str_contains($request['prompt'], 'Watercolour illustration')
+        && str_contains($request['prompt'], 'a printed label carrying the name'));
 });
 
 test('picking an option sets the packshot and leaves the option in the grid', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
-    ProductResearchPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 3]);
+    $productResearch->update(['packshot_count' => 3]);
 
     $options = $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -412,10 +441,7 @@ test('a market with no palette of its own still avoids the default brown', funct
 test('an image prompt that asks for no label still gets the spelling guard', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    ProductResearchPromptSetting::create([
-        'workspace_id' => $workspace->id,
-        'packshot_prompt' => 'Blank unbranded packaging, no label of any kind.',
-    ]);
+    $productResearch->update(['packshot_prompt' => 'Blank unbranded packaging, no label of any kind.']);
 
     Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
 
@@ -451,7 +477,7 @@ test('a model that ignores n still yields the full set', function () {
 test('a partial failure still returns the options that came back', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    ProductResearchPromptSetting::create(['workspace_id' => $workspace->id, 'packshot_count' => 4]);
+    $productResearch->update(['packshot_count' => 4]);
 
     // Two of the four calls fail. A partial set beats an error the user can do
     // nothing about — the grid wraps.

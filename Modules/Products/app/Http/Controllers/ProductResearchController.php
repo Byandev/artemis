@@ -8,6 +8,7 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,6 @@ use Inertia\Inertia;
 use Modules\Products\Exceptions\ProductResearchSuggestionFailed;
 use Modules\Products\Models\ProductForm;
 use Modules\Products\Models\ProductResearch;
-use Modules\Products\Models\ProductResearchPromptSetting;
 use Modules\Products\Models\TargetMarket;
 use Modules\Products\Services\ProductResearchNameSuggester;
 use Modules\Products\Services\ProductResearchPackshotGenerator;
@@ -24,6 +24,9 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class ProductResearchController extends Controller
 {
     use AuthorizesRequests;
+
+    /** Handled by fillPrompts() rather than plain fill(), so they normalise. */
+    private const PROMPT_FIELDS = ['naming_prompt', 'name_count', 'packshot_prompt', 'packshot_count'];
 
     /** The RDPs list. */
     public function index(Workspace $workspace)
@@ -62,6 +65,8 @@ class ProductResearchController extends Controller
         return Inertia::render('workspaces/products/product-research/builder', [
             'workspace' => $workspace,
             'productResearch' => null,
+            // A brief that does not exist yet opens on the defaults.
+            'promptSettings' => $this->promptSettings(null),
             ...$this->options($workspace),
         ]);
     }
@@ -87,6 +92,7 @@ class ProductResearchController extends Controller
                 'additional_instruction' => $productResearch->additional_instruction,
                 ...$this->packshotPayload($workspace, $productResearch),
             ],
+            'promptSettings' => $this->promptSettings($productResearch),
             ...$this->options($workspace),
         ]);
     }
@@ -96,13 +102,11 @@ class ProductResearchController extends Controller
         $this->guardModule($workspace);
         $this->authorize(Permission::ManageProductResearch->value, $workspace);
 
-        $validated = $request->validate($this->rules($request, $workspace));
-
-        $productResearch = ProductResearch::create([
-            ...$validated,
-            'workspace_id' => $workspace->id,
-            'created_by' => $request->user()->id,
-        ]);
+        $productResearch = $this->fileBrief(
+            $request->validate($this->rules($request, $workspace)),
+            $workspace,
+            $request,
+        );
 
         return redirect()
             ->route('workspaces.products.product-research.index', $workspace)
@@ -115,7 +119,11 @@ class ProductResearchController extends Controller
         $this->authorize(Permission::ManageProductResearch->value, $workspace);
         $this->guard($workspace, $productResearch);
 
-        $productResearch->update($request->validate($this->rules($request, $workspace)));
+        $validated = $request->validate($this->rules($request, $workspace));
+
+        $this->fillPrompts($productResearch, $validated)
+            ->fill(Arr::except($validated, self::PROMPT_FIELDS))
+            ->save();
 
         return redirect()
             ->route('workspaces.products.product-research.index', $workspace)
@@ -135,7 +143,10 @@ class ProductResearchController extends Controller
         $this->guardModule($workspace);
         $this->authorize(Permission::ManageProductResearch->value, $workspace);
 
-        $validated = $request->validate($this->briefRules($request, $workspace));
+        $validated = $request->validate([
+            ...$this->briefRules($request, $workspace),
+            ...$this->promptRules(),
+        ]);
 
         if (! ProductResearchNameSuggester::isConfigured()) {
             return response()->json([
@@ -151,7 +162,11 @@ class ProductResearchController extends Controller
             ? TargetMarket::ofWorkspace($workspace)->find($validated['target_market_sub_id'])
             : null;
 
-        $settings = ProductResearchPromptSetting::forWorkspace($workspace);
+        // The prompt rides on the request rather than being read back off a
+        // stored row: Step 2 is where the name is chosen, so more often than
+        // not there is no brief yet to read from. The builder holds the pair
+        // and sends it; saving the brief is what persists it.
+        $settings = $this->fillPrompts(new ProductResearch, $validated);
 
         try {
             return response()->json(
@@ -197,7 +212,10 @@ class ProductResearchController extends Controller
         set_time_limit((int) config('openai.packshot_timeout', 180) + 30);
 
         $productResearch->loadMissing(['form', 'targetMarket', 'targetMarketSub']);
-        $settings = ProductResearchPromptSetting::forWorkspace($workspace);
+
+        // Drawn with what the dialog is showing, and remembered on the brief,
+        // so reopening it later shows what these images were drawn with.
+        $this->fillPrompts($productResearch, $request->validate($this->promptRules()))->save();
 
         try {
             $images = $generator->generate(
@@ -210,8 +228,8 @@ class ProductResearchController extends Controller
                 // the palette, the sub category says what it treats.
                 $productResearch->targetMarket?->name ?? 'general wellness',
                 $productResearch->targetMarketSub?->name,
-                $settings->packshotPrompt(),
-                $settings->packshotCount(),
+                $productResearch->packshotPrompt(),
+                $productResearch->packshotCount(),
             );
         } catch (ProductResearchSuggestionFailed $e) {
             return response()->json(['message' => $e->getMessage()], 502);
@@ -291,13 +309,11 @@ class ProductResearchController extends Controller
             return $productResearch;
         }
 
-        $validated = $request->validate($this->rules($request, $workspace));
-
-        return ProductResearch::create([
-            ...$validated,
-            'workspace_id' => $workspace->id,
-            'created_by' => $request->user()->id,
-        ]);
+        return $this->fileBrief(
+            $request->validate($this->rules($request, $workspace)),
+            $workspace,
+            $request,
+        );
     }
 
     /**
@@ -366,82 +382,106 @@ class ProductResearchController extends Controller
     }
 
     /**
-     * Save the Configure prompt dialog.
+     * What the Configure prompt dialog opens on, for one brief.
      *
-     * Workspace-wide rather than per brief: it is the brand's voice, so every
-     * brief should inherit it.
+     * A brief that does not exist yet — the builder on /create — opens on the
+     * defaults, which is what an unsaved model already reports. `is_default`
+     * drives whether "Reset to default" has anything to undo.
+     *
+     * @return array<string, mixed>
      */
-    public function updatePromptSettings(Request $request, Workspace $workspace)
+    private function promptSettings(?ProductResearch $productResearch): array
     {
-        $this->guardModule($workspace);
-        $this->authorize(Permission::ManageProductResearch->value, $workspace);
+        $productResearch ??= new ProductResearch;
 
-        // `sometimes` throughout: the dialog sends both halves, but a caller
-        // changing only the naming settings must not have to restate the
-        // packshot ones — and must not have them wiped for leaving them out.
-        $validated = $request->validate([
-            // Null is "reset to default" — the model falls back rather than
-            // storing a copy of the default that would then never track it.
+        return [
+            'naming_prompt' => $productResearch->prompt(),
+            'name_count' => $productResearch->count(),
+            'default_prompt' => ProductResearch::DEFAULT_PROMPT,
+            'max_count' => ProductResearch::MAX_COUNT,
+            'is_default' => blank($productResearch->naming_prompt),
+            'packshot_prompt' => $productResearch->packshotPrompt(),
+            'packshot_count' => $productResearch->packshotCount(),
+            'default_packshot_prompt' => ProductResearch::DEFAULT_PACKSHOT_PROMPT,
+            'max_packshot_count' => ProductResearch::MAX_PACKSHOT_COUNT,
+            'packshot_is_default' => blank($productResearch->packshot_prompt),
+        ];
+    }
+
+    /**
+     * Create a brief from validated input.
+     *
+     * Shared by store() and the draft that Step 3 files on the way through, so
+     * both normalise the prompts the same way rather than mass-assigning the
+     * default's text verbatim.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function fileBrief(array $validated, Workspace $workspace, Request $request): ProductResearch
+    {
+        $productResearch = $this->fillPrompts(new ProductResearch, $validated)
+            ->fill(Arr::except($validated, self::PROMPT_FIELDS));
+
+        $productResearch->workspace_id = $workspace->id;
+        $productResearch->created_by = $request->user()->id;
+        $productResearch->save();
+
+        return $productResearch;
+    }
+
+    /**
+     * The four prompt fields, as every endpoint that touches them accepts them.
+     *
+     * `sometimes` throughout: a caller changing only the naming pair must not
+     * have to restate the packshot one, and must not have it wiped for leaving
+     * it out. Null is "reset to default" — the model falls back rather than
+     * storing a copy of the default that would then never track it.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function promptRules(): array
+    {
+        return [
             'naming_prompt' => ['sometimes', 'nullable', 'string', 'max:4000'],
-            'name_count' => ['sometimes', 'required', 'integer', 'min:1', 'max:'.ProductResearchPromptSetting::MAX_COUNT],
+            'name_count' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.ProductResearch::MAX_COUNT],
             'packshot_prompt' => ['sometimes', 'nullable', 'string', 'max:4000'],
-            'packshot_count' => ['sometimes', 'required', 'integer', 'min:1', 'max:'.ProductResearchPromptSetting::MAX_PACKSHOT_COUNT],
-        ]);
+            'packshot_count' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.ProductResearch::MAX_PACKSHOT_COUNT],
+        ];
+    }
 
-        $settings = ProductResearchPromptSetting::forWorkspace($workspace);
-
-        // Storing the default verbatim would freeze the workspace on today's
-        // wording, so it is normalised back to null.
-        $normalise = function (string $value, string $default): ?string {
-            $value = trim($value);
+    /**
+     * Put the validated prompt fields on a brief, saved or not.
+     *
+     * Storing the default verbatim would freeze the brief on today's wording,
+     * so it is normalised back to null on the way in.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function fillPrompts(ProductResearch $productResearch, array $validated): ProductResearch
+    {
+        $normalise = function (?string $value, string $default): ?string {
+            $value = trim((string) $value);
 
             return ($value === '' || $value === $default) ? null : $value;
         };
 
         if (array_key_exists('naming_prompt', $validated)) {
-            $settings->naming_prompt = $normalise(
-                (string) $validated['naming_prompt'],
-                ProductResearchPromptSetting::DEFAULT_PROMPT
-            );
+            $productResearch->naming_prompt = $normalise($validated['naming_prompt'], ProductResearch::DEFAULT_PROMPT);
         }
 
         if (array_key_exists('packshot_prompt', $validated)) {
-            $settings->packshot_prompt = $normalise(
-                (string) $validated['packshot_prompt'],
-                ProductResearchPromptSetting::DEFAULT_PACKSHOT_PROMPT
-            );
+            $productResearch->packshot_prompt = $normalise($validated['packshot_prompt'], ProductResearch::DEFAULT_PACKSHOT_PROMPT);
         }
 
-        $settings->fill(array_intersect_key(
-            $validated,
-            array_flip(['name_count', 'packshot_count'])
-        ))->save();
+        // Blank is "leave it as it was" rather than zero, which the counts can
+        // never be — the stepper's floor is 1.
+        foreach (['name_count', 'packshot_count'] as $key) {
+            if (filled($validated[$key] ?? null)) {
+                $productResearch->{$key} = $validated[$key];
+            }
+        }
 
-        return response()->json($this->promptSettings($workspace));
-    }
-
-    /**
-     * What the Configure prompt dialog opens on. `is_default` drives whether
-     * "Reset to default" has anything to undo.
-     *
-     * @return array<string, mixed>
-     */
-    private function promptSettings(Workspace $workspace): array
-    {
-        $settings = ProductResearchPromptSetting::forWorkspace($workspace);
-
-        return [
-            'naming_prompt' => $settings->prompt(),
-            'name_count' => $settings->count(),
-            'default_prompt' => ProductResearchPromptSetting::DEFAULT_PROMPT,
-            'max_count' => ProductResearchPromptSetting::MAX_COUNT,
-            'is_default' => blank($settings->naming_prompt),
-            'packshot_prompt' => $settings->packshotPrompt(),
-            'packshot_count' => $settings->packshotCount(),
-            'default_packshot_prompt' => ProductResearchPromptSetting::DEFAULT_PACKSHOT_PROMPT,
-            'max_packshot_count' => ProductResearchPromptSetting::MAX_PACKSHOT_COUNT,
-            'packshot_is_default' => blank($settings->packshot_prompt),
-        ];
+        return $productResearch;
     }
 
     /**
@@ -476,7 +516,6 @@ class ProductResearchController extends Controller
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get(),
-            'promptSettings' => $this->promptSettings($workspace),
             'targetMarkets' => TargetMarket::ofWorkspace($workspace)
                 ->categories()
                 ->with(['children' => fn ($q) => $q->select('id', 'parent_id', 'name', 'position')->ordered()])
@@ -496,6 +535,7 @@ class ProductResearchController extends Controller
             // brief, and the list has a column for it.
             'name' => ['required', 'string', 'max:255'],
             ...$this->briefRules($request, $workspace),
+            ...$this->promptRules(),
             'positioning' => ['nullable', 'string'],
             'claims' => ['nullable', 'string'],
             'active_ingredients' => ['nullable', 'string'],

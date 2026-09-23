@@ -42,16 +42,22 @@ export interface TargetMarketOption {
     children: { id: number; name: string }[];
 }
 
-/** What the Configure prompt dialog edits, workspace-wide. */
+/**
+ * What the Configure prompt dialog opens on, for one brief.
+ *
+ * Per brief rather than per workspace: a spray for back pain wants different
+ * wording from a capsule. The editable four live on the builder's form and are
+ * persisted when the brief is saved; the rest is the model's own constants.
+ */
 export interface PromptSettings {
-    /** The brand's half of the system prompt. */
+    /** The editable half of the system prompt. */
     naming_prompt: string;
     name_count: number;
     /** What "Reset to default" restores. */
     default_prompt: string;
     /** The stepper's ceiling. */
     max_count: number;
-    /** False once the workspace has saved a prompt of its own. */
+    /** False once this brief carries a prompt of its own. */
     is_default: boolean;
 
     /** The packshot step keeps its own pair — it asks for something else. */

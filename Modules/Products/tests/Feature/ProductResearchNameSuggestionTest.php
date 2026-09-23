@@ -7,7 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Modules\Products\Models\ProductForm;
-use Modules\Products\Models\ProductResearchPromptSetting;
+use Modules\Products\Models\ProductResearch;
 use Modules\Products\Models\TargetMarket;
 use Tests\TestCase;
 
@@ -363,21 +363,20 @@ test('the provider routing key is left off for OpenAI, which rejects it', functi
         && ! $request->hasHeader('HTTP-Referer'));
 });
 
-test('the workspace prompt and count reach the model', function () {
+test("the brief's prompt and count reach the model", function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
-
-    ProductResearchPromptSetting::create([
-        'workspace_id' => $workspace->id,
-        'naming_prompt' => 'You name premium herbal products for Cebu pharmacies.',
-        'name_count' => 4,
-    ]);
 
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody(4))]);
 
+    // Step 2 is where the name is chosen, so there is usually no brief yet —
+    // the builder sends the pair it is holding rather than the server reading
+    // it back off a row.
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
             'product_form_id' => $form->id,
             'target_market_id' => $category->id,
+            'naming_prompt' => 'You name premium herbal products for Cebu pharmacies.',
+            'name_count' => 4,
         ])
         ->assertOk()
         ->assertJsonCount(4, 'names');
@@ -395,7 +394,7 @@ test('the workspace prompt and count reach the model', function () {
     });
 });
 
-test('a workspace that never opened the dialog generates on the defaults', function () {
+test('a brief that never opened the dialog generates on the defaults', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
     Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
@@ -409,59 +408,104 @@ test('a workspace that never opened the dialog generates on the defaults', funct
 
     Http::assertSent(fn ($request) => str_contains(
         $request['messages'][0]['content'],
-        ProductResearchPromptSetting::DEFAULT_PROMPT
+        ProductResearch::DEFAULT_PROMPT
     ));
 });
 
-test('the configure dialog saves the prompt and the count', function () {
-    ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
+test('the configure dialog is saved with the brief, not the workspace', function () {
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
     $this->actingAs($owner)
-        ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [
+            'name' => 'Back Ease Balm',
+            'product_form_id' => $form->id,
+            'target_market_id' => $category->id,
             'naming_prompt' => 'Short, punchy names only.',
             'name_count' => 6,
         ])
-        ->assertOk()
-        ->assertJsonPath('naming_prompt', 'Short, punchy names only.')
-        ->assertJsonPath('name_count', 6)
-        ->assertJsonPath('is_default', false);
+        ->assertRedirect();
 
-    $settings = ProductResearchPromptSetting::where('workspace_id', $workspace->id)->firstOrFail();
-    expect($settings->naming_prompt)->toBe('Short, punchy names only.');
+    $productResearch = ProductResearch::ofWorkspace($workspace)->firstOrFail();
+
+    expect($productResearch->naming_prompt)->toBe('Short, punchy names only.')
+        ->and($productResearch->name_count)->toBe(6);
+});
+
+test('two briefs in one workspace keep their own prompts', function () {
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
+
+    $file = fn (string $name, string $prompt, int $count) => $this->actingAs($owner)
+        ->post("/workspaces/{$workspace->slug}/products/product-research", [
+            'name' => $name,
+            'product_form_id' => $form->id,
+            'target_market_id' => $category->id,
+            'naming_prompt' => $prompt,
+            'name_count' => $count,
+        ])
+        ->assertRedirect();
+
+    $file('Back Ease Balm', 'Clinical, restrained names.', 3);
+    $file('Joint Relief Spray', 'Loud, punchy names.', 8);
+
+    $balm = ProductResearch::where('name', 'Back Ease Balm')->firstOrFail();
+    $spray = ProductResearch::where('name', 'Joint Relief Spray')->firstOrFail();
+
+    // The whole point of the move: one brief's wording does not follow the
+    // other around the workspace.
+    expect($balm->naming_prompt)->toBe('Clinical, restrained names.')
+        ->and($balm->name_count)->toBe(3)
+        ->and($spray->naming_prompt)->toBe('Loud, punchy names.')
+        ->and($spray->name_count)->toBe(8);
 });
 
 test('resetting to the default stores nothing rather than a copy of it', function () {
-    ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    ProductResearchPromptSetting::create([
+    $productResearch = ProductResearch::create([
         'workspace_id' => $workspace->id,
+        'name' => 'Back Ease Balm',
+        'product_form_id' => $form->id,
+        'target_market_id' => $category->id,
         'naming_prompt' => 'Something custom.',
-        'name_count' => 10,
     ]);
 
     // Saving the default back has to clear the column, not store a copy that
     // would then never track a change to the default.
     $this->actingAs($owner)
-        ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
-            'naming_prompt' => ProductResearchPromptSetting::DEFAULT_PROMPT,
+        ->put("/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}", [
+            'name' => 'Back Ease Balm',
+            'product_form_id' => $form->id,
+            'target_market_id' => $category->id,
+            'naming_prompt' => ProductResearch::DEFAULT_PROMPT,
             'name_count' => 10,
         ])
-        ->assertOk()
-        ->assertJsonPath('is_default', true);
+        ->assertRedirect();
 
-    expect(ProductResearchPromptSetting::where('workspace_id', $workspace->id)->first()->naming_prompt)->toBeNull();
+    expect($productResearch->refresh()->naming_prompt)->toBeNull();
 });
 
 test('the count is capped, and saving needs the manage permission', function () {
-    ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    foreach ([0, ProductResearchPromptSetting::MAX_COUNT + 1] as $bad) {
+    foreach ([0, ProductResearch::MAX_COUNT + 1] as $bad) {
         $this->actingAs($owner)
-            ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
+            ->postJson("/workspaces/{$workspace->slug}/products/product-research", [
+                'name' => 'Back Ease Balm',
+                'product_form_id' => $form->id,
+                'target_market_id' => $category->id,
                 'name_count' => $bad,
             ])
             ->assertJsonValidationErrors('name_count');
     }
+
+    // The generate endpoint validates it too — it is the one actually spending.
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
+            'product_form_id' => $form->id,
+            'target_market_id' => $category->id,
+            'name_count' => ProductResearch::MAX_COUNT + 1,
+        ])
+        ->assertJsonValidationErrors('name_count');
 
     $viewer = makeMemberWithPermissions(
         $workspace,
@@ -470,37 +514,56 @@ test('the count is capped, and saving needs the manage permission', function () 
     );
 
     $this->actingAs($viewer)
-        ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research", [
+            'name' => 'Back Ease Balm',
+            'product_form_id' => $form->id,
+            'target_market_id' => $category->id,
             'name_count' => 5,
         ])
         ->assertForbidden();
 });
 
-test('the builder page opens the dialog on the saved settings', function () {
-    ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
+test('the builder opens the dialog on the brief it is editing', function () {
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    ProductResearchPromptSetting::create([
+    $productResearch = ProductResearch::create([
         'workspace_id' => $workspace->id,
+        'name' => 'Back Ease Balm',
+        'product_form_id' => $form->id,
+        'target_market_id' => $category->id,
         'naming_prompt' => 'House voice.',
         'name_count' => 7,
     ]);
 
     $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/products/product-research/create")
+        ->get("/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}/edit")
         ->assertInertia(fn ($page) => $page
             ->where('promptSettings.naming_prompt', 'House voice.')
             ->where('promptSettings.name_count', 7)
-            ->where('promptSettings.max_count', ProductResearchPromptSetting::MAX_COUNT)
-            ->where('promptSettings.default_prompt', ProductResearchPromptSetting::DEFAULT_PROMPT)
+            ->where('promptSettings.max_count', ProductResearch::MAX_COUNT)
+            ->where('promptSettings.default_prompt', ProductResearch::DEFAULT_PROMPT)
             ->where('promptSettings.is_default', false)
+        );
+
+    // A brief that does not exist yet opens on the defaults, whatever any
+    // other brief in the workspace was set to.
+    $this->actingAs($owner)
+        ->get("/workspaces/{$workspace->slug}/products/product-research/create")
+        ->assertInertia(fn ($page) => $page
+            ->where('promptSettings.naming_prompt', ProductResearch::DEFAULT_PROMPT)
+            ->where('promptSettings.name_count', ProductResearch::DEFAULT_COUNT)
+            ->where('promptSettings.is_default', true)
         );
 });
 
 test('changing one half of the settings leaves the other alone', function () {
-    ['user' => $owner, 'workspace' => $workspace] = suggestionFixtures();
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    ProductResearchPromptSetting::create([
+    $productResearch = ProductResearch::create([
         'workspace_id' => $workspace->id,
+        'name' => 'Back Ease Balm',
+        'product_form_id' => $form->id,
+        'target_market_id' => $category->id,
         'naming_prompt' => 'House voice.',
         'name_count' => 7,
         'packshot_prompt' => 'Watercolour on cream paper.',
@@ -509,14 +572,20 @@ test('changing one half of the settings leaves the other alone', function () {
 
     // The naming half only — the packshot settings are not restated.
     $this->actingAs($owner)
-        ->putJson("/workspaces/{$workspace->slug}/products/product-research/prompt-settings", [
+        ->put("/workspaces/{$workspace->slug}/products/product-research/{$productResearch->id}", [
+            'name' => 'Back Ease Balm',
+            'product_form_id' => $form->id,
+            'target_market_id' => $category->id,
             'naming_prompt' => 'New voice.',
             'name_count' => 4,
         ])
-        ->assertOk()
-        ->assertJsonPath('naming_prompt', 'New voice.')
-        ->assertJsonPath('name_count', 4)
+        ->assertRedirect();
+
+    $productResearch->refresh();
+
+    expect($productResearch->naming_prompt)->toBe('New voice.')
+        ->and($productResearch->name_count)->toBe(4)
         // Left out, so left as they were rather than wiped.
-        ->assertJsonPath('packshot_prompt', 'Watercolour on cream paper.')
-        ->assertJsonPath('packshot_count', 3);
+        ->and($productResearch->packshot_prompt)->toBe('Watercolour on cream paper.')
+        ->and($productResearch->packshot_count)->toBe(3);
 });
