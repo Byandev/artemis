@@ -88,7 +88,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
         })->where('date', $date)
             ->sum('spend');
 
-        $roas = $ad_spent ? $sales / $ad_spent : 0;
+        $roas = $ad_spent > 0 ? $sales / $ad_spent : 0;
 
         $delivered = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('delivered_at', $date)
