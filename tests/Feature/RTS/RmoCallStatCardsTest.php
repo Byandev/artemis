@@ -87,6 +87,7 @@ function rmoPage(array $params, $workspace)
 
 beforeEach(function () {
     ['workspace' => $this->workspace] = makeWorkspaceWithOwner();
+    subscribeWorkspace($this->workspace);
 
     $this->csrA = PancakeUser::create(['name' => 'CSR A']);
     $this->csrB = PancakeUser::create(['name' => 'CSR B']);

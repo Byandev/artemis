@@ -4,6 +4,8 @@ use App\Enums\IntegrationService;
 use App\Jobs\SyncCsrDailyCallRecord;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\UserIntegration;
 use App\Models\WelleDailyRecord;
@@ -199,6 +201,21 @@ function actingAsWorkspaceOwner(): array
     test()->actingAs($ctx['user']);
 
     return $ctx;
+}
+
+/**
+ * Put a workspace on a subscription — active by default. Public pages such as
+ * RMO management refuse to open for a workspace whose subscription has lapsed.
+ */
+function subscribeWorkspace(Workspace $workspace, string $status = Subscription::STATUS_ACTIVE, ?Carbon $periodEnd = null): Subscription
+{
+    return Subscription::create([
+        'workspace_id' => $workspace->id,
+        'subscription_plan_id' => SubscriptionPlan::where('code', SubscriptionPlan::CODE_STARTER)->firstOrFail()->id,
+        'status' => $status,
+        'current_period_start' => now()->subMonth(),
+        'current_period_end' => $periodEnd ?? now()->addMonth(),
+    ]);
 }
 
 /**

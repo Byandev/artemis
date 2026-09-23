@@ -75,6 +75,7 @@ function statusOf(int $id): string
 beforeEach(function () {
     $this->owner = User::factory()->create();
     $this->workspace = Workspace::factory()->create(['owner_id' => $this->owner->id]);
+    subscribeWorkspace($this->workspace);
     $this->page = Page::factory()->forWorkspace($this->workspace)->create();
     $this->shop = Shop::factory()->forWorkspace($this->workspace)->create();
 
