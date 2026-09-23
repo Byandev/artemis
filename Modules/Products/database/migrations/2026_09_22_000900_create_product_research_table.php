@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('rdps', function (Blueprint $table) {
+        Schema::create('product_research', function (Blueprint $table) {
             $table->id();
             $table->foreignId('workspace_id')->constrained()->cascadeOnDelete();
             // Who built the brief — the "Created by" column on the list.
@@ -41,6 +41,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('rdps');
+        Schema::dropIfExists('product_research');
     }
 };

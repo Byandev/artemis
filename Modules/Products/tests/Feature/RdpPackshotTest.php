@@ -8,7 +8,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Modules\Products\Models\ProductForm;
-use Modules\Products\Models\Rdp;
+use Modules\Products\Models\ProductResearch;
 use Modules\Products\Models\RdpPromptSetting;
 use Modules\Products\Models\TargetMarket;
 use Tests\TestCase;
@@ -37,7 +37,7 @@ beforeEach(function () {
 /**
  * A saved brief with a name, a form and a market — what Step 3 needs.
  *
- * @return array{user: User, workspace: Workspace, rdp: Rdp}
+ * @return array{user: User, workspace: Workspace, rdp: ProductResearch}
  */
 function packshotFixtures(): array
 {
@@ -46,7 +46,7 @@ function packshotFixtures(): array
     $form = ProductForm::create(['workspace_id' => $workspace->id, 'name' => 'Spray']);
     $category = TargetMarket::create(['workspace_id' => $workspace->id, 'name' => 'Cardiovascular']);
 
-    $rdp = Rdp::create([
+    $rdp = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -86,7 +86,7 @@ test('it draws the configured number of options and files them on the brief', fu
     expect($response->json('packshot_options'))->toHaveCount(5)
         // Nothing is chosen until someone picks one.
         ->and($response->json('packshot'))->toBeNull()
-        ->and($rdp->getMedia(Rdp::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(5);
+        ->and($rdp->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(5);
 
     Http::assertSent(function ($request) {
         return str_ends_with($request->url(), '/images')
@@ -117,7 +117,7 @@ test('re-drawing replaces the previous set rather than piling up', function () {
 
     // Two runs of three, not six — the grid shows one set, and the old files
     // would otherwise sit in the bucket unreachable.
-    expect($rdp->refresh()->getMedia(Rdp::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(3);
+    expect($rdp->refresh()->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(3);
 });
 
 test('the workspace style note and count reach the generator', function () {
@@ -169,9 +169,9 @@ test('an option belonging to another brief cannot be adopted', function () {
 
     $otherRdp->addMediaFromString('not-really-an-image')
         ->usingFileName('theirs.png')
-        ->toMediaCollection(Rdp::PACKSHOT_OPTIONS_COLLECTION);
+        ->toMediaCollection(ProductResearch::PACKSHOT_OPTIONS_COLLECTION);
 
-    $theirs = $otherRdp->getFirstMedia(Rdp::PACKSHOT_OPTIONS_COLLECTION);
+    $theirs = $otherRdp->getFirstMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/{$rdp->id}/packshot/select", [
@@ -192,7 +192,7 @@ test('someone can upload their own render instead', function () {
 
     expect($response->json('packshot'))->not->toBeNull();
 
-    $media = $rdp->refresh()->getFirstMedia(Rdp::PACKSHOT_COLLECTION);
+    $media = $rdp->refresh()->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION);
     expect($media->disk)->toBe('s3');
     Storage::disk('s3')->assertExists($media->getPathRelativeToRoot());
 
@@ -212,8 +212,8 @@ test('uploading a second render replaces the first', function () {
             ->assertOk();
     }
 
-    expect($rdp->refresh()->getMedia(Rdp::PACKSHOT_COLLECTION))->toHaveCount(1)
-        ->and($rdp->getFirstMedia(Rdp::PACKSHOT_COLLECTION)->file_name)->toBe('second.png');
+    expect($rdp->refresh()->getMedia(ProductResearch::PACKSHOT_COLLECTION))->toHaveCount(1)
+        ->and($rdp->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION)->file_name)->toBe('second.png');
 });
 
 test('a non-image upload is refused', function () {
@@ -250,7 +250,7 @@ test('an upstream failure is reported without leaking the provider error', funct
 
     expect($response->json('message'))->not->toContain('secret upstream detail')
         // A failed run leaves the previous set alone.
-        ->and($rdp->refresh()->getMedia(Rdp::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(0);
+        ->and($rdp->refresh()->getMedia(ProductResearch::PACKSHOT_OPTIONS_COLLECTION))->toHaveCount(0);
 });
 
 test('a 200 carrying no usable image is refused', function () {
@@ -295,7 +295,7 @@ test('a packshot is served through the app, and not across workspaces', function
             'packshot' => UploadedFile::fake()->image('render.png'),
         ])->assertOk();
 
-    $media = $rdp->refresh()->getFirstMedia(Rdp::PACKSHOT_COLLECTION);
+    $media = $rdp->refresh()->getFirstMedia(ProductResearch::PACKSHOT_COLLECTION);
     $url = "/workspaces/{$workspace->slug}/products/rdp-builder/{$rdp->id}/packshot/{$media->id}";
 
     // A bucket that can sign hands back a 302 to the short-lived URL.
@@ -555,7 +555,7 @@ test('a draft that has never been saved can still generate', function () {
         ->assertOk()
         ->assertJsonCount(5, 'packshot_options');
 
-    $rdp = Rdp::ofWorkspace($workspace)->firstOrFail();
+    $rdp = ProductResearch::ofWorkspace($workspace)->firstOrFail();
 
     // The id comes back so the builder knows what it is now editing.
     expect($response->json('rdp_id'))->toBe($rdp->id)
@@ -584,7 +584,7 @@ test('a draft is filed once, not once per generate', function () {
         ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", ['rdp_id' => $first])
         ->assertOk();
 
-    expect(Rdp::ofWorkspace($workspace)->count())->toBe(1);
+    expect(ProductResearch::ofWorkspace($workspace)->count())->toBe(1);
 });
 
 test('an unsaved draft missing its brief is refused rather than half filed', function () {
@@ -594,7 +594,7 @@ test('an unsaved draft missing its brief is refused rather than half filed', fun
         ->postJson("/workspaces/{$workspace->slug}/products/rdp-builder/packshots", [])
         ->assertJsonValidationErrors(['name', 'product_form_id', 'target_market_id']);
 
-    expect(Rdp::ofWorkspace($workspace)->count())->toBe(0);
+    expect(ProductResearch::ofWorkspace($workspace)->count())->toBe(0);
     Http::assertNothingSent();
 });
 

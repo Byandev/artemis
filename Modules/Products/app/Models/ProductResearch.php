@@ -19,7 +19,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * how they read back into the textareas. Splitting them into rows would buy
  * nothing: nothing queries an individual claim.
  */
-class Rdp extends Model implements HasMedia
+class ProductResearch extends Model implements HasMedia
 {
     use InteractsWithMedia;
 
@@ -32,7 +32,7 @@ class Rdp extends Model implements HasMedia
      */
     public const PACKSHOT_OPTIONS_COLLECTION = 'RDP_PACKSHOT_OPTIONS';
 
-    protected $table = 'rdps';
+    protected $table = 'product_research';
 
     protected $fillable = [
         'workspace_id',

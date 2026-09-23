@@ -5,7 +5,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Products\Models\ProductForm;
-use Modules\Products\Models\Rdp;
+use Modules\Products\Models\ProductResearch;
 use Modules\Products\Models\TargetMarket;
 use Tests\TestCase;
 
@@ -120,7 +120,7 @@ test('a brief is saved with its brief, name and lab notes', function () {
         ])
         ->assertRedirect("/workspaces/{$workspace->slug}/products/rdp-builder");
 
-    $rdp = Rdp::ofWorkspace($workspace)->firstOrFail();
+    $rdp = ProductResearch::ofWorkspace($workspace)->firstOrFail();
 
     expect($rdp->name)->toBe('Back Ease Balm')
         ->and($rdp->product_form_id)->toBe($form->id)
@@ -200,7 +200,7 @@ test('a market must be a top-level one, and from this workspace', function () {
 test('opening a saved brief loads it back into the builder', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = rdpFixtures();
 
-    $rdp = Rdp::create([
+    $rdp = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -224,7 +224,7 @@ test('opening a saved brief loads it back into the builder', function () {
 test('update saves over the brief without filing a second one', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = rdpFixtures();
 
-    $rdp = Rdp::create([
+    $rdp = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -241,7 +241,7 @@ test('update saves over the brief without filing a second one', function () {
         ])
         ->assertRedirect("/workspaces/{$workspace->slug}/products/rdp-builder");
 
-    expect(Rdp::ofWorkspace($workspace)->count())->toBe(1)
+    expect(ProductResearch::ofWorkspace($workspace)->count())->toBe(1)
         ->and($rdp->refresh()->name)->toBe('Back Ease Balm Plus')
         ->and($rdp->additional_instruction)->toBe('Bigger tub.');
 });
@@ -250,7 +250,7 @@ test('a brief from another workspace is not reachable', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = rdpFixtures();
     ['user' => $stranger, 'workspace' => $other, 'form' => $otherForm, 'category' => $otherCategory] = rdpFixtures();
 
-    $foreign = Rdp::create([
+    $foreign = ProductResearch::create([
         'workspace_id' => $other->id,
         'created_by' => $stranger->id,
         'product_form_id' => $otherForm->id,
@@ -274,7 +274,7 @@ test('a brief from another workspace is not reachable', function () {
 test('the list shows the sub category, the date and who built it', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = rdpFixtures();
 
-    $rdp = Rdp::create([
+    $rdp = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
@@ -299,7 +299,7 @@ test('the list shows the sub category, the date and who built it', function () {
 test('a brief outlives the taxonomy it was filed under', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = rdpFixtures();
 
-    $rdp = Rdp::create([
+    $rdp = ProductResearch::create([
         'workspace_id' => $workspace->id,
         'created_by' => $owner->id,
         'product_form_id' => $form->id,
