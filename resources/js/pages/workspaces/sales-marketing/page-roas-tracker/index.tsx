@@ -37,6 +37,7 @@ interface Metrics {
     returning_amount: number;
     roas: number | null;
     ad_roas: number | null;
+    /** On a day, the trailing 7 days ending on it; on Total/Average, the range. */
     rts_rate: number | null;
     ad_cpp: number | null;
     cpp: number | null;
@@ -419,8 +420,8 @@ const COLUMNS: MetricColumn[] = [
     },
     {
         id: 'rts_rate',
-        label: 'RTS Rate',
-        head: 'RTS',
+        label: 'RTS Rate (each day: trailing 7d; Total/Average: the range)',
+        head: 'RTS 7d',
         group: 'Delivery',
         format: 'percent',
         tone: rtsTone,
