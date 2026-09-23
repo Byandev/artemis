@@ -272,7 +272,7 @@ export function AppSidebar() {
         ...(currentWorkspace.products_module_enabled
             ? [
                   {
-                      title: 'Product Management',
+                      title: 'Product',
                       icon: Package,
                       anyOf: [
                           PERMISSIONS.ViewProducts,
