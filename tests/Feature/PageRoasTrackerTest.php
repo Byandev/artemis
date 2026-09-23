@@ -135,6 +135,7 @@ it('treats a day the builder skipped as nothing returning', function () {
 it('shows a day exactly as the builder stored it, deriving nothing', function () {
     // Ratios that disagree with their own ingredients on purpose: if the tracker
     // recomputed any of them, it would overwrite these with 2.00 / 5.00 / 2.50.
+    // RTS is the exception — a day shows its trailing 7 days, tested below.
     record([
         'date' => '2026-08-01',
         'orders' => 20, 'sales' => 1000, 'ad_spent' => 500,
@@ -147,7 +148,6 @@ it('shows a day exactly as the builder stored it, deriving nothing', function ()
 
     expect($day['roas'])->toBe(9.11)
         ->and($day['ad_roas'])->toBe(9.22)
-        ->and($day['rts_rate'])->toBe(9.33)
         ->and($day['ad_cpp'])->toBe(9.44)
         ->and($day['cpp'])->toBe(9.55);
 });
@@ -173,6 +173,56 @@ it('weights RTS by what actually moved, not by the day', function () {
     $page = trackerPage('2026-08-01', '2026-08-02');
 
     expect($page['total']['rts_rate'])->toBe(13.64);
+});
+
+it('shows each day the RTS of the 7 days ending on it, not the day alone', function () {
+    // 08-01 falls before the range but inside the first day's window.
+    record(['date' => '2026-08-01', 'returning_amount' => 300, 'delivered_amount' => 700, 'rts_rate' => 30]);
+    record(['date' => '2026-08-05', 'returning_amount' => 0, 'delivered_amount' => 1000, 'rts_rate' => 0]);
+    record(['date' => '2026-08-08', 'returning_amount' => 100, 'delivered_amount' => 900, 'rts_rate' => 10]);
+
+    $page = trackerPage('2026-08-05', '2026-08-08');
+
+    // 08-05 reaches back to 07-30: 300 back against 300 + 1700 moved.
+    expect($page['days']['2026-08-05']['rts_rate'])->toBe(15.0)
+        // A day with no row of its own still has a trailing rate.
+        ->and($page['days']['2026-08-06']['rts_rate'])->toBe(15.0)
+        // 08-08 starts at 08-02, so 08-01 has dropped out: 100 against 100 + 1900.
+        ->and($page['days']['2026-08-08']['rts_rate'])->toBe(5.0)
+        // The Total row still blends the range in view, not a trailing window.
+        ->and($page['total']['rts_rate'])->toBe(5.0);
+});
+
+it('blends the trailing 7-day RTS across pages on the all-pages group', function () {
+    $second = Page::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    record(['date' => '2026-08-01', 'returning_amount' => 100, 'delivered_amount' => 900]);
+    PageDailyRecord::create([
+        'workspace_id' => $this->workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => $second->getMorphClass(),
+        'page_id' => $second->getKey(),
+        'date' => '2026-08-02',
+        'returning_amount' => 500, 'delivered_amount' => 500,
+    ]);
+
+    $response = test()->get(route(
+        'workspaces.sales-marketing.page-roas-tracker',
+        [$this->workspace, 'start' => '2026-08-02', 'end' => '2026-08-02'],
+    ));
+
+    $overall = $response->viewData('page')['props']['overall'];
+
+    // 600 back against 600 + 1400 moved over 07-27..08-02.
+    expect($overall['days']['2026-08-02']['rts_rate'])->toBe(30.0);
+});
+
+it('leaves a trailing RTS null when nothing moved in the window', function () {
+    record(['date' => '2026-08-01', 'orders' => 5, 'sales' => 500]);
+
+    $page = trackerPage('2026-08-01', '2026-08-01');
+
+    expect($page['days']['2026-08-01']['rts_rate'])->toBeNull();
 });
 
 it('leaves RTS null on a range with no delivery activity at all', function () {
