@@ -172,6 +172,7 @@ test('the orders export still resolves the same filtered rows', function () {
 
 test('the public route needs the workspace password unlocked', function () {
     [, $workspace] = rmoCallLogContext();
+    subscribeWorkspace($workspace);
 
     $this->get("/public/workspaces/{$workspace->slug}/rts/rmo-management/call-logs/export?delivery_date=2026-07-20")
         ->assertForbidden();

@@ -791,7 +791,30 @@ function SubscriptionModal({
                         </label>
                         <select
                             value={data.status}
-                            onChange={(e) => setData('status', e.target.value)}
+                            onChange={(e) => {
+                                const status = e.target.value;
+                                // Reactivating on the old, already-passed period
+                                // would save a subscription that is still lapsed —
+                                // drop the stale dates so they auto-calculate.
+                                const periodOver =
+                                    !!data.current_period_end &&
+                                    data.current_period_end <
+                                        format(new Date(), 'yyyy-MM-dd');
+                                const reactivating =
+                                    status === 'active' ||
+                                    status === 'trialing';
+
+                                setData((prev) => ({
+                                    ...prev,
+                                    status,
+                                    ...(reactivating && periodOver
+                                        ? {
+                                              current_period_start: '',
+                                              current_period_end: '',
+                                          }
+                                        : {}),
+                                }));
+                            }}
                             className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
                         >
                             <option value="active">Active</option>

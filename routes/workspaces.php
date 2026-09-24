@@ -123,19 +123,22 @@ Route::get('/public/workspaces/{workspace}/sales-targets/{salesTarget}', [Public
     ->whereNumber('salesTarget')
     ->name('public-page.sales-targets.show');
 
-Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/stats', [ForDeliveryController::class, 'publicStats'])->name('public-page.rmo-management.stats');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-status', [ForDeliveryController::class, 'publicBulkUpdateStatus'])->name('public-page.rmo-management.bulkUpdateStatus');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('public-page.rmo-management.callLogs');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('public-page.rmo-management.callLogs.export');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('public-page.rmo-management.callLogs.breakdown');
+// Public RMO management is shut off entirely once the workspace's subscription lapses.
+Route::middleware('public.subscription')->group(function () {
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/stats', [ForDeliveryController::class, 'publicStats'])->name('public-page.rmo-management.stats');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-status', [ForDeliveryController::class, 'publicBulkUpdateStatus'])->name('public-page.rmo-management.bulkUpdateStatus');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('public-page.rmo-management.callLogs');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('public-page.rmo-management.callLogs.export');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('public-page.rmo-management.callLogs.breakdown');
+});
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
