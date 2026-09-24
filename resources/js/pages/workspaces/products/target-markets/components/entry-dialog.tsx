@@ -12,8 +12,10 @@ import {
     BTN_SECONDARY,
     FIELD,
     FIELD_ERROR,
+    FIELD_LABEL,
     INPUT,
     LABEL,
+    MUTED,
     SECTION_BORDER,
 } from '../../lib/ui';
 import { type ParentOption, type TargetMarketEntry } from '../types';
@@ -100,7 +102,7 @@ export default function TargetMarketEntryDialog({
                                 ? 'Rename target market entry'
                                 : 'New target market entry'}
                         </DialogTitle>
-                        <DialogDescription className="mt-1 text-[12px] text-gray-400 dark:text-gray-500">
+                        <DialogDescription className={`mt-1 ${MUTED}`}>
                             {isEditing
                                 ? 'Where it sits stays as it is — only the name changes.'
                                 : 'Pick where it belongs, then name it.'}
@@ -112,9 +114,7 @@ export default function TargetMarketEntryDialog({
                     <div className="space-y-5 px-5 py-4">
                         {!isEditing && (
                             <div className={FIELD}>
-                                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-200">
-                                    Add under
-                                </label>
+                                <label className={FIELD_LABEL}>Add under</label>
                                 <select
                                     className={INPUT}
                                     value={data.parent_id}
@@ -143,9 +143,7 @@ export default function TargetMarketEntryDialog({
                         )}
 
                         <div className={FIELD}>
-                            <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-200">
-                                Name
-                            </label>
+                            <label className={FIELD_LABEL}>Name</label>
                             <input
                                 type="text"
                                 autoFocus

@@ -84,6 +84,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | RDP Media Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where an RDP's packshot lives — both the render someone uploads and the
+    | options the generator produces. Same reasoning as the disks above: pinned
+    | explicitly, private, and served through the app with a signed URL.
+    |
+    */
+
+    'product_research_media_disk' => env('PRODUCT_RESEARCH_MEDIA_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

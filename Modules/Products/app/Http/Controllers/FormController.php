@@ -49,6 +49,7 @@ class FormController extends Controller
             $form = ProductForm::create([
                 'workspace_id' => $workspace->id,
                 'name' => $validated['name'],
+                'packshot_description' => $validated['packshot_description'] ?? null,
             ]);
 
             $this->syncVariants($request, $form);
@@ -70,7 +71,10 @@ class FormController extends Controller
         $validated = $request->validate($this->rules($workspace, $productForm));
 
         DB::transaction(function () use ($request, $productForm, $validated) {
-            $productForm->update(['name' => $validated['name']]);
+            $productForm->update([
+                'name' => $validated['name'],
+                'packshot_description' => $validated['packshot_description'] ?? null,
+            ]);
 
             $this->syncVariants($request, $productForm);
         });
@@ -171,6 +175,9 @@ class FormController extends Controller
                     ->where('workspace_id', $workspace->id)
                     ->ignore($form?->id),
             ],
+            // How the RDP Builder's packshot step should draw this form. Blank
+            // falls back to the standard description for the name.
+            'packshot_description' => ['nullable', 'string', 'max:500'],
             'variants' => ['nullable', 'array'],
             // The id of a size already saved on this form. Anything else is
             // ignored by syncVariants(), which only matches ids it owns.
@@ -267,6 +274,9 @@ class FormController extends Controller
         return [
             'id' => $form->id,
             'name' => $form->name,
+            // What was typed, not the fallback — so an empty field stays empty
+            // in the dialog rather than looking already filled in.
+            'packshot_description' => $form->packshot_description,
             'products_count' => $form->products_count,
             'variants_count' => $form->variants_count,
             'variants' => $form->variants->map(function (ProductFormVariant $variant) use ($workspace) {

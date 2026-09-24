@@ -278,6 +278,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewProducts,
                           PERMISSIONS.ViewProductForms,
                           PERMISSIONS.ViewTargetMarkets,
+                          PERMISSIONS.ViewProductResearch,
                       ],
                       items: [
                           {
@@ -297,6 +298,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/products/target-markets`,
                               icon: Target,
                               permission: PERMISSIONS.ViewTargetMarkets,
+                          },
+                          {
+                              title: 'RDP Builder',
+                              href: `/workspaces/${slug}/products/product-research`,
+                              icon: Layers,
+                              permission: PERMISSIONS.ViewProductResearch,
                           },
                       ],
                   },

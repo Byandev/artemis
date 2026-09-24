@@ -95,13 +95,13 @@ export default function VariantImageField({
                     <img
                         src={shownUrl}
                         alt=""
-                        className="h-full w-full rounded-[10px] border border-black/8 object-cover dark:border-white/8"
+                        className="h-full w-full rounded-[10px] border border-black/6 object-cover dark:border-white/6"
                     />
                     <button
                         type="button"
                         onClick={clear}
                         aria-label="Remove image"
-                        className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-black/8 bg-white text-gray-500 shadow-sm transition-all hover:text-gray-800 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-100"
+                        className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-black/6 bg-white text-gray-400 shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-colors hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:text-gray-200"
                     >
                         <X className="h-3 w-3" />
                     </button>
@@ -122,11 +122,11 @@ export default function VariantImageField({
                     className={`flex h-[88px] w-[88px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[10px] border border-dashed px-2 text-center transition-all ${
                         dragging
                             ? 'border-emerald-500 bg-emerald-500/5'
-                            : 'border-black/15 bg-stone-50 hover:border-black/25 dark:border-white/15 dark:bg-zinc-800 dark:hover:border-white/25'
+                            : 'border-black/10 bg-stone-100 hover:border-black/20 dark:border-white/10 dark:bg-zinc-800 dark:hover:border-white/20'
                     }`}
                 >
                     <ImageUp className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    <p className="text-[11px] leading-tight font-medium text-gray-500 dark:text-gray-400">
+                    <p className="text-[11px] leading-tight font-medium text-gray-400 dark:text-gray-500">
                         Drop image
                     </p>
                     <p className="text-[10px] leading-tight text-gray-400 dark:text-gray-500">
@@ -147,7 +147,7 @@ export default function VariantImageField({
             />
 
             {message && (
-                <p className={`mt-1 max-w-[88px] ${FIELD_ERROR}`}>{message}</p>
+                <p className={`max-w-[88px] ${FIELD_ERROR}`}>{message}</p>
             )}
         </div>
     );

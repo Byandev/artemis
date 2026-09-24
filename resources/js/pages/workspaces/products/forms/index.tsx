@@ -16,15 +16,20 @@ import { Head, useForm } from '@inertiajs/react';
 import { ImageOff, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
+    BADGE_NEUTRAL,
+    BTN_GHOST,
     BTN_PRIMARY,
     CARD,
     EMPTY,
     LABEL,
-    NUM,
-    PILL_DANGER,
-    PILL_OUTLINE,
+    MUTED,
     ROW_DIVIDE,
+    ROW_HOVER,
     SECTION_BORDER,
+    TD,
+    TD_NUM,
+    TD_PRIMARY,
+    TH,
 } from '../lib/ui';
 import ProductFormDialog from './components/form-dialog';
 import { type ProductForm } from './types';
@@ -39,11 +44,7 @@ const SIZES_SHOWN = 4;
 
 const Sizes = ({ form }: { form: ProductForm }) => {
     if (form.variants.length === 0) {
-        return (
-            <span className="font-mono text-[11px] text-gray-300 dark:text-gray-600">
-                —
-            </span>
-        );
+        return <span className="text-gray-300 dark:text-gray-600">—</span>;
     }
 
     const shown = form.variants.slice(0, SIZES_SHOWN);
@@ -54,26 +55,26 @@ const Sizes = ({ form }: { form: ProductForm }) => {
             {shown.map((variant) => (
                 <span
                     key={variant.id}
-                    className="flex items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 py-1 pr-2.5 pl-1 dark:border-white/6 dark:bg-zinc-800"
+                    className={`${BADGE_NEUTRAL} py-1 pr-3 pl-1`}
                 >
                     {variant.image ? (
                         <img
                             src={variant.image.url}
                             alt=""
-                            className="h-6 w-6 rounded-md object-cover"
+                            className="h-5 w-5 rounded-full object-cover"
                         />
                     ) : (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-stone-200 text-gray-400 dark:bg-zinc-700 dark:text-gray-500">
-                            <ImageOff className="h-3 w-3" />
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black/5 dark:bg-white/10">
+                            <ImageOff className="h-2.5 w-2.5" />
                         </span>
                     )}
-                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-300">
+                    <span className="font-mono tabular-nums">
                         {variant.name}
                     </span>
                 </span>
             ))}
             {rest > 0 && (
-                <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                <span className="font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
                     +{rest}
                 </span>
             )}
@@ -131,9 +132,7 @@ const Index = ({ workspace, forms }: Props) => {
 
             {forms.length === 0 ? (
                 <div className={EMPTY}>
-                    <p className="text-[13px] text-gray-500 dark:text-gray-400">
-                        No product forms yet.
-                    </p>
+                    <p className={MUTED}>No product forms yet.</p>
                     <p className="text-[12px] text-gray-400 dark:text-gray-500">
                         Add the formats your catalog ships in — Oil, Spray,
                         Patch.
@@ -142,7 +141,7 @@ const Index = ({ workspace, forms }: Props) => {
             ) : (
                 <div className={`overflow-hidden ${CARD}`}>
                     <div
-                        className={`flex items-center justify-between border-b ${SECTION_BORDER} px-5 py-3.5`}
+                        className={`flex items-center justify-between border-b ${SECTION_BORDER} px-4 py-3`}
                     >
                         <p className={LABEL}>Product Forms</p>
                         <p className={LABEL}>
@@ -154,48 +153,34 @@ const Index = ({ workspace, forms }: Props) => {
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[820px] text-left">
                             <thead>
-                                <tr
-                                    className={`border-b ${SECTION_BORDER} bg-stone-50/60 dark:bg-zinc-800/40`}
-                                >
-                                    <th className={`px-5 py-2.5 ${LABEL}`}>
-                                        Form
-                                    </th>
-                                    <th className={`px-5 py-2.5 ${LABEL}`}>
-                                        Sizes
-                                    </th>
-                                    <th
-                                        className={`px-5 py-2.5 text-right ${LABEL}`}
-                                    >
+                                <tr className={`border-b ${SECTION_BORDER}`}>
+                                    <th className={TH}>Form</th>
+                                    <th className={TH}>Sizes</th>
+                                    <th className={`${TH} text-right`}>
                                         # of Products
                                     </th>
-                                    <th
-                                        className={`px-5 py-2.5 text-right ${LABEL}`}
-                                    >
+                                    <th className={`${TH} text-right`}>
                                         # of Variants
                                     </th>
-                                    <th className="px-5 py-2.5" />
+                                    <th className={TH} />
                                 </tr>
                             </thead>
                             <tbody className={ROW_DIVIDE}>
                                 {forms.map((form) => (
-                                    <tr key={form.id}>
-                                        <td className="px-5 py-3.5 text-[15px] font-semibold text-gray-800 dark:text-gray-100">
+                                    <tr key={form.id} className={ROW_HOVER}>
+                                        <td className={TD_PRIMARY}>
                                             {form.name}
                                         </td>
-                                        <td className="px-5 py-3.5">
+                                        <td className={TD}>
                                             <Sizes form={form} />
                                         </td>
-                                        <td
-                                            className={`px-5 py-3.5 text-right ${NUM}`}
-                                        >
+                                        <td className={`${TD_NUM} text-right`}>
                                             {form.products_count}
                                         </td>
-                                        <td
-                                            className={`px-5 py-3.5 text-right ${NUM}`}
-                                        >
+                                        <td className={`${TD_NUM} text-right`}>
                                             {form.variants_count}
                                         </td>
-                                        <td className="px-5 py-3.5">
+                                        <td className={TD}>
                                             {canManage && (
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
@@ -203,7 +188,7 @@ const Index = ({ workspace, forms }: Props) => {
                                                         onClick={() =>
                                                             openEdit(form)
                                                         }
-                                                        className={PILL_OUTLINE}
+                                                        className={BTN_GHOST}
                                                     >
                                                         <Pencil className="h-3 w-3" />
                                                         Edit
@@ -213,7 +198,7 @@ const Index = ({ workspace, forms }: Props) => {
                                                         onClick={() =>
                                                             setDeleting(form)
                                                         }
-                                                        className={PILL_DANGER}
+                                                        className={`${BTN_GHOST} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400`}
                                                     >
                                                         <Trash2 className="h-3 w-3" />
                                                         Delete

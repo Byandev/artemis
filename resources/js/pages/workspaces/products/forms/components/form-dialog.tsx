@@ -14,9 +14,14 @@ import {
     BTN_SECONDARY,
     FIELD,
     FIELD_ERROR,
+    FIELD_LABEL,
+    ICON_BTN,
     INPUT,
+    INSET,
     LABEL,
+    MUTED,
     SECTION_BORDER,
+    TEXTAREA,
 } from '../../lib/ui';
 import { type ProductForm, type VariantImage } from '../types';
 import VariantImageField from './variant-image-field';
@@ -46,6 +51,7 @@ interface VariantRow {
 
 interface FormValues {
     name: string;
+    packshot_description: string;
     variants: VariantRow[];
 }
 
@@ -63,7 +69,7 @@ function blankRow(): VariantRow {
     };
 }
 
-const EMPTY: FormValues = { name: '', variants: [] };
+const EMPTY: FormValues = { name: '', packshot_description: '', variants: [] };
 
 export default function ProductFormDialog({
     open,
@@ -96,6 +102,7 @@ export default function ProductFormDialog({
             form
                 ? {
                       name: form.name,
+                      packshot_description: form.packshot_description ?? '',
                       variants: form.variants.map((variant) => ({
                           key: `saved-${variant.id}`,
                           id: variant.id,
@@ -148,6 +155,7 @@ export default function ProductFormDialog({
         transform((values) => ({
             ...(editing ? { _method: 'put' } : {}),
             name: values.name,
+            packshot_description: values.packshot_description,
             // `key` and `existing` are UI bookkeeping; the server reconciles on
             // `id` alone. A file is only sent when one was picked, so a row
             // left alone keeps whatever it already has.
@@ -187,7 +195,7 @@ export default function ProductFormDialog({
                 it a form with a dozen sizes grows the dialog past the viewport
                 and pushes Save out of reach.
             */}
-            <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+            <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden rounded-[14px] p-0 sm:max-w-xl">
                 <div
                     className={`shrink-0 border-b ${SECTION_BORDER} px-5 pt-5 pb-4`}
                 >
@@ -196,7 +204,7 @@ export default function ProductFormDialog({
                         <DialogTitle className="text-[17px] font-semibold text-gray-900 dark:text-gray-100">
                             {editing ? 'Edit form' : 'New form'}
                         </DialogTitle>
-                        <DialogDescription className="mt-1 text-[12px] text-gray-400 dark:text-gray-500">
+                        <DialogDescription className={`mt-1 ${MUTED}`}>
                             Name the form, then add a picture for every size or
                             variant it ships in.
                         </DialogDescription>
@@ -211,9 +219,7 @@ export default function ProductFormDialog({
                         scroll, rather than forcing the dialog to grow. */}
                     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
                         <div className={FIELD}>
-                            <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-200">
-                                Form name
-                            </label>
+                            <label className={FIELD_LABEL}>Form name</label>
                             <input
                                 type="text"
                                 autoFocus
@@ -229,13 +235,44 @@ export default function ProductFormDialog({
                             )}
                         </div>
 
+                        <div className={FIELD}>
+                            <label className={FIELD_LABEL}>
+                                How it is packaged{' '}
+                                <span className="font-normal text-gray-400 dark:text-gray-500">
+                                    (optional)
+                                </span>
+                            </label>
+                            <textarea
+                                rows={2}
+                                className={TEXTAREA}
+                                placeholder="e.g. an upright stand-up foil pouch with a zip seal"
+                                value={data.packshot_description}
+                                onChange={(e) =>
+                                    setData(
+                                        'packshot_description',
+                                        e.target.value,
+                                    )
+                                }
+                            />
+                            <p className={MUTED}>
+                                What the RDP Builder draws for this form. Leave
+                                it blank to use the standard description for the
+                                name.
+                            </p>
+                            {errors.packshot_description && (
+                                <p className={FIELD_ERROR}>
+                                    {errors.packshot_description}
+                                </p>
+                            )}
+                        </div>
+
                         <div className="space-y-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-[13px] font-medium text-gray-700 dark:text-gray-200">
                                         Size / Variants
                                     </p>
-                                    <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                                    <p className={`mt-0.5 ${MUTED}`}>
                                         Each size or variant carries its own
                                         picture.
                                     </p>
@@ -251,7 +288,7 @@ export default function ProductFormDialog({
                             </div>
 
                             {data.variants.length === 0 ? (
-                                <p className="rounded-[10px] border border-dashed border-black/12 bg-stone-50 px-3 py-6 text-center text-[12px] text-gray-400 dark:border-white/12 dark:bg-zinc-800 dark:text-gray-500">
+                                <p className="rounded-[10px] border border-dashed border-black/10 bg-stone-100 px-3 py-6 text-center text-[12px] text-gray-400 dark:border-white/10 dark:bg-zinc-800 dark:text-gray-500">
                                     No sizes yet. Add one to give this form a
                                     picture.
                                 </p>
@@ -260,7 +297,7 @@ export default function ProductFormDialog({
                                     {data.variants.map((row, index) => (
                                         <div
                                             key={row.key}
-                                            className="flex items-start gap-3 rounded-[12px] border border-black/6 bg-stone-50/70 p-3 dark:border-white/6 dark:bg-zinc-800/50"
+                                            className={`flex items-start gap-3 rounded-[10px] border border-black/6 ${INSET} p-3 dark:border-white/6`}
                                         >
                                             <VariantImageField
                                                 file={row.image}
@@ -318,9 +355,9 @@ export default function ProductFormDialog({
                                                     removeRow(row.key)
                                                 }
                                                 aria-label={`Remove size ${index + 1}`}
-                                                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-black/8 bg-white text-gray-400 transition-all hover:text-gray-700 dark:border-white/8 dark:bg-zinc-900 dark:hover:text-gray-200"
+                                                className={`mt-1 bg-white dark:bg-zinc-900 ${ICON_BTN}`}
                                             >
-                                                <X className="h-4 w-4" />
+                                                <X className="h-3.5 w-3.5" />
                                             </button>
                                         </div>
                                     ))}
