@@ -8,5 +8,6 @@
     "GencysERP": true,
     "SimGateway": true,
     "Billing": true,
-    "Courses": true
+    "Courses": true,
+    "Products": true
 }

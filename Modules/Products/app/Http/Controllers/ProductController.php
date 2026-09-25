@@ -1,18 +1,20 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace Modules\Products\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Workspace;
 use App\Services\PostHogService;
 use App\Support\TeamVisibility;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\Products\Models\Product;
+use Modules\Products\Models\ProductForm;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -22,17 +24,18 @@ class ProductController extends Controller
 
     public function index(Request $request, Workspace $workspace)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::ViewProducts->value, $workspace);
 
         $user = $request->user();
 
-        $products = QueryBuilder::for(
-            Product::ofWorkspace($workspace)
-                ->when(
-                    TeamVisibility::shouldScope($user, $workspace),
-                    fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
-                )
-        )
+        $scoped = fn () => Product::ofWorkspace($workspace)
+            ->when(
+                TeamVisibility::shouldScope($user, $workspace),
+                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
+            );
+
+        $products = QueryBuilder::for($scoped())
             ->with('owner')
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -63,6 +66,28 @@ class ProductController extends Controller
             ->distinct()
             ->pluck('category');
 
+        // Headline counts and the per-status tab counts. Deliberately ignores the
+        // status filter — the tabs have to keep showing every stage's total while
+        // one of them is selected — but honours search/category so the numbers
+        // describe the same slice the table is paginating through.
+        $filters = (array) $request->input('filter', []);
+        $search = $filters['search'] ?? null;
+        $category = $filters['category'] ?? null;
+
+        $summaryQuery = $scoped()
+            ->when($search, fn ($q, $value) => $q->where(fn ($inner) => $inner
+                ->where('name', 'like', "%{$value}%")
+                ->orWhere('code', 'like', "%{$value}%")))
+            ->when($category, fn ($q, $value) => $q->where('category', $value));
+
+        $countsByStatus = (clone $summaryQuery)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $statusCounts = collect(Product::STATUSES)
+            ->mapWithKeys(fn ($status) => [$status => (int) ($countsByStatus[$status] ?? 0)]);
+
         return Inertia::render('workspaces/products/index', [
             'products' => $products,
             'workspace' => $workspace,
@@ -72,11 +97,19 @@ class ProductController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'categories' => $categories,
+            'statusCounts' => $statusCounts,
+            'summary' => [
+                'total_product_count' => (int) (clone $summaryQuery)->count(),
+                'scaling_product_count' => $statusCounts['Scaling'],
+                'testing_product_count' => $statusCounts['Testing'],
+                'inactive_product_count' => $statusCounts['Inactive'],
+            ],
         ]);
     }
 
     public function create(Workspace $workspace)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::CreateProducts->value, $workspace);
         $shops = Shop::where('workspace_id', $workspace->id)
             ->visibleTo(auth()->user(), $workspace)
@@ -87,17 +120,25 @@ class ProductController extends Controller
         return Inertia::render('workspaces/products/create', [
             'workspace' => $workspace,
             'shops' => $shops,
+            'forms' => $this->formOptions($workspace),
         ]);
     }
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::CreateProducts->value, $workspace);
 
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code,NULL,id,workspace_id,'.$workspace->id,
             'category' => 'required|string|max:255',
+            // Scoped to this workspace so a form id from another one can't be
+            // pinned onto the product.
+            'product_form_id' => [
+                'nullable',
+                Rule::exists('product_forms', 'id')->where('workspace_id', $workspace->id),
+            ],
             'status' => ['required', Rule::in(Product::STATUSES)],
             'winning_date' => 'nullable|date',
             'description' => 'nullable|string',
@@ -113,6 +154,7 @@ class ProductController extends Controller
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
+            'product_form_id' => $request->input('product_form_id') ?: null,
             'status' => $request->status,
             'winning_date' => $request->winning_date ?: null,
             'description' => $request->description,
@@ -144,6 +186,7 @@ class ProductController extends Controller
 
     public function edit(Workspace $workspace, Product $product)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::EditProducts->value, $workspace);
         $shops = Shop::where('workspace_id', $workspace->id)
             ->visibleTo(auth()->user(), $workspace)
@@ -159,11 +202,13 @@ class ProductController extends Controller
             'workspace' => $workspace,
             'product' => $product,
             'shops' => $shops,
+            'forms' => $this->formOptions($workspace),
         ]);
     }
 
     public function update(Request $request, Workspace $workspace, Product $product)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::EditProducts->value, $workspace);
 
         if ($product->workspace_id !== $workspace->id) {
@@ -174,6 +219,12 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:products,code,'.$product->id.',id,workspace_id,'.$workspace->id,
             'category' => 'required|string|max:255',
+            // Scoped to this workspace so a form id from another one can't be
+            // pinned onto the product.
+            'product_form_id' => [
+                'nullable',
+                Rule::exists('product_forms', 'id')->where('workspace_id', $workspace->id),
+            ],
             'status' => ['required', Rule::in(Product::STATUSES)],
             'winning_date' => 'nullable|date',
             'description' => 'nullable|string',
@@ -187,6 +238,7 @@ class ProductController extends Controller
             'name' => $request->name,
             'code' => $request->code,
             'category' => $request->category,
+            'product_form_id' => $request->input('product_form_id') ?: null,
             'status' => $request->status,
             'winning_date' => $request->winning_date ?: null,
             'description' => $request->description,
@@ -216,6 +268,7 @@ class ProductController extends Controller
 
     public function destroy(Workspace $workspace, Product $product)
     {
+        $this->guardModule($workspace);
         $this->authorize(Permission::DeleteProducts->value, $workspace);
 
         if ($product->workspace_id !== $workspace->id) {
@@ -225,5 +278,29 @@ class ProductController extends Controller
         $product->delete();
 
         return redirect()->route('workspaces.products.index', $workspace->slug);
+    }
+
+    /**
+     * Products are only reachable in a workspace that has the module switched
+     * on. Owners bypass the permission checks below (they hold '*'), so the
+     * module flag has to be enforced here rather than left to the policy.
+     */
+    /**
+     * The delivery formats this workspace has defined, for the picker on the
+     * create and edit screens.
+     *
+     * @return Collection<int, ProductForm>
+     */
+    private function formOptions(Workspace $workspace)
+    {
+        return ProductForm::ofWorkspace($workspace)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function guardModule(Workspace $workspace): void
+    {
+        abort_unless($workspace->products_module_enabled, 404);
     }
 }

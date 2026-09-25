@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Product;
 use App\Models\User;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\IncomeStatement;
@@ -12,6 +11,7 @@ use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\GencysDailySalesOrderItem;
 use Modules\GencysERP\Models\Intern;
 use Modules\Inventory\Models\InventoryUnitCode;
+use Modules\Products\Models\Product;
 
 /** A delivered order credited to the given intern cell. */
 function uis_order(int $id, $workspace, string $cell, array $attrs = []): GencysDailySalesOrder

@@ -6,7 +6,6 @@ use App\Http\Controllers\API\Workspace\CsrDashboardController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ParcelJourneyStatsController;
-use App\Http\Controllers\API\Workspace\ProductController;
 use App\Http\Controllers\API\Workspace\SalesMarketingDashboardController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
@@ -15,6 +14,7 @@ use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
 use App\Http\Controllers\API\Workspace\WelleStatsController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
+use Modules\Products\Http\Controllers\Api\ProductController;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
 Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {

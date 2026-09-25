@@ -1,9 +1,9 @@
 <?php
 
-use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use Modules\Finance\Models\FundRequest;
+use Modules\Products\Models\Product;
 
 beforeEach(function () {
     $this->user = User::factory()->create();

@@ -1,11 +1,11 @@
 <?php
 
-namespace Database\Seeders;
+namespace Modules\Products\Database\Seeders;
 
-use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Seeder;
+use Modules\Products\Models\Product;
 
 class ProductSeeder extends Seeder
 {

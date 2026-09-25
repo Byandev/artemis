@@ -4,7 +4,6 @@ namespace Modules\Creatives\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
@@ -19,6 +18,7 @@ use Modules\Creatives\Http\Requests\StoreReviewRequest;
 use Modules\Creatives\Http\Requests\UpdateCreativeRequest;
 use Modules\Creatives\Models\Creative;
 use Modules\Creatives\Models\CreativeReview;
+use Modules\Products\Models\Product;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;

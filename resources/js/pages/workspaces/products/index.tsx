@@ -9,6 +9,11 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PERMISSIONS } from '@/constants/permissions';
+import {
+    PRODUCT_STATUS_COLORS,
+    PRODUCT_STATUSES,
+    type ProductStatus,
+} from '@/constants/product-statuses';
 import { usePermission } from '@/hooks/use-permission';
 import { toFrontendSort } from '@/lib/sort';
 import ProductLayout from '@/pages/workspaces/products/partials/layout';
@@ -27,12 +32,20 @@ import { toast } from 'sonner';
 interface ProductsProps {
     workspace: Workspace;
     products: PaginatedData<Product>;
+    summary: {
+        total_product_count: number;
+        scaling_product_count: number;
+        testing_product_count: number;
+        inactive_product_count: number;
+    };
+    statusCounts: Record<string, number>;
     query?: {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
         filter?: {
             search?: string;
+            status?: string;
         };
     };
 }
@@ -43,29 +56,50 @@ interface ProductsPageProps {
     };
 }
 
-const StatusBadge = ({ status }: { status: string }) => {
-    const isActive = status === 'active';
-    return (
-        <span
-            className={clsx(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ring-1 ring-inset',
-                isActive
-                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                    : 'bg-slate-50 text-slate-700 ring-slate-200',
-            )}
-        >
-            {status.toUpperCase()}
-        </span>
-    );
-};
+const StatusBadge = ({ status }: { status: string }) => (
+    <span
+        className={clsx(
+            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide',
+            PRODUCT_STATUS_COLORS[status as ProductStatus] ??
+                'bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-gray-400',
+        )}
+    >
+        {status.toUpperCase()}
+    </span>
+);
 
-const Index = ({ products, workspace, query }: ProductsProps) => {
+// "All" plus one tab per lifecycle stage, in the same order as the enum.
+const STATUS_TABS: { label: string; value: string }[] = [
+    { label: 'All', value: '' },
+    ...PRODUCT_STATUSES.map((s) => ({ label: s, value: s })),
+];
+
+const StatCard = ({ label, value }: { label: string; value: number }) => (
+    <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
+        <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
+            {label}
+        </p>
+        <h4 className="mt-2 text-2xl font-bold text-gray-800 dark:text-white/90">
+            {value.toLocaleString()}
+        </h4>
+    </div>
+);
+
+const Index = ({
+    products,
+    workspace,
+    summary,
+    statusCounts,
+    query,
+}: ProductsProps) => {
     const { flash } = usePage().props as ProductsPageProps;
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    // '' is the "All" tab — the controller only narrows when a status is sent.
+    const [status, setStatus] = useState(query?.filter?.status ?? '');
     const [productToDelete, setProductToDelete] = useState<Product | null>(
         null,
     );
@@ -80,27 +114,45 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
         }
     }, [flash?.success]);
 
+    // Partial reloads have to pull the counts too — search narrows them, so the
+    // stat cards and tab badges would otherwise drift out of sync with the table.
+    const RELOAD_PROPS = ['products', 'summary', 'statusCounts', 'query'];
+
+    const fetchProducts = (
+        overrides: Record<string, string | number | null | undefined> = {},
+        partial = true,
+    ) => {
+        router.get(
+            workspaces.products.index({ workspace }),
+            {
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[status]': status || undefined,
+                page: query?.page ?? 1,
+                per_page: query?.perPage ?? products.per_page,
+                ...overrides,
+            },
+            {
+                preserveState: partial,
+                replace: true,
+                preserveScroll: true,
+                ...(partial ? { only: RELOAD_PROPS } : {}),
+            },
+        );
+    };
+
     useEffect(() => {
         const timer = setTimeout(() => {
-            router.get(
-                workspaces.products.index({ workspace }),
-                {
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : (query?.page ?? 1),
-                    per_page: query?.perPage ?? products.per_page,
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['products'],
-                },
-            );
+            fetchProducts({ page: searchValue ? 1 : (query?.page ?? 1) });
         }, 500);
 
         return () => clearTimeout(timer);
     }, [searchValue]);
+
+    const handleStatusChange = (next: string) => {
+        setStatus(next);
+        fetchProducts({ 'filter[status]': next || undefined, page: 1 });
+    };
 
     const handleEdit = (product: Product) => {
         router.get(workspaces.products.edit({ workspace, product }));
@@ -208,7 +260,26 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
         >
             <Head title={`${workspace.name} - Products`} />
 
-            <div className="mb-3 flex items-center gap-2">
+            <div className="mb-5 grid grid-cols-2 gap-2 md:gap-4 xl:grid-cols-4">
+                <StatCard
+                    label="Total Products"
+                    value={summary.total_product_count}
+                />
+                <StatCard
+                    label="Scaling Products"
+                    value={summary.scaling_product_count}
+                />
+                <StatCard
+                    label="Testing Products"
+                    value={summary.testing_product_count}
+                />
+                <StatCard
+                    label="Inactive Products"
+                    value={summary.inactive_product_count}
+                />
+            </div>
+
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="relative w-full max-w-xs">
                     <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                     <input
@@ -217,6 +288,30 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                         value={searchValue}
                         onChange={(e) => setSearchValue(e.target.value)}
                     />
+                </div>
+
+                <div className="flex max-w-full flex-nowrap items-center overflow-x-auto sm:justify-end">
+                    <div className="flex h-8 shrink-0 items-center gap-0.5 rounded-[10px] border border-black/6 bg-stone-100 p-0.5 dark:border-white/6 dark:bg-zinc-800">
+                        {STATUS_TABS.map((tab) => (
+                            <button
+                                key={tab.value || 'all'}
+                                onClick={() => handleStatusChange(tab.value)}
+                                className={clsx(
+                                    'h-full rounded-lg px-3 text-[12px]! font-semibold tracking-tight whitespace-nowrap transition-all',
+                                    status === tab.value
+                                        ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-700 dark:text-gray-100'
+                                        : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
+                                )}
+                            >
+                                {tab.label}
+                                <span className="ml-1.5 text-gray-400 dark:text-gray-500">
+                                    {tab.value
+                                        ? (statusCounts[tab.value] ?? 0)
+                                        : summary.total_product_count}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -228,22 +323,16 @@ const Index = ({ products, workspace, query }: ProductsProps) => {
                     initialSorting={initialSorting}
                     meta={{ ...omit(products, ['data']) }}
                     onFetch={(params) => {
-                        router.get(
-                            workspaces.products.index({ workspace }),
+                        fetchProducts(
                             {
                                 sort: params?.sort,
-                                'filter[search]': searchValue || undefined,
                                 page: params?.page ?? 1,
                                 per_page:
                                     params?.per_page ??
                                     query?.perPage ??
                                     products.per_page,
                             },
-                            {
-                                preserveState: false,
-                                replace: true,
-                                preserveScroll: true,
-                            },
+                            false,
                         );
                     }}
                 />

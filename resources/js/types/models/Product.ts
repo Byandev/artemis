@@ -9,6 +9,8 @@ export interface Product {
     name: string;
     code: string;
     category: string;
+    /** The delivery format this product ships in, if one was picked. */
+    product_form_id: number | null;
     status: ProductStatus;
     /** Y-m-d date the product was marked a winning item. */
     winning_date: string | null;
