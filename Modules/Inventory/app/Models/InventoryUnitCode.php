@@ -3,11 +3,11 @@
 namespace Modules\Inventory\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Products\Models\Product;
 
 /**
  * A generic, source-agnostic unit code (e.g. a bundle/SKU grouping) and its

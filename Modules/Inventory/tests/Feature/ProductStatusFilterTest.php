@@ -1,10 +1,10 @@
 <?php
 
-use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Inventory\Models\InventoryItem;
+use Modules\Products\Models\Product;
 use Tests\TestCase;
 
 // Module test dirs aren't bound by the root tests/Pest.php (->in('Feature') only

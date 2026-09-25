@@ -4,7 +4,6 @@ namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\PageDailyBudgetRecord;
-use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
@@ -13,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Products\Models\Product;
 
 class BudgetTrackerController extends Controller
 {

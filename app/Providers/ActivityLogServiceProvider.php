@@ -8,7 +8,6 @@ use App\Enums\Logging\TriggerType;
 use App\Facades\Activity;
 use App\Listeners\LogAuthenticationActivity;
 use App\Models\Page;
-use App\Models\Product;
 use App\Models\Role;
 use App\Models\Shop;
 use App\Models\Team;
@@ -27,6 +26,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Models\Report;
+use Modules\Products\Models\Product;
 
 /**
  * Central wiring for automatic activity logging:

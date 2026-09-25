@@ -38,6 +38,12 @@ enum Permission: string
     case CreateProducts = 'Create Products';
     case EditProducts = 'Edit Products';
     case DeleteProducts = 'Delete Products';
+    case ViewProductForms = 'View Product Forms';
+    case ManageProductForms = 'Manage Product Forms';
+    case ViewTargetMarkets = 'View Target Markets';
+    case ManageTargetMarkets = 'Manage Target Markets';
+    case ViewProductResearch = 'View RDP Builder';
+    case ManageProductResearch = 'Manage RDP Builder';
 
     // Teams
     case ViewTeams = 'View Teams';
@@ -247,7 +253,13 @@ enum Permission: string
             self::ViewProducts,
             self::CreateProducts,
             self::EditProducts,
-            self::DeleteProducts => 'Products',
+            self::DeleteProducts,
+            self::ViewProductForms,
+            self::ManageProductForms,
+            self::ViewTargetMarkets,
+            self::ManageTargetMarkets,
+            self::ViewProductResearch,
+            self::ManageProductResearch => 'Products',
 
             self::ViewTeams,
             self::CreateTeams,

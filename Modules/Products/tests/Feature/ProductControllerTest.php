@@ -1,11 +1,18 @@
 <?php
 
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Models\Workspace;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Modules\Products\Models\Product;
+use Tests\TestCase;
+
+// Module test dirs aren't bound by the root tests/Pest.php (->in('Feature') only
+// covers tests/Feature), so extend the app TestCase explicitly to boot the app.
+uses(TestCase::class, RefreshDatabase::class);
 
 test('owner can view products index', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
     Product::factory()->create(['workspace_id' => $workspace->id, 'owner_id' => $owner->id]);
 
     $this->actingAs($owner)
@@ -14,7 +21,7 @@ test('owner can view products index', function () {
 });
 
 test('non-member cannot view products', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeProductsWorkspace();
     $stranger = User::factory()->create();
 
     $this->actingAs($stranger)
@@ -23,7 +30,7 @@ test('non-member cannot view products', function () {
 });
 
 test('owner can create a product', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
 
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/products/create")
@@ -41,7 +48,7 @@ test('owner can create a product', function () {
 });
 
 test('store validates required fields and status enum', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
 
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/products/create")
@@ -52,8 +59,8 @@ test('store validates required fields and status enum', function () {
 });
 
 test('product code must be unique within workspace but can repeat across workspaces', function () {
-    ['user' => $ownerA, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
-    ['user' => $ownerB, 'workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    ['user' => $ownerA, 'workspace' => $workspaceA] = makeProductsWorkspace();
+    ['user' => $ownerB, 'workspace' => $workspaceB] = makeProductsWorkspace();
 
     Product::factory()->create(['workspace_id' => $workspaceA->id, 'owner_id' => $ownerA->id, 'name' => 'X', 'code' => 'DUP', 'category' => 'C', 'status' => 'Scaling']);
 
@@ -75,7 +82,7 @@ test('product code must be unique within workspace but can repeat across workspa
 });
 
 test('owner can update a product', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
     $product = Product::factory()->create(['workspace_id' => $workspace->id, 'owner_id' => $owner->id, 'name' => 'Old', 'code' => 'C1', 'category' => 'X', 'status' => 'Scaling']);
 
     $this->actingAs($owner)
@@ -92,8 +99,8 @@ test('owner can update a product', function () {
 });
 
 test('cannot update product from another workspace', function () {
-    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
-    ['user' => $ownerB, 'workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspaceA] = makeProductsWorkspace();
+    ['user' => $ownerB, 'workspace' => $workspaceB] = makeProductsWorkspace();
     $foreign = Product::factory()->create(['workspace_id' => $workspaceB->id, 'owner_id' => $ownerB->id, 'name' => 'F', 'code' => 'F1', 'category' => 'C', 'status' => 'Scaling']);
 
     $this->actingAs($owner)
@@ -104,7 +111,7 @@ test('cannot update product from another workspace', function () {
 });
 
 test('owner can delete a product', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
     $product = Product::factory()->create(['workspace_id' => $workspace->id, 'owner_id' => $owner->id, 'name' => 'X', 'code' => 'C', 'category' => 'C', 'status' => 'Scaling']);
 
     $this->actingAs($owner)
@@ -115,7 +122,7 @@ test('owner can delete a product', function () {
 });
 
 test('store rejects code longer than 10 characters', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
 
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/products/create")
@@ -126,7 +133,7 @@ test('store rejects code longer than 10 characters', function () {
 });
 
 test('store rejects when shop_ids contains an unknown shop id', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
 
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/products/create")
@@ -138,7 +145,7 @@ test('store rejects when shop_ids contains an unknown shop id', function () {
 });
 
 test('non-member cannot delete a product', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
     $product = Product::factory()->create(['workspace_id' => $workspace->id, 'owner_id' => $owner->id]);
     $stranger = User::factory()->create();
 
@@ -158,7 +165,7 @@ function productsFromInertia($response): array
 }
 
 test('products index filter[search] matches name and code', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Findable Hat', 'code' => 'AAA']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Other', 'code' => 'BBB-FIND']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Different', 'code' => 'CCC']);
@@ -173,7 +180,7 @@ test('products index filter[search] matches name and code', function () {
 });
 
 test('products index filter[category] narrows exact match', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'A', 'category' => 'Health']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'B', 'category' => 'Beauty']);
 
@@ -184,7 +191,7 @@ test('products index filter[category] narrows exact match', function () {
 });
 
 test('products index filter[status] narrows exact match', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'A', 'status' => 'Scaling']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'B', 'status' => 'Failed']);
 
@@ -195,7 +202,7 @@ test('products index filter[status] narrows exact match', function () {
 });
 
 test('products index defaults to created_at descending', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
     $a = Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'First']);
     sleep(1);
     $b = Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Second']);
@@ -208,7 +215,7 @@ test('products index defaults to created_at descending', function () {
 });
 
 test('products index sort=name returns ascending', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Bravo']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Alpha']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Charlie']);
@@ -220,7 +227,7 @@ test('products index sort=name returns ascending', function () {
 });
 
 test('products index sort=-name returns descending', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Alpha']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Bravo']);
 
@@ -231,7 +238,7 @@ test('products index sort=-name returns descending', function () {
 });
 
 test('products index combines filter[category] and sort=code', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Z', 'category' => 'Health', 'code' => 'B-1']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Y', 'category' => 'Health', 'code' => 'A-1']);
     Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'X', 'category' => 'Other', 'code' => 'A-0']);
@@ -243,8 +250,8 @@ test('products index combines filter[category] and sort=code', function () {
 });
 
 test('store attaches selected shops from same workspace and ignores foreign shops', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['workspace' => $other] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeProductsWorkspace();
+    ['workspace' => $other] = makeProductsWorkspace();
 
     $myShop = Shop::factory()->forWorkspace($workspace)->create();
     $foreignShop = Shop::factory()->forWorkspace($other)->create();
@@ -261,4 +268,68 @@ test('store attaches selected shops from same workspace and ignores foreign shop
     expect($myShop->fresh()->product_id)->toBe($product->id);
     // Foreign shop should NOT have been linked
     expect($foreignShop->fresh()->product_id)->not->toBe($product->id);
+});
+
+function productPropsFromInertia($response): array
+{
+    return $response->getOriginalContent()->getData()['page']['props'];
+}
+
+test('products index returns summary counts per lifecycle stage', function () {
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
+    Product::factory()->count(2)->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'status' => 'Scaling']);
+    Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'status' => 'Testing']);
+    Product::factory()->count(3)->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'status' => 'Inactive']);
+
+    $props = productPropsFromInertia(
+        $this->actingAs($owner)->get("/workspaces/{$w->slug}/products/list")->assertOk()
+    );
+
+    expect($props['summary'])->toMatchArray([
+        'total_product_count' => 6,
+        'scaling_product_count' => 2,
+        'testing_product_count' => 1,
+        'inactive_product_count' => 3,
+    ]);
+
+    // Every stage is present so the tabs can render a count even at zero.
+    expect(collect($props['statusCounts'])->all())
+        ->toHaveKeys(Product::STATUSES)
+        ->and(collect($props['statusCounts'])['Failed'])->toBe(0);
+});
+
+test('products index summary ignores the status filter but honours search', function () {
+    ['user' => $owner, 'workspace' => $w] = makeProductsWorkspace();
+    Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Findable Hat', 'status' => 'Scaling']);
+    Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Findable Cap', 'status' => 'Testing']);
+    Product::factory()->create(['workspace_id' => $w->id, 'owner_id' => $owner->id, 'name' => 'Unrelated', 'status' => 'Scaling']);
+
+    // Selecting a tab must not collapse the other tabs' counts to zero.
+    $props = productPropsFromInertia(
+        $this->actingAs($owner)->get("/workspaces/{$w->slug}/products/list?filter[status]=Scaling")->assertOk()
+    );
+    expect($props['summary']['total_product_count'])->toBe(3)
+        ->and(collect($props['statusCounts'])['Testing'])->toBe(1);
+
+    // Search does narrow them, so the cards describe the listed slice.
+    $props = productPropsFromInertia(
+        $this->actingAs($owner)->get("/workspaces/{$w->slug}/products/list?filter[search]=findable")->assertOk()
+    );
+    expect($props['summary']['total_product_count'])->toBe(2)
+        ->and($props['summary']['scaling_product_count'])->toBe(1);
+});
+
+test('product pages 404 when the workspace has the module switched off', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $product = Product::factory()->create(['workspace_id' => $workspace->id, 'owner_id' => $owner->id]);
+
+    $this->actingAs($owner)->get("/workspaces/{$workspace->slug}/products/list")->assertNotFound();
+    $this->actingAs($owner)->get("/workspaces/{$workspace->slug}/products/analytics")->assertNotFound();
+    $this->actingAs($owner)->get("/workspaces/{$workspace->slug}/products/create")->assertNotFound();
+    $this->actingAs($owner)->get("/workspaces/{$workspace->slug}/products/{$product->id}/edit")->assertNotFound();
+    $this->actingAs($owner)->getJson("/api/workspaces/{$workspace->slug}/products")->assertNotFound();
+
+    // ...and are reachable again the moment the admin turns it on.
+    $workspace->update(['products_module_enabled' => true]);
+    $this->actingAs($owner)->get("/workspaces/{$workspace->slug}/products/list")->assertOk();
 });

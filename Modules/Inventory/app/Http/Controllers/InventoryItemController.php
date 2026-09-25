@@ -3,7 +3,6 @@
 namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
 use Illuminate\Database\Query\Builder;
@@ -25,6 +24,7 @@ use Modules\Inventory\Support\InventoryItemMetrics;
 use Modules\Inventory\Support\InventoryItemSnapshotter;
 use Modules\Inventory\Support\InventoryStockColumns;
 use Modules\Inventory\Support\ItemReportFacts;
+use Modules\Products\Models\Product;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;

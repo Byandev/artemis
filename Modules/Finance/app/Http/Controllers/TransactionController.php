@@ -7,7 +7,6 @@ use App\Enums\Permission;
 use App\Facades\Activity;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -20,6 +19,7 @@ use Modules\Finance\Models\Account;
 use Modules\Finance\Models\FundRequest;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
+use Modules\Products\Models\Product;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 

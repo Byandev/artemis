@@ -77,6 +77,12 @@ class GrantUserAllViewPermissions extends Command
             Permission::CreateProducts->value,
             Permission::EditProducts->value,
             Permission::DeleteProducts->value,
+            Permission::ViewProductForms->value,
+            Permission::ManageProductForms->value,
+            Permission::ViewTargetMarkets->value,
+            Permission::ManageTargetMarkets->value,
+            Permission::ViewProductResearch->value,
+            Permission::ManageProductResearch->value,
             // RTS
             Permission::ViewRtsAnalytics->value,
             Permission::ViewParcelJourneyTemplates->value,
