@@ -150,7 +150,7 @@ class ProductResearchController extends Controller
 
         if (! ProductResearchNameSuggester::isConfigured()) {
             return response()->json([
-                'message' => "Name suggestions aren't configured yet. Set OPENAI_API_KEY to switch this on.",
+                'message' => "Name suggestions aren't configured yet. Set OPEN_ROUTER_API_KEY to switch this on.",
             ], 503);
         }
 
@@ -200,7 +200,7 @@ class ProductResearchController extends Controller
 
         if (! ProductResearchPackshotGenerator::isConfigured()) {
             return response()->json([
-                'message' => "Packshot generation isn't configured yet. Set OPENAI_API_KEY to switch this on.",
+                'message' => "Packshot generation isn't configured yet. Set OPEN_ROUTER_API_KEY to switch this on.",
             ], 503);
         }
 
@@ -209,7 +209,7 @@ class ProductResearchController extends Controller
         // timeout never gets a chance to apply. Raised for this request only,
         // with headroom over the client timeout so the client is what gives up
         // first and the failure arrives as a readable message.
-        set_time_limit((int) config('openai.packshot_timeout', 180) + 30);
+        set_time_limit((int) config('openrouter.packshot_timeout', 180) + 30);
 
         $productResearch->loadMissing(['form', 'targetMarket', 'targetMarketSub']);
 

@@ -22,17 +22,15 @@ beforeEach(function () {
     // reasoning as tests/Feature/Settings/WelleIntegrationTest.php.
     Http::preventStrayRequests();
 
-    // Every gateway setting is pinned, not just the key. These tests assert the
-    // outbound request, and .env can point the app at a gateway — which it does
-    // on a machine configured for OpenRouter. Left ambient, the OpenAI cases
-    // below would fire at whatever the developer happens to be using.
+    // Every OpenRouter setting is pinned, not just the key. These tests assert
+    // the outbound request, and left ambient they would carry whatever model,
+    // URL and attribution the developer's .env happens to set.
     config([
-        'openai.api_key' => 'sk-test',
-        'openai.product_research_model' => 'gpt-4o-mini',
-        'openai.base_uri' => null,
-        'openai.referer' => null,
-        'openai.title' => null,
-        'openai.require_provider_parameters' => false,
+        'openrouter.api_key' => 'sk-test',
+        'openrouter.product_research_model' => 'openai/gpt-4o-mini',
+        'openrouter.base_uri' => 'https://openrouter.ai/api/v1',
+        'openrouter.referer' => null,
+        'openrouter.title' => null,
     ]);
 });
 
@@ -84,7 +82,7 @@ function fakeSuggestionBody(int $count = 10): array
 test('it returns a positioning line and ten names', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = suggestionFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
 
     $response = $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
@@ -102,7 +100,7 @@ test('it returns a positioning line and ten names', function () {
 test('the outbound call carries the key, the model and the strict schema', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category, 'sub' => $sub] = suggestionFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
@@ -117,7 +115,7 @@ test('the outbound call carries the key, the model and the strict schema', funct
 
         return $request->hasHeader('Authorization', 'Bearer sk-test')
             && str_ends_with($request->url(), '/chat/completions')
-            && $request['model'] === 'gpt-4o-mini'
+            && $request['model'] === 'openai/gpt-4o-mini'
             // Without strict structured output the grid would be parsing prose.
             && $request['response_format']['type'] === 'json_schema'
             && $request['response_format']['json_schema']['strict'] === true
@@ -131,7 +129,7 @@ test('the outbound call carries the key, the model and the strict schema', funct
 test('a brief with no sub category still generates', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
@@ -146,8 +144,8 @@ test('a brief with no sub category still generates', function () {
 test('with no api key it says so and never calls the provider', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    // Today's state: config/openai.php exists but OPENAI_API_KEY is unset.
-    config(['openai.api_key' => null]);
+    // A deploy that has config/openrouter.php but no OPEN_ROUTER_API_KEY.
+    config(['openrouter.api_key' => null]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
@@ -155,7 +153,7 @@ test('with no api key it says so and never calls the provider', function () {
             'target_market_id' => $category->id,
         ])
         ->assertStatus(503)
-        ->assertJsonPath('message', "Name suggestions aren't configured yet. Set OPENAI_API_KEY to switch this on.");
+        ->assertJsonPath('message', "Name suggestions aren't configured yet. Set OPEN_ROUTER_API_KEY to switch this on.");
 
     Http::assertNothingSent();
 });
@@ -163,7 +161,7 @@ test('with no api key it says so and never calls the provider', function () {
 test('an upstream failure is reported without leaking the provider error', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'secret upstream detail']], 500)]);
+    Http::fake(['openrouter.ai/*' => Http::response(['error' => ['message' => 'secret upstream detail']], 500)]);
 
     $response = $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
@@ -180,7 +178,7 @@ test('an upstream failure is reported without leaking the provider error', funct
 test('a throttled provider asks the user to wait rather than to retry now', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response([], 429)]);
+    Http::fake(['openrouter.ai/*' => Http::response([], 429)]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
@@ -209,7 +207,7 @@ test('a 200 carrying an unusable answer is refused, not half-rendered', function
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
     // A refusal or a truncated answer still arrives as a 200.
-    Http::fake(['api.openai.com/*' => Http::response([
+    Http::fake(['openrouter.ai/*' => Http::response([
         'choices' => [['message' => ['content' => 'I cannot help with that.']]],
     ])]);
 
@@ -227,7 +225,7 @@ test('fewer names than asked for are still shown', function () {
 
     // The grid wraps, so a short set beats an error the user can do nothing
     // about.
-    Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody(4))]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody(4))]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
@@ -311,17 +309,12 @@ test('it refuses a brief that saving would refuse', function () {
     Http::assertNothingSent();
 });
 
-test('it talks to an OpenAI-compatible gateway when the base url points at one', function () {
+test('it talks to OpenRouter with attribution and strict provider routing', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    // OpenRouter is a drop-in: same bearer auth, same /chat/completions shape,
-    // namespaced model slugs.
     config([
-        'openai.base_uri' => 'https://openrouter.ai/api/v1',
-        'openai.product_research_model' => 'openai/gpt-4o-mini',
-        'openai.referer' => 'https://artemis.test',
-        'openai.title' => 'Artemis',
-        'openai.require_provider_parameters' => true,
+        'openrouter.referer' => 'https://artemis.test',
+        'openrouter.title' => 'Artemis',
     ]);
 
     Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
@@ -347,10 +340,10 @@ test('it talks to an OpenAI-compatible gateway when the base url points at one',
     });
 });
 
-test('the provider routing key is left off for OpenAI, which rejects it', function () {
+test('attribution headers are left off when they are not configured', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
@@ -359,14 +352,14 @@ test('the provider routing key is left off for OpenAI, which rejects it', functi
         ])
         ->assertOk();
 
-    Http::assertSent(fn ($request) => ! isset($request['provider'])
-        && ! $request->hasHeader('HTTP-Referer'));
+    Http::assertSent(fn ($request) => ! $request->hasHeader('HTTP-Referer')
+        && ! $request->hasHeader('X-OpenRouter-Title'));
 });
 
 test("the brief's prompt and count reach the model", function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody(4))]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody(4))]);
 
     // Step 2 is where the name is chosen, so there is usually no brief yet —
     // the builder sends the pair it is holding rather than the server reading
@@ -397,7 +390,7 @@ test("the brief's prompt and count reach the model", function () {
 test('a brief that never opened the dialog generates on the defaults', function () {
     ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakeSuggestionBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
