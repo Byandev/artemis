@@ -12,6 +12,54 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.38.0',
+        date: '2026-09-25',
+        sections: [
+            {
+                title: 'Products — RDP Builder (New)',
+                items: [
+                    'The RDP Builder walks you through briefing a new product for the lab in four steps — Brief, Name, Product Image and More Information — and Save to RDPs files it on the RDPs list, where every brief shows its Product Name, Form, Target Market, date and who created it, ready to open and pick up again',
+                    'Once you’ve picked a product form and a market, Suggest names comes back with a set of candidate names, each with a one-line reason for it, plus a positioning line for the product — click a card to use that name, or type your own. Configure prompt lets you change the voice and how many names you get (up to 20), and Reset to default puts the standard wording back',
+                    'With a name chosen, the Product Image step generates packshot options drawn from the product form’s own description — pick the one you want, or drop in your own render instead. Each image is a paid call, so the count tops out at eight, and a brief that hasn’t been saved yet is filed as a draft on the way through so its images have somewhere to live',
+                    'More Information takes the claims, benefits and effects, the target active ingredients, and anything else the lab needs, one per line, and Download CSV hands you the whole brief as it stands on screen, unsaved edits included',
+                ],
+            },
+            {
+                title: 'Products — Product Forms (New)',
+                items: [
+                    'Product Forms is where you list the formats your catalog ships in — Oil, Spray, Patch, Capsule — each with its sizes or variants underneath, and every size carries its own picture. iPhone photos are accepted as they come, and removing a size or a form clears its pictures out with it',
+                    'Each form has an optional description of what it physically looks like, which is what the RDP Builder draws when it makes product images — leave it blank and the standard look for that form is used, or spell it out if your balm comes in a sachet rather than a tin',
+                    'A product can now be filed under a form from the create and edit screens, with No form as the default',
+                ],
+            },
+            {
+                title: 'Products — Target Market (New)',
+                items: [
+                    'Target Market holds the markets your catalog is sold into as categories with sub categories under them — Cardiovascular, with Hypertension beneath it — which is what the RDP Builder’s Target market and Sub category pickers offer',
+                    'Search finds sub categories as well as categories and brings up the category a match sits in, so looking up Hypertension doesn’t come back empty just because it’s filed under Cardiovascular. Expand all and Collapse all open or fold the whole tree at once',
+                    'Rename a row with the pencil or delete it — deleting a category takes its sub categories with it. The same name can’t be used twice under one category, but can repeat under different ones',
+                ],
+            },
+            {
+                title: 'Products — Menu and Product List',
+                items: [
+                    'Products is now a Product group in the menu, holding Manage (the product list you already know), Product Forms, Target Market and RDP Builder. Each page has its own view and manage grants on the roles screen, so people only see the pages their role opens',
+                    'The product list opens with four tiles — Total, Scaling, Testing and Inactive products — and tabs across the top narrow the table to one stage, each with its count beside it. The counts follow your search, so the tiles, the tabs and the table always describe the same set of products',
+                    'Status badges on the list are coloured by stage rather than showing everything but Active in the same grey',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'A rejected call is recorded with no talk time. The phone had been reporting the seconds it spent ringing as the call’s length, which added to talk-time totals and could push a call past the three seconds that count it as connected. This applies to calls synced from now on; calls already recorded keep their old length',
+                    'The Assign User picker on the CSR employee dialog is now a search box that matches on name or email, so you no longer have to scroll through the whole workspace to find one person — it opens on whoever is already assigned, so pressing Enter straight away won’t unassign them',
+                    'Refreshing a shop’s users now finishes before the page reloads, so the list is current the moment you see Users refreshed. A shop with no POS token, or a POS that can’t be reached, now tells you so instead of reporting success',
+                    'The Sales & Marketing team comparison lists every member who has a figure for the window, not just the top eight. It shows eight at a time and scrolls to the rest, and the average line is worked out across everyone',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.37.4',
         date: '2026-09-18',
         sections: [

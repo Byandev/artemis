@@ -20,9 +20,7 @@ use Modules\Products\Exceptions\ProductResearchSuggestionFailed;
  * for in prose: the grid needs exactly ten `{name, rationale}` pairs, and
  * parsing that back out of free text would fail quietly and often.
  *
- * Talks to OpenAI over the HTTP client rather than through openai-php/laravel,
- * which this repo has never actually had installed — see config/openai.php and
- * the note in App\Http\Controllers\Workspaces\AskDataController.
+ * Talks to OpenRouter over the HTTP client — see config/openrouter.php.
  */
 class ProductResearchNameSuggester
 {
@@ -32,8 +30,8 @@ class ProductResearchNameSuggester
 
     public function __construct()
     {
-        $this->model = (string) config('openai.product_research_model', 'gpt-4o-mini');
-        $this->timeout = (int) config('openai.request_timeout', 30);
+        $this->model = (string) config('openrouter.product_research_model', 'openai/gpt-4o-mini');
+        $this->timeout = (int) config('openrouter.request_timeout', 30);
     }
 
     /**
@@ -42,7 +40,7 @@ class ProductResearchNameSuggester
      */
     public static function isConfigured(): bool
     {
-        return filled(config('openai.api_key'));
+        return filled(config('openrouter.api_key'));
     }
 
     /**
@@ -108,9 +106,9 @@ class ProductResearchNameSuggester
 
     private function request(): PendingRequest
     {
-        return Http::withToken((string) config('openai.api_key'))
+        return Http::withToken((string) config('openrouter.api_key'))
             ->withHeaders($this->attributionHeaders())
-            ->baseUrl(rtrim((string) (config('openai.base_uri') ?: 'https://api.openai.com/v1'), '/'))
+            ->baseUrl(rtrim((string) (config('openrouter.base_uri') ?: 'https://openrouter.ai/api/v1'), '/'))
             ->timeout($this->timeout)
             ->acceptJson()
             ->asJson();
@@ -118,15 +116,15 @@ class ProductResearchNameSuggester
 
     /**
      * Attribution headers OpenRouter reads for its leaderboards. Sent only when
-     * configured, and ignored by OpenAI itself.
+     * configured.
      *
      * @return array<string, string>
      */
     private function attributionHeaders(): array
     {
         return array_filter([
-            'HTTP-Referer' => (string) config('openai.referer'),
-            'X-OpenRouter-Title' => (string) config('openai.title'),
+            'HTTP-Referer' => (string) config('openrouter.referer'),
+            'X-OpenRouter-Title' => (string) config('openrouter.title'),
         ], 'filled');
     }
 
@@ -246,11 +244,8 @@ class ProductResearchNameSuggester
         // OpenRouter serves one model through several provider endpoints and
         // only some support strict structured outputs; routed to one that does
         // not, the request fails outright. This pins routing to endpoints that
-        // honour every parameter above. OpenAI rejects the unknown key, so it
-        // stays off unless the gateway needs it.
-        if (config('openai.require_provider_parameters')) {
-            $payload['provider'] = ['require_parameters' => true];
-        }
+        // honour every parameter above.
+        $payload['provider'] = ['require_parameters' => true];
 
         return $payload;
     }

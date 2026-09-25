@@ -21,9 +21,9 @@ use Modules\Products\Exceptions\ProductResearchSuggestionFailed;
  *
  * What comes back is a concept for the lab, not artwork to print.
  *
- * Uses the OpenAI-compatible images endpoint, which returns base64 rather than
- * a URL — so the bytes are handed straight to media-library and never fetched
- * a second time.
+ * Uses OpenRouter's OpenAI-compatible images endpoint, which returns base64
+ * rather than a URL — so the bytes are handed straight to media-library and
+ * never fetched a second time.
  */
 class ProductResearchPackshotGenerator
 {
@@ -61,17 +61,17 @@ class ProductResearchPackshotGenerator
 
     public function __construct()
     {
-        $this->model = (string) config('openai.packshot_model', 'openai/gpt-image-2');
-        $this->quality = (string) config('openai.packshot_quality', 'high');
-        $this->aspectRatio = (string) config('openai.packshot_aspect_ratio', '3:4');
+        $this->model = (string) config('openrouter.packshot_model', 'openai/gpt-image-2');
+        $this->quality = (string) config('openrouter.packshot_quality', 'high');
+        $this->aspectRatio = (string) config('openrouter.packshot_aspect_ratio', '3:4');
         // Images are far slower than text: several at once routinely runs past
         // a minute, where the naming call settles in under twenty seconds.
-        $this->timeout = (int) config('openai.packshot_timeout', 180);
+        $this->timeout = (int) config('openrouter.packshot_timeout', 180);
     }
 
     public static function isConfigured(): bool
     {
-        return filled(config('openai.api_key'));
+        return filled(config('openrouter.api_key'));
     }
 
     /**
@@ -192,12 +192,12 @@ class ProductResearchPackshotGenerator
 
     private function pooled(Pool $pool): PendingRequest
     {
-        return $pool->withToken((string) config('openai.api_key'))
+        return $pool->withToken((string) config('openrouter.api_key'))
             ->withHeaders(array_filter([
-                'HTTP-Referer' => (string) config('openai.referer'),
-                'X-OpenRouter-Title' => (string) config('openai.title'),
+                'HTTP-Referer' => (string) config('openrouter.referer'),
+                'X-OpenRouter-Title' => (string) config('openrouter.title'),
             ], 'filled'))
-            ->baseUrl(rtrim((string) (config('openai.base_uri') ?: 'https://api.openai.com/v1'), '/'))
+            ->baseUrl(rtrim((string) (config('openrouter.base_uri') ?: 'https://openrouter.ai/api/v1'), '/'))
             ->timeout($this->timeout)
             ->acceptJson()
             ->asJson();
