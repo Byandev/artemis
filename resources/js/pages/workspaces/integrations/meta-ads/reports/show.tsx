@@ -35,6 +35,7 @@ import {
     type CustomBreakdownItem,
     DEFAULT_VIEW,
     isDateFilter,
+    isMediaTypeFilter,
     isMetricFilter,
     isNameFilter,
     isoDaysAgo,
@@ -96,6 +97,7 @@ export default function ReportShow({
     const nameFilter = config.filters.find(isNameFilter) ?? null;
     const metricFilters = config.filters.filter(isMetricFilter);
     const dateFilters = config.filters.filter(isDateFilter);
+    const mediaTypeFilter = config.filters.find(isMediaTypeFilter) ?? null;
     const accountsKey = config.accounts.join(',');
     const filtersKey = JSON.stringify(config.filters);
 
@@ -131,6 +133,10 @@ export default function ReportShow({
         );
         if (validDateFilters.length > 0) {
             qs.set('date_filters', JSON.stringify(validDateFilters));
+        }
+        // Image / video — narrows every breakdown to ads of that creative type.
+        if (mediaTypeFilter) {
+            qs.set('media_type', mediaTypeFilter.value);
         }
         // Creator filter (ad-level) — persisted in the report config; the engine
         // applies it only to ad-grained breakdowns and ignores it otherwise.

@@ -84,6 +84,7 @@ class AdsManagerController extends Controller
         $metricFilters = $this->parseMetricFilters($request);
         $dateFilters = $this->parseDateFilters($request);
         $objectives = $this->parseObjectiveFilters($request);
+        $mediaType = $this->parseMediaTypeFilter($request);
 
         $scopeBy = (string) $request->query('scope_by', '');
         $scopeValue = (string) $request->query('scope', '');
@@ -99,7 +100,7 @@ class AdsManagerController extends Controller
         if ($scopeBy === '' && str_starts_with($groupByRaw, 'custom:')) {
             $breakdownId = (int) substr($groupByRaw, 7);
             $rows = $this->aggregateCustomBreakdown(
-                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters, $creatorFilter, $dateFilters
+                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters, $creatorFilter, $dateFilters, $mediaType
             );
 
             return response()->json(['rows' => $rows]);
@@ -113,7 +114,7 @@ class AdsManagerController extends Controller
             $scope = null;
         }
 
-        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter, $dateFilters, $objectives);
+        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter, $dateFilters, $objectives, $mediaType);
 
         return response()->json(['rows' => $rows]);
     }
@@ -234,6 +235,9 @@ class AdsManagerController extends Controller
         $creatorFilter = (string) $request->query('creator_id', '');
         $this->applyCreatorFilter($query, $creatorFilter === '' ? null : $creatorFilter);
 
+        // Image / video — same reason: the row it opened from only counts those ads.
+        $this->constrainByMediaType($query, 'meta_ads_ads.id', $this->parseMediaTypeFilter($request));
+
         $byDate = $query->select($selects)
             ->groupBy('meta_ads_insights.date')
             ->get()
@@ -259,16 +263,18 @@ class AdsManagerController extends Controller
     }
 
     /**
-     * A creative is a video when Meta tags it object_type=VIDEO or it carries a
-     * top-level video_id (a few video creatives have no video_id but are still
-     * VIDEO). Everything else is treated as an image. object_type alone is
-     * unreliable (PHOTO/SHARE/STATUS/PRIVACY_CHECK_FAIL all appear), so both
-     * signals are combined.
+     * A creative is a video when Meta tags it object_type=VIDEO, it carries a
+     * top-level video_id, or its object_story_spec holds one — video_data for a
+     * single video, or a video card inside a carousel's child_attachments. Many
+     * SHARE / PRIVACY_CHECK_FAIL creatives are videos that only expose the id
+     * there. Everything else is treated as an image.
      */
-    private const MEDIA_TYPE_SQL = "CASE WHEN meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL THEN 'video' ELSE 'image' END";
+    private const IS_VIDEO_SQL = "(meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL OR meta_ads_creatives.object_story_spec LIKE '%\"video_id\"%')";
+
+    private const MEDIA_TYPE_SQL = 'CASE WHEN '.self::IS_VIDEO_SQL." THEN 'video' ELSE 'image' END";
 
     /** Same split as MEDIA_TYPE_SQL, but with the human label used as a group name. */
-    private const AD_TYPE_LABEL_SQL = "CASE WHEN meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL THEN 'Video' ELSE 'Image' END";
+    private const AD_TYPE_LABEL_SQL = 'CASE WHEN '.self::IS_VIDEO_SQL." THEN 'Video' ELSE 'Image' END";
 
     /**
      * Group name for the page breakdown. Ad sets whose promoted_object carried
@@ -755,11 +761,11 @@ class AdsManagerController extends Controller
             ->select('pages.id');
     }
 
-    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null, array $dateFilters = [], array $objectives = []): array
+    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null, array $dateFilters = [], array $objectives = [], ?string $mediaType = null): array
     {
         $config = $this->groupByConfig($groupBy);
 
-        $insights = $this->insightsSubquery($config['insightKey'], $since, $until, $objectives);
+        $insights = $this->insightsSubquery($config['insightKey'], $since, $until, $objectives, $mediaType);
 
         $base = $config['model']::query();
 
@@ -787,6 +793,10 @@ class AdsManagerController extends Controller
         // subquery above already narrowed what they're allowed to sum.
         $this->applyObjectiveFilter($base, $config, $objectives);
 
+        // Image / video — keeps only rows that ran at least one ad of that type.
+        // The insights subquery already limits their metrics to those ads.
+        $this->applyMediaTypeFilter($base, $config, $mediaType);
+
         // Number of ads in each group — shown for every dimension except `ad`
         // (where each row is already a single ad). `ad_name` counts distinct ads
         // sharing the name; the rest join a per-entity ad count subquery.
@@ -797,7 +807,7 @@ class AdsManagerController extends Controller
             $selects[] = DB::raw($config['adsCountExpr'].' AS ads_count');
             $hasAdsCount = true;
         } elseif (isset($config['adsCount'])) {
-            $adsCount = $this->adsCountSubquery($config['adsCount']['key']);
+            $adsCount = $this->adsCountSubquery($config['adsCount']['key'], $mediaType);
             $base->leftJoinSub($adsCount, 'ac', 'ac.'.$config['adsCount']['key'], '=', $config['adsCount']['joinOn']);
             $selects[] = DB::raw('COALESCE(MAX(ac.ads_count), 0) AS ads_count');
             $hasAdsCount = true;
@@ -869,7 +879,8 @@ class AdsManagerController extends Controller
         int $breakdownId,
         array $metricFilters = [],
         ?string $creatorFilter = null,
-        array $dateFilters = []
+        array $dateFilters = [],
+        ?string $mediaType = null
     ): array {
         $breakdown = CustomBreakdown::where('workspace_id', $workspace->id)->findOrFail($breakdownId);
 
@@ -880,13 +891,14 @@ class AdsManagerController extends Controller
             return (new LengthAwarePaginator([], 0, $perPage, 1))->toArray();
         }
 
-        $insights = $this->insightsSubquery('meta_ads_ad_id', $since, $until);
+        $insights = $this->insightsSubquery('meta_ads_ad_id', $since, $until, [], $mediaType);
 
         $base = Ad::query()
             ->leftJoinSub($insights, 'i', 'i.meta_ads_ad_id', '=', 'meta_ads_ads.id')
             ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds)
             ->whereRaw("({$case}) IS NOT NULL")
             ->tap(fn ($q) => $this->applyCreatorFilter($q, $creatorFilter))
+            ->tap(fn ($q) => $this->constrainByMediaType($q, 'meta_ads_ads.id', $mediaType))
             ->select(array_merge(
                 [
                     DB::raw("({$case}) AS name"),
@@ -981,9 +993,10 @@ class AdsManagerController extends Controller
      * One row per entity key with the count of ads belonging to it. LEFT JOINed
      * as `ac` so the count never fans out the per-entity insight aggregates.
      */
-    private function adsCountSubquery(string $keyColumn)
+    private function adsCountSubquery(string $keyColumn, ?string $mediaType = null)
     {
         return DB::table('meta_ads_ads')
+            ->tap(fn ($q) => $this->constrainByMediaType($q, 'meta_ads_ads.id', $mediaType))
             ->select($keyColumn, DB::raw('COUNT(*) AS ads_count'))
             ->groupBy($keyColumn);
     }
@@ -1438,7 +1451,7 @@ class AdsManagerController extends Controller
      * account id) for the date range. LEFT JOINed onto the entity base as `i`,
      * so entities with no insights in the window simply get NULL → 0 metrics.
      */
-    private function insightsSubquery(string $keyColumn, string $since, string $until, array $objectives = [])
+    private function insightsSubquery(string $keyColumn, string $since, string $until, array $objectives = [], ?string $mediaType = null)
     {
         $selects = [$keyColumn];
         foreach (self::INSIGHTS_METRICS as $col) {
@@ -1452,6 +1465,9 @@ class AdsManagerController extends Controller
             // account row would keep summing spend from campaigns the filter
             // excluded, and report a total the filter says you're not looking at.
             ->tap(fn ($q) => $this->constrainByObjectives($q, 'meta_ads_campaign_id', $objectives))
+            // Insights are ad-level, so an image/video filter narrows the sums
+            // for every breakdown — a campaign row totals only its video ads.
+            ->tap(fn ($q) => $this->constrainByMediaType($q, 'meta_ads_ad_id', $mediaType))
             ->select($selects)
             ->groupBy($keyColumn);
     }
@@ -1521,6 +1537,75 @@ class AdsManagerController extends Controller
                 $this->constrainByObjectives($sub, 'id', $objectives);
             });
         }
+    }
+
+    /**
+     * Image / video filter (`media_type`). Anything else means no constraint.
+     */
+    private function parseMediaTypeFilter(Request $request): ?string
+    {
+        $value = (string) $request->query('media_type', '');
+
+        return in_array($value, ['image', 'video'], true) ? $value : null;
+    }
+
+    /**
+     * Ids of video ads, split exactly like MEDIA_TYPE_SQL. Every other ad —
+     * including one with no synced creative — counts as an image.
+     */
+    private function videoAdIds()
+    {
+        return DB::table('meta_ads_ads')
+            ->join('meta_ads_creatives', 'meta_ads_creatives.id', '=', 'meta_ads_ads.meta_ads_creative_id')
+            ->whereRaw(self::IS_VIDEO_SQL)
+            ->select('meta_ads_ads.id');
+    }
+
+    /** Constrains a column holding an ad id to image or video ads. */
+    private function constrainByMediaType($query, string $adIdColumn, ?string $mediaType): void
+    {
+        if ($mediaType === null) {
+            return;
+        }
+
+        $mediaType === 'video'
+            ? $query->whereIn($adIdColumn, $this->videoAdIds())
+            : $query->whereNotIn($adIdColumn, $this->videoAdIds());
+    }
+
+    /**
+     * Narrows a breakdown to rows that carry ads of the given media type. Ad-
+     * grained groupings filter the ads themselves; the rest keep an entity
+     * when at least one of its ads matches.
+     */
+    private function applyMediaTypeFilter($query, array $config, ?string $mediaType): void
+    {
+        if ($mediaType === null) {
+            return;
+        }
+
+        if ($config['model'] === Ad::class) {
+            $this->constrainByMediaType($query, 'meta_ads_ads.id', $mediaType);
+
+            return;
+        }
+
+        $column = match ($config['model']) {
+            AdSet::class => ['meta_ads_sets.id', 'meta_ads_set_id'],
+            Campaign::class => ['meta_ads_campaigns.id', 'meta_ads_campaign_id'],
+            AdAccount::class => ['meta_ads_accounts.id', 'meta_ads_account_id'],
+            default => null,
+        };
+
+        if ($column === null) {
+            return;
+        }
+
+        [$entityColumn, $adColumn] = $column;
+        $query->whereIn($entityColumn, function ($sub) use ($adColumn, $mediaType) {
+            $sub->select($adColumn)->from('meta_ads_ads');
+            $this->constrainByMediaType($sub, 'meta_ads_ads.id', $mediaType);
+        });
     }
 
     /**
