@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Products\Exceptions\ProductResearchSuggestionFailed;
+use Modules\Products\Models\Product;
 use Modules\Products\Models\ProductForm;
 use Modules\Products\Models\ProductResearch;
 use Modules\Products\Models\TargetMarket;
@@ -146,6 +147,8 @@ class ProductResearchController extends Controller
         $validated = $request->validate([
             ...$this->briefRules($request, $workspace),
             ...$this->promptRules(),
+            // The "Use our product names as reference" box.
+            'reference_catalog' => ['sometimes', 'boolean'],
         ]);
 
         if (! ProductResearchNameSuggester::isConfigured()) {
@@ -162,6 +165,21 @@ class ProductResearchController extends Controller
             ? TargetMarket::ofWorkspace($workspace)->find($validated['target_market_sub_id'])
             : null;
 
+        // The catalogue's names go out only when the builder asked for them,
+        // and only the names — this workspace's, newest first.
+        $referenceNames = ($validated['reference_catalog'] ?? false)
+            ? Product::ofWorkspace($workspace)
+                ->whereNotNull('name')
+                ->where('name', '!=', '')
+                ->latest()
+                ->limit(ProductResearchNameSuggester::MAX_REFERENCE_NAMES)
+                ->pluck('name')
+                ->map(fn ($name) => trim((string) $name))
+                ->unique()
+                ->values()
+                ->all()
+            : [];
+
         // The prompt rides on the request rather than being read back off a
         // stored row: Step 2 is where the name is chosen, so more often than
         // not there is no brief yet to read from. The builder holds the pair
@@ -176,6 +194,7 @@ class ProductResearchController extends Controller
                     $sub?->name,
                     $settings->prompt(),
                     $settings->count(),
+                    $referenceNames,
                 )
             );
         } catch (ProductResearchSuggestionFailed $e) {

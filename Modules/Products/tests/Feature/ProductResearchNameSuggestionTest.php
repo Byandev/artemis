@@ -6,6 +6,7 @@ use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Modules\Products\Models\Product;
 use Modules\Products\Models\ProductForm;
 use Modules\Products\Models\ProductResearch;
 use Modules\Products\Models\TargetMarket;
@@ -581,4 +582,49 @@ test('changing one half of the settings leaves the other alone', function () {
         // Left out, so left as they were rather than wiped.
         ->and($productResearch->packshot_prompt)->toBe('Watercolour on cream paper.')
         ->and($productResearch->packshot_count)->toBe(3);
+});
+
+test('ticking the reference box sends this workspace\'s product names, and only its own', function () {
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
+
+    Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'Salveo Barley Balm']);
+    Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'Cardio Vitality Spray']);
+    Product::factory()->create(['name' => 'Someone Else’s Tonic']);
+
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
+            'product_form_id' => $form->id,
+            'target_market_id' => $category->id,
+            'reference_catalog' => true,
+        ])
+        ->assertOk();
+
+    Http::assertSent(function ($request) {
+        $brief = $request['messages'][1]['content'];
+
+        return str_contains($brief, 'Existing product names in this catalogue')
+            && str_contains($brief, 'Salveo Barley Balm')
+            && str_contains($brief, 'Cardio Vitality Spray')
+            && ! str_contains($brief, 'Someone Else’s Tonic');
+    });
+});
+
+test('the catalogue stays out of the prompt unless the box is ticked', function () {
+    ['user' => $owner, 'workspace' => $workspace, 'form' => $form, 'category' => $category] = suggestionFixtures();
+
+    Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'Salveo Barley Balm']);
+
+    Http::fake(['openrouter.ai/*' => Http::response(fakeSuggestionBody())]);
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/products/product-research/suggest-names", [
+            'product_form_id' => $form->id,
+            'target_market_id' => $category->id,
+        ])
+        ->assertOk();
+
+    Http::assertSent(fn ($request) => ! str_contains($request['messages'][1]['content'], 'Salveo Barley Balm')
+        && ! str_contains($request['messages'][1]['content'], 'Existing product names'));
 });
