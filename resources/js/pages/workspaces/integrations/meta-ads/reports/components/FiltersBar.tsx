@@ -21,13 +21,17 @@ import {
     DATE_OP_LABELS,
     dateFilterSupported,
     isDateFilter,
+    isMediaTypeFilter,
     isNameFilter,
+    MEDIA_TYPE_LABELS,
     METRIC_OP_LABELS,
     NAME_OP_LABELS,
     type BreakdownValue,
     type DateFilter,
     type DateFilterField,
     type DateFilterOp,
+    type MediaType,
+    type MediaTypeFilter,
     type MetricFilter,
     type MetricFilterOp,
     type NameFilter,
@@ -54,6 +58,7 @@ export function FiltersBar({
     dateRange: { since: string; until: string };
 }) {
     const hasName = filters.some(isNameFilter);
+    const hasMediaType = filters.some(isMediaTypeFilter);
     const usedDateFields = filters.filter(isDateFilter).map((f) => f.field);
 
     const update = (index: number, next: ReportFilter) =>
@@ -63,6 +68,11 @@ export function FiltersBar({
 
     const addName = () =>
         onChange([...filters, { field: 'name', op: 'contains', value: '' }]);
+    const addMediaType = () =>
+        onChange([
+            ...filters,
+            { field: 'media_type', op: 'is', value: 'video' },
+        ]);
     const addMetric = (field: string) =>
         onChange([...filters, { field, op: 'gte', value: 0 }]);
     // Seeded to the report's own window rather than today — a fresh "is on today"
@@ -89,6 +99,13 @@ export function FiltersBar({
                         onChange={(next) => update(i, next)}
                         onRemove={() => remove(i)}
                     />
+                ) : isMediaTypeFilter(f) ? (
+                    <MediaTypeFilterChip
+                        key={`media-type-${i}`}
+                        filter={f}
+                        onChange={(next) => update(i, next)}
+                        onRemove={() => remove(i)}
+                    />
                 ) : isDateFilter(f) ? (
                     <DateFilterChip
                         key={`date-${i}-${f.field}`}
@@ -109,9 +126,11 @@ export function FiltersBar({
 
             <AddFilterButton
                 hasName={hasName}
+                hasMediaType={hasMediaType}
                 usedDateFields={usedDateFields}
                 groupBy={groupBy}
                 onAddName={addName}
+                onAddMediaType={addMediaType}
                 onAddMetric={addMetric}
                 onAddDate={addDate}
             />
@@ -222,6 +241,50 @@ function DateFilterChip({
                 </>
             )}
 
+            <button
+                type="button"
+                onClick={onRemove}
+                className="rounded p-1 text-gray-400 hover:text-red-500"
+            >
+                <X className="h-3.5 w-3.5" />
+            </button>
+        </div>
+    );
+}
+
+function MediaTypeFilterChip({
+    filter,
+    onChange,
+    onRemove,
+}: {
+    filter: MediaTypeFilter;
+    onChange: (f: MediaTypeFilter) => void;
+    onRemove: () => void;
+}) {
+    return (
+        <div className="flex items-center gap-1.5 rounded-md bg-gray-50 px-1.5 py-1 dark:bg-zinc-800">
+            <span className="px-1 text-xs text-gray-500 dark:text-gray-400">
+                Ad type is
+            </span>
+            <Select
+                value={filter.value}
+                onValueChange={(value) =>
+                    onChange({ ...filter, value: value as MediaType })
+                }
+            >
+                <SelectTrigger className="h-7 w-[90px] text-xs">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {(Object.keys(MEDIA_TYPE_LABELS) as MediaType[]).map(
+                        (type) => (
+                            <SelectItem key={type} value={type}>
+                                {MEDIA_TYPE_LABELS[type]}
+                            </SelectItem>
+                        ),
+                    )}
+                </SelectContent>
+            </Select>
             <button
                 type="button"
                 onClick={onRemove}
@@ -355,16 +418,20 @@ function MetricFilterChip({
 
 function AddFilterButton({
     hasName,
+    hasMediaType,
     usedDateFields,
     groupBy,
     onAddName,
+    onAddMediaType,
     onAddMetric,
     onAddDate,
 }: {
     hasName: boolean;
+    hasMediaType: boolean;
     usedDateFields: DateFilterField[];
     groupBy: BreakdownValue;
     onAddName: () => void;
+    onAddMediaType: () => void;
     onAddMetric: (field: string) => void;
     onAddDate: (field: DateFilterField) => void;
 }) {
@@ -376,6 +443,9 @@ function AddFilterButton({
         o.label.toLowerCase().includes(q),
     );
     const showName = !hasName && (q === '' || 'name'.includes(q));
+    const showMediaType =
+        !hasMediaType &&
+        ['ad type', 'image', 'video'].some((term) => term.includes(q));
 
     // Only offer a date the current breakdown can actually answer, and only
     // once — a second copy of the same field would just fight the first.
@@ -428,6 +498,18 @@ function AddFilterButton({
                             className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-zinc-800"
                         >
                             Name
+                        </button>
+                    )}
+                    {showMediaType && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onAddMediaType();
+                                setOpen(false);
+                            }}
+                            className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-zinc-800"
+                        >
+                            Ad type (image / video)
                         </button>
                     )}
                     {dateMatches.length > 0 && (
