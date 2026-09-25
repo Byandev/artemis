@@ -49,7 +49,8 @@ class CallLogController extends Controller
                 'user_id' => $request->input('user_id'),
                 'phone_number' => $log['phone_number'],
                 'type' => $log['type'],
-                'duration' => $log['duration'],
+                // Zeroed for a rejected call — see CallLog::durationFor().
+                'duration' => CallLog::durationFor($log['type'], (int) $log['duration']),
                 'call_date' => $timestamp->toDateString(),
                 'call_time' => $timestamp->toTimeString(),
                 'created_at' => $now,

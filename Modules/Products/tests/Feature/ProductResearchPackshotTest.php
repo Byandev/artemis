@@ -19,14 +19,14 @@ uses(TestCase::class, RefreshDatabase::class);
 beforeEach(function () {
     Http::preventStrayRequests();
 
-    // Pinned rather than left ambient: .env can point the app at a gateway, and
-    // these tests assert the outbound request.
+    // Pinned rather than left ambient: .env sets its own OpenRouter model and
+    // URL, and these tests assert the outbound request.
     config([
-        'openai.api_key' => 'sk-test',
-        'openai.base_uri' => null,
-        'openai.referer' => null,
-        'openai.title' => null,
-        'openai.packshot_model' => 'openai/gpt-image-2',
+        'openrouter.api_key' => 'sk-test',
+        'openrouter.base_uri' => 'https://openrouter.ai/api/v1',
+        'openrouter.referer' => null,
+        'openrouter.title' => null,
+        'openrouter.packshot_model' => 'openai/gpt-image-2',
         'filesystems.product_research_media_disk' => 's3',
     ]);
 
@@ -73,7 +73,7 @@ function fakePackshotBody(int $count = 1): array
 test('it draws the configured number of options and files them on the brief', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $response = $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -104,7 +104,7 @@ test('it draws the configured number of options and files them on the brief', fu
 test('re-drawing replaces the previous set rather than piling up', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $productResearch->update(['packshot_count' => 3]);
 
@@ -122,7 +122,7 @@ test('re-drawing replaces the previous set rather than piling up', function () {
 test("the brief's style note and count reach the generator, and are remembered", function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     // Sent with the call rather than read off a workspace row, so the images
     // are drawn with what the Configure prompt dialog is showing.
@@ -146,7 +146,7 @@ test("the brief's style note and count reach the generator, and are remembered",
 test('one brief\'s image prompt does not follow another around the workspace', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $productResearch->update(['packshot_prompt' => 'Watercolour illustration on cream paper.']);
 
@@ -172,7 +172,7 @@ test('one brief\'s image prompt does not follow another around the workspace', f
 test('picking an option sets the packshot and leaves the option in the grid', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
     $productResearch->update(['packshot_count' => 3]);
 
     $options = $this->actingAs($owner)
@@ -194,7 +194,7 @@ test('an option belonging to another brief cannot be adopted', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
     ['productResearch' => $otherProductResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $otherProductResearch->addMediaFromString('not-really-an-image')
         ->usingFileName('theirs.png')
@@ -259,7 +259,7 @@ test('a non-image upload is refused', function () {
 test('with no api key it says so and never calls the provider', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    config(['openai.api_key' => null]);
+    config(['openrouter.api_key' => null]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -271,7 +271,7 @@ test('with no api key it says so and never calls the provider', function () {
 test('an upstream failure is reported without leaking the provider error', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(['error' => 'secret upstream detail'], 500)]);
+    Http::fake(['openrouter.ai/*' => Http::response(['error' => 'secret upstream detail'], 500)]);
 
     $response = $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -285,7 +285,7 @@ test('an upstream failure is reported without leaking the provider error', funct
 test('a 200 carrying no usable image is refused', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(['data' => [['b64_json' => '']]])]);
+    Http::fake(['openrouter.ai/*' => Http::response(['data' => [['b64_json' => '']]])]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -356,7 +356,7 @@ test('the prompt describes the delivery form, not a generic container', function
     $patch = ProductForm::create(['workspace_id' => $workspace->id, 'name' => 'Patch']);
     $productResearch->update(['product_form_id' => $patch->id]);
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -379,7 +379,7 @@ test('a form the catalog added later still gets a usable prompt', function () {
     $lozenge = ProductForm::create(['workspace_id' => $workspace->id, 'name' => 'Lozenge']);
     $productResearch->update(['product_form_id' => $lozenge->id]);
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -402,7 +402,7 @@ test('the market sets the palette and the sub category says what it treats', fun
     ]);
     $productResearch->update(['target_market_sub_id' => $sub->id]);
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -426,7 +426,7 @@ test('a market with no palette of its own still avoids the default brown', funct
     $odd = TargetMarket::create(['workspace_id' => $workspace->id, 'name' => 'Sleep']);
     $productResearch->update(['target_market_id' => $odd->id, 'target_market_sub_id' => null]);
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -443,7 +443,7 @@ test('an image prompt that asks for no label still gets the spelling guard', fun
 
     $productResearch->update(['packshot_prompt' => 'Blank unbranded packaging, no label of any kind.']);
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -464,7 +464,7 @@ test('a model that ignores n still yields the full set', function () {
 
     // seedream answers every call with exactly one image whatever `n` says.
     // Asking once per option is what makes the count portable.
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody(1))]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody(1))]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -499,7 +499,7 @@ test('a partial failure still returns the options that came back', function () {
 test('every option is seeded differently so the set is not one image repeated', function () {
     ['user' => $owner, 'workspace' => $workspace, 'productResearch' => $productResearch] = packshotFixtures();
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -527,7 +527,7 @@ test('a description typed on the form is what gets drawn', function () {
     ]);
     $productResearch->update(['product_form_id' => $balm->id]);
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", ['product_research_id' => $productResearch->id])
@@ -568,7 +568,7 @@ test('a draft that has never been saved can still generate', function () {
     $form = ProductForm::create(['workspace_id' => $workspace->id, 'name' => 'Spray']);
     $category = TargetMarket::create(['workspace_id' => $workspace->id, 'name' => 'Cardiovascular']);
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     // No product_research_id: the brief is filed on the way through, so Step 3 does not
     // have to wait on Save to RDPs.
@@ -595,7 +595,7 @@ test('a draft is filed once, not once per generate', function () {
     $form = ProductForm::create(['workspace_id' => $workspace->id, 'name' => 'Spray']);
     $category = TargetMarket::create(['workspace_id' => $workspace->id, 'name' => 'Cardiovascular']);
 
-    Http::fake(['api.openai.com/*' => Http::response(fakePackshotBody())]);
+    Http::fake(['openrouter.ai/*' => Http::response(fakePackshotBody())]);
 
     $first = $this->actingAs($owner)
         ->postJson("/workspaces/{$workspace->slug}/products/product-research/packshots", [

@@ -317,7 +317,22 @@ class ShopController extends Controller
             abort(403);
         }
 
-        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+        if (! $shop->pos_token) {
+            throw ValidationException::withMessages([
+                'pos_token' => 'This shop has no POS token, so its users cannot be refreshed.',
+            ]);
+        }
+
+        // Runs inline rather than on the 'pancake' queue: it's a single POS call
+        // plus a handful of upserts, and the user expects the list to be current
+        // as soon as the action returns.
+        try {
+            FetchShopUsers::dispatchSync($shop);
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                'pos_token' => 'Could not reach the POS API to refresh the user list.',
+            ]);
+        }
 
         return redirect()->route('workspaces.shops.index', $workspace);
     }
