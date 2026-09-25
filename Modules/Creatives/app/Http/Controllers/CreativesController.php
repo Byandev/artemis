@@ -50,7 +50,8 @@ class CreativesController extends Controller
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
-                        $q->where('name', 'like', "%{$value}%")
+                        $q->where('code', 'like', "%{$value}%")
+                            ->orWhere('name', 'like', "%{$value}%")
                             ->orWhere('headline', 'like', "%{$value}%")
                             ->orWhere('description', 'like', "%{$value}%");
                     });
@@ -75,6 +76,7 @@ class CreativesController extends Controller
                 AllowedFilter::callback('approved_at_to', fn ($q, $v) => $q->whereDate('approved_at', '<=', $v)),
             ])
             ->allowedSorts([
+                AllowedSort::field('code'),
                 AllowedSort::field('name'),
                 AllowedSort::field('creative_date'),
                 // format is a MySQL ENUM; cast to CHAR so it sorts alphabetically
@@ -428,6 +430,7 @@ class CreativesController extends Controller
 
         return [
             'id' => $c->id,
+            'code' => $c->code,
             'name' => $c->name,
             'description' => $c->description,
             'format' => $c->format,
