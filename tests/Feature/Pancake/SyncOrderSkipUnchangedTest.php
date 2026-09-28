@@ -51,6 +51,7 @@ function runSyncOrder(Workspace $workspace, Page $page, array $data): void
 }
 
 test('an unchanged payload skips the rewrite', function () {
+    $this->freezeTime();
     $workspace = Workspace::factory()->create();
     $page = Page::factory()->forWorkspace($workspace)->create();
     $payload = pancakeOrderPayload($page);
@@ -68,6 +69,23 @@ test('an unchanged payload skips the rewrite', function () {
     DB::disableQueryLog();
 
     expect($writes)->toBeEmpty();
+});
+
+test('the same payload with its lists reordered still skips', function () {
+    $this->freezeTime();
+    $workspace = Workspace::factory()->create();
+    $page = Page::factory()->forWorkspace($workspace)->create();
+    $history = [
+        ['status' => 0, 'updated_at' => now()->subDays(3)->utc()->format('Y-m-d\TH:i:s')],
+        ['status' => 1, 'updated_at' => now()->subDays(2)->utc()->format('Y-m-d\TH:i:s')],
+    ];
+
+    runSyncOrder($workspace, $page, pancakeOrderPayload($page, ['status_history' => $history]));
+    $firstHash = Order::where('order_number', 1001)->value('sync_hash');
+
+    runSyncOrder($workspace, $page, pancakeOrderPayload($page, ['status_history' => array_reverse($history)]));
+
+    expect(Order::where('order_number', 1001)->value('sync_hash'))->toBe($firstHash);
 });
 
 test('a changed payload syncs in full', function () {

@@ -37,7 +37,7 @@ class SyncOrder implements ShouldQueue
         LinkVerificationCallLogsAction $linkCallLogs,
         RmoUpsellStamper $upsellStamper,
     ): void {
-        $hash = md5(json_encode($this->data));
+        $hash = md5(json_encode($this->canonical($this->data)));
 
         $existing = Order::query()
             ->where('order_number', $this->data['id'])
@@ -80,5 +80,27 @@ class SyncOrder implements ShouldQueue
         // Stamped last, so a sync that fails part-way runs in full next time.
         // Written on the base query so it leaves updated_at alone.
         Order::whereKey($savedOrder->id)->toBase()->update(['sync_hash' => $hash]);
+    }
+
+    /**
+     * The payload with its lists sorted, so the fingerprint only moves when the
+     * content does. Pancake hands back status_history and items in a different
+     * order from one fetch to the next.
+     */
+    private function canonical(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $value = array_map(fn ($item) => $this->canonical($item), $value);
+
+        if (array_is_list($value)) {
+            usort($value, fn ($a, $b) => json_encode($a) <=> json_encode($b));
+        } else {
+            ksort($value);
+        }
+
+        return $value;
     }
 }
