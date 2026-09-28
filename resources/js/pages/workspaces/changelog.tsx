@@ -60,6 +60,42 @@ const changelog: ChangelogEntry[] = [
         ],
     },
     {
+        version: 'v3.37.5',
+        date: '2026-09-28',
+        sections: [
+            {
+                title: 'Orders — Pancake Sync',
+                items: [
+                    'An order that comes back from Pancake exactly as it was last time is now passed over rather than written out again — the hourly sync and the shipped-order pulls re-read thousands of orders that haven’t moved, and rewriting every one of them was the bulk of the load on the database',
+                    'Anything that has changed still syncs in full as before: a new status, a new tracking update, an edited item or address all come through on the next pass, and delivery updates still go out to customers as they did',
+                    'Calls that arrive after their order are still matched to it, and today’s RMO rows still pick up their upsell figures, even when the order itself is passed over — both depend on other feeds, not on the order changing',
+                    'The first sync after this release still rewrites every order once; the saving starts from the pass after that',
+                ],
+            },
+            {
+                title: 'RTS — Call Logs',
+                items: [
+                    'A rejected call is now stored with no talk time — the phone reports the seconds it spent ringing as if they were a conversation, which padded every talk-time total and could count a call nobody picked up as connected',
+                    'This applies to calls synced from now on; rejected calls already on record keep the duration they arrived with',
+                ],
+            },
+            {
+                title: 'Shops — Refresh Users',
+                items: [
+                    'Refresh users now updates the shop’s user list there and then, so the list is current the moment the confirmation appears — it used to be queued and could take a while to show up',
+                    'A shop with no POS token, or a POS that can’t be reached, now tells you so straight away rather than reporting a refresh that was never going to happen',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The CSR daily records and call records now refresh every two hours as intended — the schedule they were on wasn’t a valid time, so the regular refresh wasn’t happening',
+                    'The 12pm, 2pm, 5pm and 7pm Gencys ERP passes now sync everything the 9am pass does, rather than only transaction history, purchase orders and the daily sales tracker',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.37.4',
         date: '2026-09-18',
         sections: [
