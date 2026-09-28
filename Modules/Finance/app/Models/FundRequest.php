@@ -9,9 +9,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class FundRequest extends Model
+class FundRequest extends Model implements HasMedia
 {
+    use InteractsWithMedia;
+
+    /**
+     * The files uploaded against the attachments the request's transaction type
+     * calls for. Each carries the `attachment_id` it answers as a custom
+     * property; one file per attachment.
+     */
+    public const ATTACHMENTS_COLLECTION = 'fund_request_attachments';
+
     protected $table = 'finance_fund_requests';
 
     /**
@@ -99,5 +110,23 @@ class FundRequest extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        // No acceptsMimeTypes() on purpose — see WorkspaceChecklistCompletion:
+        // request validation owns what is accepted and returns a field error.
+        $this->addMediaCollection(static::ATTACHMENTS_COLLECTION)
+            ->useDisk(config('filesystems.fund_request_attachment_disk'));
+    }
+
+    /**
+     * The checklist items ticked off on this request, out of its transaction
+     * type's checklist.
+     */
+    public function checkedChecklists(): BelongsToMany
+    {
+        return $this->belongsToMany(FundRequestChecklist::class, 'finance_fund_request_checklist_checks', 'fund_request_id', 'checklist_id')
+            ->withTimestamps();
     }
 }

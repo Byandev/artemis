@@ -8,13 +8,16 @@ use App\Models\Department;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\FundRequestRequest;
 use Modules\Finance\Models\FundRequest;
 use Modules\Finance\Models\TransactionType;
 use Modules\Products\Models\Product;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -80,19 +83,78 @@ class FundRequestController extends Controller
         return Inertia::render('workspaces/finance/request-funds/index', [
             'workspace' => $workspace,
             'requestFunds' => $requestFunds,
-            'users' => $workspace->users()->get(['users.id', 'users.name']),
             'statuses' => FundRequest::STATUSES,
-            'products' => $this->productOptions($request, $workspace),
-            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name', 'nature']),
-            'departments' => Department::ofWorkspace($workspace)
-                ->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'canApproveStatus' => $request->user()->can(Permission::ApproveFinanceRequestFunds->value, $workspace),
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    public function create(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateFinanceRequestFunds->value, $workspace);
+
+        return Inertia::render('workspaces/finance/request-funds/create', [
+            'workspace' => $workspace,
+            ...$this->formOptions($request, $workspace),
+        ]);
+    }
+
+    public function edit(Request $request, Workspace $workspace, FundRequest $requestFund)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceRequestFunds->value, $workspace);
+        $this->ensureOwns($workspace, $requestFund);
+
+        $requestFund->load([
+            'chargeToUsers:users.id,users.name',
+            'productShares',
+            'approver:id,name',
+            'checkedChecklists:finance_fund_request_checklists.id',
+        ]);
+
+        return Inertia::render('workspaces/finance/request-funds/edit', [
+            'workspace' => $workspace,
+            'requestFund' => [
+                ...$requestFund->toArray(),
+                'checklist_ids' => $requestFund->checkedChecklists->pluck('id'),
+                'files' => $this->filesFor($workspace, $requestFund),
+            ],
+            ...$this->formOptions($request, $workspace),
+        ]);
+    }
+
+    /**
+     * Stream / redirect to one of a request's uploaded attachments. The bucket is
+     * private, so this hands out a short-lived signed URL, or streams the bytes
+     * when the disk cannot sign one (a local disk in development).
+     */
+    public function downloadAttachment(Request $request, Workspace $workspace, FundRequest $requestFund, Media $media)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceRequestFunds->value, $workspace);
+        $this->ensureOwns($workspace, $requestFund);
+
+        abort_unless(
+            $media->model_type === FundRequest::class
+                && (int) $media->model_id === $requestFund->id
+                && $media->collection_name === FundRequest::ATTACHMENTS_COLLECTION,
+            404,
+        );
+
+        $disk = Storage::disk($media->disk);
+
+        if ($disk->providesTemporaryUrls()) {
+            return redirect()->away($disk->temporaryUrl(
+                $media->getPathRelativeToRoot(),
+                Carbon::now()->addMinutes(5),
+            ));
+        }
+
+        return $disk->download($media->getPathRelativeToRoot(), $media->file_name);
     }
 
     public function store(FundRequestRequest $request, Workspace $workspace)
@@ -118,6 +180,7 @@ class FundRequestController extends Controller
             ]);
 
             $this->syncShares($fundRequest, $request, $workspace);
+            $this->syncRequirements($fundRequest, $request);
         });
 
         return redirect()->route('workspaces.finance.request-funds.index', $workspace->slug)
@@ -137,6 +200,7 @@ class FundRequestController extends Controller
             $requestFund->update($this->attributesFor($validated, $workspace));
 
             $this->syncShares($requestFund, $request, $workspace);
+            $this->syncRequirements($requestFund, $request);
         });
 
         return redirect()->route('workspaces.finance.request-funds.index', $workspace->slug)
@@ -210,12 +274,13 @@ class FundRequestController extends Controller
     }
 
     /**
-     * The column values for a request. charge_to / products are pivots, not
-     * columns, so they are stripped here and synced after the row exists.
+     * The column values for a request. charge_to / products are pivots, and the
+     * checklist and attachments live in their own tables, so they are stripped
+     * here and synced after the row exists.
      */
     protected function attributesFor(array $validated, Workspace $workspace): array
     {
-        return collect($validated)->except(['charge_to', 'products'])->all();
+        return collect($validated)->except(['charge_to', 'products', 'checklist_ids', 'attachments', 'remove_attachments'])->all();
     }
 
     /**
@@ -253,6 +318,77 @@ class FundRequestController extends Controller
                 'sort_order' => $index,
             ])->all()
         );
+    }
+
+    /**
+     * Tick off the submitted checklist items and store the uploaded attachment
+     * files, then drop anything that no longer belongs to the request's type —
+     * switching the type leaves the old type's files and ticks behind otherwise.
+     * Validation has already confined both to the chosen type.
+     */
+    protected function syncRequirements(FundRequest $fundRequest, FundRequestRequest $request): void
+    {
+        $fundRequest->checkedChecklists()->sync($request->input('checklist_ids', []));
+
+        $type = $fundRequest->transactionType()->with('attachments:id,transaction_type_id')->first();
+        $allowed = $type?->attachments->pluck('id')->all() ?? [];
+        $replaced = array_map('intval', array_keys($request->file('attachments', [])));
+        $removed = array_map('intval', $request->input('remove_attachments', []));
+
+        // Deleted one model at a time so media-library removes each object from
+        // the bucket (a query-builder delete would orphan the files).
+        $fundRequest->getMedia(FundRequest::ATTACHMENTS_COLLECTION)
+            ->filter(function (Media $media) use ($allowed, $replaced, $removed) {
+                $attachmentId = (int) $media->getCustomProperty('attachment_id');
+
+                return ! in_array($attachmentId, $allowed, true)
+                    || in_array($attachmentId, $replaced, true)
+                    || in_array($attachmentId, $removed, true);
+            })
+            ->each->delete();
+
+        foreach ($request->file('attachments', []) as $attachmentId => $file) {
+            $fundRequest->addMedia($file)
+                ->withCustomProperties(['attachment_id' => (int) $attachmentId])
+                ->toMediaCollection(FundRequest::ATTACHMENTS_COLLECTION);
+        }
+    }
+
+    /**
+     * The request's uploaded files, as the form shows them: which attachment each
+     * answers, its name and size, and where to download it.
+     */
+    protected function filesFor(Workspace $workspace, FundRequest $fundRequest): array
+    {
+        return $fundRequest->getMedia(FundRequest::ATTACHMENTS_COLLECTION)
+            ->map(fn (Media $media) => [
+                'id' => $media->id,
+                'attachment_id' => (int) $media->getCustomProperty('attachment_id'),
+                'file_name' => $media->file_name,
+                'size' => $media->size,
+                'url' => route('workspaces.finance.request-funds.attachments.show', [$workspace->slug, $fundRequest->id, $media->id]),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Option lists for the create / edit form. Each transaction type carries the
+     * attachments and checklist it calls for, so the form can show them the
+     * moment the type is picked.
+     */
+    protected function formOptions(Request $request, Workspace $workspace): array
+    {
+        return [
+            'users' => $workspace->users()->orderBy('users.name')->get(['users.id', 'users.name']),
+            'products' => $this->productOptions($request, $workspace),
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->with(['attachments:id,transaction_type_id,name', 'checklists:id,transaction_type_id,name'])
+                ->orderBy('name')
+                ->get(['id', 'name', 'nature']),
+            'departments' => Department::ofWorkspace($workspace)
+                ->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+        ];
     }
 
     /**

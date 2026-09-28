@@ -48,6 +48,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fund Request Attachment Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where the files uploaded against a fund request's attachments (the ones
+    | its transaction type calls for) are stored. Private like the proof
+    | buckets above: served through a signed URL, never a public one.
+    |
+    */
+
+    'fund_request_attachment_disk' => env('FUND_REQUEST_ATTACHMENT_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Course Media Disk
     |--------------------------------------------------------------------------
     |

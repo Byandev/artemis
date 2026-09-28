@@ -7,10 +7,18 @@ use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Modules\Finance\Http\Requests\Concerns\SplitsShares;
+use Modules\Finance\Models\FundRequest;
+use Modules\Finance\Models\FundRequestAttachment;
 
 class FundRequestRequest extends FormRequest
 {
     use SplitsShares;
+
+    /**
+     * What an attachment may be: scans and photos (`heif` alongside `heic`, as
+     * iOS photos are often detected as the former), PDFs, and office files.
+     */
+    public const ATTACHMENT_MIMES = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'];
 
     public function authorize(): bool
     {
@@ -55,12 +63,31 @@ class FundRequestRequest extends FormRequest
                 Rule::exists('products', 'id')->where('workspace_id', $workspace->id),
             ],
             'products.*.amount' => ['nullable', 'numeric', 'min:0'],
+
+            // The items ticked off on the chosen type's checklist.
+            'checklist_ids' => ['nullable', 'array'],
+            'checklist_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('finance_fund_request_checklists', 'id')
+                    ->where('transaction_type_id', $this->input('transaction_type_id') ?: 0),
+            ],
+
+            // Files keyed by the attachment they answer: attachments[<id>] = file.
+            // That each key is one of the chosen type's attachments is checked
+            // in after(), since the keys aren't values a rule can see.
+            'attachments' => ['nullable', 'array'],
+            'attachments.*' => ['file', 'mimes:'.implode(',', self::ATTACHMENT_MIMES), 'max:10240'],
+            // Attachment ids whose file on file should be removed (edit only).
+            'remove_attachments' => ['nullable', 'array'],
+            'remove_attachments.*' => ['integer'],
         ];
     }
 
     /**
      * The charge-to and product shares must each account for the whole request —
-     * otherwise part of it would silently belong to nobody.
+     * otherwise part of it would silently belong to nobody — and every
+     * attachment the chosen type calls for must have a file.
      */
     public function after(): array
     {
@@ -73,7 +100,47 @@ class FundRequestRequest extends FormRequest
 
             $this->assertSharesCoverAmount($validator, 'charge_to', 'charge-to', $this->chargeToShares(), $total);
             $this->assertSharesCoverAmount($validator, 'products', 'product', $this->productShares(), $total);
+
+            $required = $this->input('transaction_type_id')
+                ? FundRequestAttachment::where('transaction_type_id', $this->input('transaction_type_id'))->pluck('name', 'id')
+                : collect();
+            $uploaded = array_map('intval', array_keys($this->file('attachments', [])));
+
+            foreach ($uploaded as $attachmentId) {
+                if (! $required->has($attachmentId)) {
+                    $validator->errors()->add("attachments.{$attachmentId}", 'This attachment is not one the selected type calls for.');
+                }
+            }
+
+            // Every attachment the type calls for needs a file: a new upload, or
+            // (on an edit) the one already on file, unless it is being removed.
+            $kept = array_diff($this->savedAttachmentIds(), array_map('intval', $this->input('remove_attachments', [])));
+
+            foreach ($required as $attachmentId => $name) {
+                if (! in_array($attachmentId, $uploaded, true) && ! in_array($attachmentId, $kept, true)) {
+                    $validator->errors()->add("attachments.{$attachmentId}", "Upload the {$name}.");
+                }
+            }
         }];
+    }
+
+    /**
+     * The attachment ids the request being edited already has a file for; none
+     * when creating.
+     *
+     * @return list<int>
+     */
+    protected function savedAttachmentIds(): array
+    {
+        $fundRequest = $this->route('requestFund');
+
+        if (! $fundRequest instanceof FundRequest) {
+            return [];
+        }
+
+        return $fundRequest->getMedia(FundRequest::ATTACHMENTS_COLLECTION)
+            ->map(fn ($media) => (int) $media->getCustomProperty('attachment_id'))
+            ->all();
     }
 
     /** The amount the charge-to and product shares have to cover. */
@@ -120,6 +187,9 @@ class FundRequestRequest extends FormRequest
             'products.*.product_id.required' => 'Select a product for every product row.',
             'products.*.product_id.exists' => 'The product must belong to this workspace.',
             'products.*.product_id.distinct' => 'Each product can only be listed once.',
+            'checklist_ids.*.exists' => 'That checklist item is not on the selected type\'s checklist.',
+            'attachments.*.mimes' => 'Upload an image, PDF, Word, Excel or CSV file.',
+            'attachments.*.max' => 'The file may not be larger than 10 MB.',
         ];
     }
 

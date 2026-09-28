@@ -60,6 +60,7 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
 use Modules\Finance\Http\Controllers\IncomeStatementController as FinanceIncomeStatementController;
+use Modules\Finance\Http\Controllers\ManagementController as FinanceManagementController;
 use Modules\Finance\Http\Controllers\PurchasedOrderLookupController as FinancePurchasedOrderLookupController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
@@ -719,10 +720,18 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
 
         Route::get('/request-funds', [FinanceFundRequestController::class, 'index'])->name('request-funds.index');
+        Route::get('/request-funds/create', [FinanceFundRequestController::class, 'create'])->name('request-funds.create');
+        Route::get('/request-funds/{requestFund}/edit', [FinanceFundRequestController::class, 'edit'])->name('request-funds.edit');
+        Route::get('/request-funds/{requestFund}/attachments/{media}', [FinanceFundRequestController::class, 'downloadAttachment'])->name('request-funds.attachments.show');
         Route::post('/request-funds', [FinanceFundRequestController::class, 'store'])->name('request-funds.store');
         Route::put('/request-funds/{requestFund}/status', [FinanceFundRequestController::class, 'updateStatus'])->name('request-funds.status');
         Route::put('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'update'])->name('request-funds.update');
         Route::delete('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'destroy'])->name('request-funds.destroy');
+
+        Route::get('/management', [FinanceManagementController::class, 'index'])->name('management.index');
+        Route::post('/management/transaction-types/{transactionType}/{kind}', [FinanceManagementController::class, 'store'])->whereIn('kind', ['attachments', 'checklists'])->name('management.items.store');
+        Route::put('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'update'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.items.update');
+        Route::delete('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'destroy'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.items.destroy');
     });
 
     Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {
