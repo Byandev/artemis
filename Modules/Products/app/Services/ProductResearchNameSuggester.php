@@ -24,6 +24,13 @@ use Modules\Products\Exceptions\ProductResearchSuggestionFailed;
  */
 class ProductResearchNameSuggester
 {
+    /**
+     * How many of the workspace's product names ride along as reference. The
+     * newest ones — enough to show the house style without a large catalogue
+     * turning every press into a long, slow prompt.
+     */
+    public const MAX_REFERENCE_NAMES = 100;
+
     private string $model;
 
     private int $timeout;
@@ -44,6 +51,7 @@ class ProductResearchNameSuggester
     }
 
     /**
+     * @param  list<string>  $referenceNames  the workspace's existing product names, when the builder opted in
      * @return array{positioning: string, names: list<array{name: string, rationale: string}>}
      *
      * @throws ProductResearchSuggestionFailed
@@ -54,8 +62,9 @@ class ProductResearchNameSuggester
         ?string $subCategory,
         string $namingPrompt,
         int $count,
+        array $referenceNames = [],
     ): array {
-        $response = $this->send($this->payload($form, $market, $subCategory, $namingPrompt, $count));
+        $response = $this->send($this->payload($form, $market, $subCategory, $namingPrompt, $count, $referenceNames));
 
         $content = data_get($response, 'choices.0.message.content');
 
@@ -184,11 +193,21 @@ class ProductResearchNameSuggester
         ?string $subCategory,
         string $namingPrompt,
         int $count,
+        array $referenceNames,
     ): array {
         $brief = "Product form: {$form}\nTarget market: {$market}";
 
         if (filled($subCategory)) {
             $brief .= "\nSub category: {$subCategory}";
+        }
+
+        // The workspace's own catalogue, when the builder asked for it — so the
+        // set reads like the brand's other products and never lands on a name
+        // that is already taken.
+        if ($referenceNames !== []) {
+            $brief .= "\n\nExisting product names in this catalogue, for reference only —"
+                ." match their house style, but never reuse one or suggest a near-copy:\n- "
+                .implode("\n- ", $referenceNames);
         }
 
         $payload = [

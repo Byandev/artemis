@@ -141,6 +141,8 @@ const Builder = ({
     });
 
     const [suggestions, setSuggestions] = useState<NameSuggestion[]>([]);
+    // Off by default: the catalogue only goes out when someone asks for it.
+    const [referenceCatalog, setReferenceCatalog] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
     const [suggestError, setSuggestError] = useState<string | null>(null);
 
@@ -187,6 +189,7 @@ const Builder = ({
                 target_market_sub_id: data.target_market_sub_id || null,
                 naming_prompt: data.naming_prompt,
                 name_count: data.name_count,
+                reference_catalog: referenceCatalog,
             });
 
             setSuggestions(response.data.names);
@@ -452,6 +455,20 @@ const Builder = ({
                                 >
                                     Configure prompt
                                 </button>
+
+                                <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-gray-600 dark:text-gray-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={referenceCatalog}
+                                        onChange={(e) =>
+                                            setReferenceCatalog(
+                                                e.target.checked,
+                                            )
+                                        }
+                                        className="h-3.5 w-3.5 rounded border-gray-300 accent-emerald-600 dark:border-zinc-600"
+                                    />
+                                    Use our product names as reference
+                                </label>
 
                                 <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
                                     {suggesting
