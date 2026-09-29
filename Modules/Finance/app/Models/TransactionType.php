@@ -5,7 +5,7 @@ namespace Modules\Finance\Models;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class TransactionType extends Model
 {
@@ -87,16 +87,16 @@ class TransactionType extends Model
     /**
      * The attachments a fund request of this type calls for.
      */
-    public function attachments(): HasMany
+    public function attachments(): BelongsToMany
     {
-        return $this->hasMany(FundRequestAttachment::class, 'transaction_type_id')->orderBy('name');
+        return $this->belongsToMany(FundRequestAttachmentRequirement::class, 'finance_fund_request_transaction_type_attachments', 'transaction_type_id', 'attachment_requirement_id')->orderBy('name');
     }
 
     /**
      * The checklist items a fund request of this type is checked against.
      */
-    public function checklists(): HasMany
+    public function checklists(): BelongsToMany
     {
-        return $this->hasMany(FundRequestChecklist::class, 'transaction_type_id')->orderBy('name');
+        return $this->belongsToMany(FundRequestChecklistRequirement::class, 'finance_fund_request_transaction_type_checklists', 'transaction_type_id', 'checklist_requirement_id')->orderBy('name');
     }
 }

@@ -722,16 +722,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/request-funds', [FinanceFundRequestController::class, 'index'])->name('request-funds.index');
         Route::get('/request-funds/create', [FinanceFundRequestController::class, 'create'])->name('request-funds.create');
         Route::get('/request-funds/{requestFund}/edit', [FinanceFundRequestController::class, 'edit'])->name('request-funds.edit');
-        Route::get('/request-funds/{requestFund}/attachments/{media}', [FinanceFundRequestController::class, 'downloadAttachment'])->name('request-funds.attachments.show');
+        Route::get('/request-funds/{requestFund}/attachments/{attachment}', [FinanceFundRequestController::class, 'downloadAttachment'])->name('request-funds.attachments.show');
         Route::post('/request-funds', [FinanceFundRequestController::class, 'store'])->name('request-funds.store');
         Route::put('/request-funds/{requestFund}/status', [FinanceFundRequestController::class, 'updateStatus'])->name('request-funds.status');
         Route::put('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'update'])->name('request-funds.update');
         Route::delete('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'destroy'])->name('request-funds.destroy');
 
         Route::get('/management', [FinanceManagementController::class, 'index'])->name('management.index');
-        Route::post('/management/transaction-types/{transactionType}/{kind}', [FinanceManagementController::class, 'store'])->whereIn('kind', ['attachments', 'checklists'])->name('management.items.store');
-        Route::put('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'update'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.items.update');
-        Route::delete('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'destroy'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.items.destroy');
+        Route::post('/management/{kind}', [FinanceManagementController::class, 'store'])->whereIn('kind', ['attachments', 'checklists'])->name('management.requirements.store');
+        Route::put('/management/{kind}/{id}', [FinanceManagementController::class, 'update'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.update');
+        Route::delete('/management/{kind}/{id}', [FinanceManagementController::class, 'destroy'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.destroy');
+        Route::put('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'link'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.link');
+        Route::delete('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'unlink'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.unlink');
     });
 
     Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {

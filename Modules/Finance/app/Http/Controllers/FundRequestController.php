@@ -15,9 +15,9 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\FundRequestRequest;
 use Modules\Finance\Models\FundRequest;
+use Modules\Finance\Models\FundRequestAttachment;
 use Modules\Finance\Models\TransactionType;
 use Modules\Products\Models\Product;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -113,7 +113,7 @@ class FundRequestController extends Controller
             'chargeToUsers:users.id,users.name',
             'productShares',
             'approver:id,name',
-            'checkedChecklists:finance_fund_request_checklists.id',
+            'checkedChecklists:finance_fund_request_checklist_requirements.id',
         ]);
 
         return Inertia::render('workspaces/finance/request-funds/edit', [
@@ -132,18 +132,15 @@ class FundRequestController extends Controller
      * private, so this hands out a short-lived signed URL, or streams the bytes
      * when the disk cannot sign one (a local disk in development).
      */
-    public function downloadAttachment(Request $request, Workspace $workspace, FundRequest $requestFund, Media $media)
+    public function downloadAttachment(Request $request, Workspace $workspace, FundRequest $requestFund, FundRequestAttachment $attachment)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceRequestFunds->value, $workspace);
         $this->ensureOwns($workspace, $requestFund);
 
-        abort_unless(
-            $media->model_type === FundRequest::class
-                && (int) $media->model_id === $requestFund->id
-                && $media->collection_name === FundRequest::ATTACHMENTS_COLLECTION,
-            404,
-        );
+        abort_unless($attachment->fund_request_id === $requestFund->id, 404);
+
+        $media = $attachment->file() ?? abort(404);
 
         $disk = Storage::disk($media->disk);
 
@@ -330,43 +327,41 @@ class FundRequestController extends Controller
     {
         $fundRequest->checkedChecklists()->sync($request->input('checklist_ids', []));
 
-        $type = $fundRequest->transactionType()->with('attachments:id,transaction_type_id')->first();
+        $type = $fundRequest->transactionType()->with('attachments:id')->first();
         $allowed = $type?->attachments->pluck('id')->all() ?? [];
         $replaced = array_map('intval', array_keys($request->file('attachments', [])));
         $removed = array_map('intval', $request->input('remove_attachments', []));
 
-        // Deleted one model at a time so media-library removes each object from
-        // the bucket (a query-builder delete would orphan the files).
-        $fundRequest->getMedia(FundRequest::ATTACHMENTS_COLLECTION)
-            ->filter(function (Media $media) use ($allowed, $replaced, $removed) {
-                $attachmentId = (int) $media->getCustomProperty('attachment_id');
-
-                return ! in_array($attachmentId, $allowed, true)
-                    || in_array($attachmentId, $replaced, true)
-                    || in_array($attachmentId, $removed, true);
-            })
+        // Deleted one model at a time so media-library removes each file from
+        // the bucket (a query-builder delete would orphan them).
+        $fundRequest->attachments()->get()
+            ->filter(fn (FundRequestAttachment $attachment) => ! in_array($attachment->attachment_requirement_id, $allowed, true)
+                || in_array($attachment->attachment_requirement_id, $replaced, true)
+                || in_array($attachment->attachment_requirement_id, $removed, true))
             ->each->delete();
 
-        foreach ($request->file('attachments', []) as $attachmentId => $file) {
-            $fundRequest->addMedia($file)
-                ->withCustomProperties(['attachment_id' => (int) $attachmentId])
-                ->toMediaCollection(FundRequest::ATTACHMENTS_COLLECTION);
+        foreach ($request->file('attachments', []) as $requirementId => $file) {
+            $fundRequest->attachments()
+                ->create(['attachment_requirement_id' => (int) $requirementId])
+                ->addMedia($file)
+                ->toMediaCollection(FundRequestAttachment::FILE_COLLECTION);
         }
     }
 
     /**
-     * The request's uploaded files, as the form shows them: which attachment each
-     * answers, its name and size, and where to download it.
+     * The request's uploaded files, as the form shows them: which attachment
+     * requirement each answers, its name and size, and where to download it.
      */
     protected function filesFor(Workspace $workspace, FundRequest $fundRequest): array
     {
-        return $fundRequest->getMedia(FundRequest::ATTACHMENTS_COLLECTION)
-            ->map(fn (Media $media) => [
-                'id' => $media->id,
-                'attachment_id' => (int) $media->getCustomProperty('attachment_id'),
-                'file_name' => $media->file_name,
-                'size' => $media->size,
-                'url' => route('workspaces.finance.request-funds.attachments.show', [$workspace->slug, $fundRequest->id, $media->id]),
+        return $fundRequest->attachments()->with('media')->get()
+            ->filter(fn (FundRequestAttachment $attachment) => $attachment->file())
+            ->map(fn (FundRequestAttachment $attachment) => [
+                'id' => $attachment->id,
+                'attachment_requirement_id' => $attachment->attachment_requirement_id,
+                'file_name' => $attachment->file()->file_name,
+                'size' => $attachment->file()->size,
+                'url' => route('workspaces.finance.request-funds.attachments.show', [$workspace->slug, $fundRequest->id, $attachment->id]),
             ])
             ->values()
             ->all();
@@ -383,7 +378,7 @@ class FundRequestController extends Controller
             'users' => $workspace->users()->orderBy('users.name')->get(['users.id', 'users.name']),
             'products' => $this->productOptions($request, $workspace),
             'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
-                ->with(['attachments:id,transaction_type_id,name', 'checklists:id,transaction_type_id,name'])
+                ->with(['attachments:id,name', 'checklists:id,name'])
                 ->orderBy('name')
                 ->get(['id', 'name', 'nature']),
             'departments' => Department::ofWorkspace($workspace)

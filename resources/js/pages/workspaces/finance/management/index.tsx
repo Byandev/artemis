@@ -1,6 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { inputCls } from '@/components/finance/account-form-dialog';
 import { transactionTypeStyle } from '@/components/finance/transaction-type';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -33,6 +34,11 @@ interface NamedItem {
     name: string;
 }
 
+/** One of the workspace's requirements, and how many types call for it. */
+interface Requirement extends NamedItem {
+    transaction_types_count: number;
+}
+
 interface ManagedType {
     id: number;
     name: string;
@@ -43,7 +49,7 @@ interface ManagedType {
 
 type Kind = 'attachments' | 'checklists';
 
-/** The two lists each transaction type owns. `kind` is also the URL segment. */
+/** The two kinds of requirement a type can call for. `kind` is also the URL segment. */
 const KINDS: {
     kind: Kind;
     title: string;
@@ -73,9 +79,14 @@ interface Permissions {
 interface Props {
     workspace: Workspace;
     types: ManagedType[];
+    requirements: Record<Kind, Requirement[]>;
 }
 
-export default function FinanceManagementIndex({ workspace, types }: Props) {
+export default function FinanceManagementIndex({
+    workspace,
+    types,
+    requirements,
+}: Props) {
     const [managingId, setManagingId] = useState<number | null>(null);
     const can: Permissions = {
         canCreate: usePermission(PERMISSIONS.CreateFinanceTransactions),
@@ -91,11 +102,11 @@ export default function FinanceManagementIndex({ workspace, types }: Props) {
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Finance Management`} />
+            <Head title={`${workspace.name} - RF Requirements`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Management"
-                    description="Each transaction type's attachments and checklist."
+                    title="RF Requirements"
+                    description="The attachments and checklist each transaction type calls for."
                 >
                     <Link
                         href={`${base}/transaction-types`}
@@ -208,8 +219,10 @@ export default function FinanceManagementIndex({ workspace, types }: Props) {
                                         {managing?.name}
                                     </DialogTitle>
                                     <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-                                        The attachments and checklist a fund
-                                        request of this type calls for.
+                                        Tick what a fund request of this type
+                                        calls for. Each item is shared across
+                                        types, so a rename or delete applies to
+                                        every type using it.
                                     </DialogDescription>
                                 </DialogHeader>
                             </div>
@@ -248,8 +261,13 @@ export default function FinanceManagementIndex({ workspace, types }: Props) {
                                             <ItemSection
                                                 icon={k.icon}
                                                 placeholder={k.placeholder}
-                                                items={managing[k.kind]}
-                                                url={`${base}/management/transaction-types/${managing.id}/${k.kind}`}
+                                                items={requirements[k.kind]}
+                                                linkedIds={managing[k.kind].map(
+                                                    (i) => i.id,
+                                                )}
+                                                typeId={managing.id}
+                                                url={`${base}/management/${k.kind}`}
+                                                linkUrl={`${base}/management/transaction-types/${managing.id}/${k.kind}`}
                                                 can={can}
                                             />
                                         </TabsContent>
@@ -294,27 +312,37 @@ function Chips({
     );
 }
 
-/** One of a type's lists (a tab): an add box on top, then each row with rename / delete. */
+/**
+ * One kind of requirement (a tab): an add box on top, then every one of the
+ * workspace's requirements with a tick for whether this type calls for it.
+ */
 function ItemSection({
     icon: Icon,
     placeholder,
     items,
+    linkedIds,
+    typeId,
     url,
+    linkUrl,
     can,
 }: {
     icon: LucideIcon;
     placeholder: string;
-    items: NamedItem[];
+    items: Requirement[];
+    linkedIds: number[];
+    typeId: number;
     url: string;
+    linkUrl: string;
     can: Permissions;
 }) {
-    const add = useForm({ name: '' });
+    // A new requirement is linked to the type it is added from.
+    const add = useForm({ name: '', transaction_type_id: typeId });
 
     const handleAdd = (e: React.FormEvent) => {
         e.preventDefault();
         add.post(url, {
             preserveScroll: true,
-            onSuccess: () => add.reset(),
+            onSuccess: () => add.reset('name'),
         });
     };
 
@@ -360,7 +388,9 @@ function ItemSection({
                         key={i.id}
                         item={i}
                         icon={Icon}
+                        linked={linkedIds.includes(i.id)}
                         url={`${url}/${i.id}`}
+                        linkUrl={`${linkUrl}/${i.id}`}
                         can={can}
                     />
                 ))}
@@ -372,12 +402,16 @@ function ItemSection({
 function ItemRow({
     item,
     icon: Icon,
+    linked,
     url,
+    linkUrl,
     can,
 }: {
-    item: NamedItem;
+    item: Requirement;
     icon: LucideIcon;
+    linked: boolean;
     url: string;
+    linkUrl: string;
     can: Permissions;
 }) {
     const [editing, setEditing] = useState(false);
@@ -395,6 +429,14 @@ function ItemRow({
         form.clearErrors();
         setEditing(false);
     };
+
+    const toggle = (on: boolean) =>
+        on
+            ? router.put(linkUrl, {}, { preserveScroll: true })
+            : router.delete(linkUrl, { preserveScroll: true });
+
+    // Other types calling for it, which a rename or delete would also touch.
+    const others = item.transaction_types_count - (linked ? 1 : 0);
 
     const save = (e: React.FormEvent) => {
         e.preventDefault();
@@ -444,9 +486,20 @@ function ItemRow({
 
     return (
         <div className="group flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-stone-50 dark:hover:bg-zinc-800">
+            <Checkbox
+                checked={linked}
+                disabled={!can.canEdit}
+                onCheckedChange={(v) => toggle(v === true)}
+                aria-label={`${linked ? 'Remove' : 'Add'} ${item.name}`}
+            />
             <Icon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
             <span className="min-w-0 flex-1 truncate text-[13px] text-gray-700 dark:text-gray-200">
                 {item.name}
+                {others > 0 && (
+                    <span className="ml-1.5 font-mono text-[11px] text-gray-400">
+                        +{others} other {others === 1 ? 'type' : 'types'}
+                    </span>
+                )}
             </span>
             {confirming ? (
                 <span className="flex items-center gap-1">

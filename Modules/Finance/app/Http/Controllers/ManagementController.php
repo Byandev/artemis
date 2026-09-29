@@ -5,26 +5,34 @@ namespace Modules\Finance\Http\Controllers;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\Finance\Models\FundRequestAttachmentRequirement;
+use Modules\Finance\Models\FundRequestChecklistRequirement;
 use Modules\Finance\Models\TransactionType;
 
 /**
- * Finance management: every transaction type alongside the attachments it calls
- * for and the checklist it is checked against. Each type owns both lists — they
- * are created, renamed and deleted here, under the type.
+ * Finance management: the workspace's attachment and checklist requirements,
+ * and which transaction types call for each. A requirement is the workspace's,
+ * so one can be linked to any number of types; renaming or deleting it touches
+ * every type it is linked to.
  */
 class ManagementController extends Controller
 {
     use AuthorizesRequests;
 
-    /** Route `{kind}` => [TransactionType relation, label for flash messages]. */
+    /**
+     * Route `{kind}` => [requirement model, TransactionType relation, label for
+     * flash messages].
+     *
+     * @var array<string, array{class-string<Model>, string, string}>
+     */
     protected const KINDS = [
-        'attachments' => ['attachments', 'Attachment'],
-        'checklists' => ['checklists', 'Checklist item'],
+        'attachments' => [FundRequestAttachmentRequirement::class, 'attachments', 'Attachment'],
+        'checklists' => [FundRequestChecklistRequirement::class, 'checklists', 'Checklist item'],
     ];
 
     protected function guard(Request $request, Workspace $workspace, ?TransactionType $transactionType = null): void
@@ -38,19 +46,19 @@ class ManagementController extends Controller
         abort_if($transactionType && $transactionType->workspace_id !== $workspace->id, 404);
     }
 
-    /** The type's list of the given kind (attachments or checklist items). */
-    protected function items(TransactionType $transactionType, string $kind): HasMany
+    /** One of the workspace's requirements of the given kind; another workspace's 404s. */
+    protected function requirement(Workspace $workspace, string $kind, int $id): Model
     {
-        return $transactionType->{self::KINDS[$kind][0]}();
+        return self::KINDS[$kind][0]::where('workspace_id', $workspace->id)->findOrFail($id);
     }
 
-    protected function rules(HasMany $items, ?int $ignoreId = null): array
+    protected function rules(Workspace $workspace, string $kind, ?int $ignoreId = null): array
     {
         return [
             'name' => [
                 'required', 'string', 'max:255',
-                Rule::unique($items->getRelated()->getTable(), 'name')
-                    ->where('transaction_type_id', $items->getParentKey())
+                Rule::unique(self::KINDS[$kind][0], 'name')
+                    ->where('workspace_id', $workspace->id)
                     ->ignore($ignoreId),
             ],
         ];
@@ -61,53 +69,97 @@ class ManagementController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
+        $requirements = fn (string $model) => $model::where('workspace_id', $workspace->id)
+            ->withCount('transactionTypes')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('workspaces/finance/management/index', [
             'workspace' => $workspace,
             'types' => TransactionType::where('workspace_id', $workspace->id)
-                ->with(['attachments:id,transaction_type_id,name', 'checklists:id,transaction_type_id,name'])
+                ->with(['attachments:id,name', 'checklists:id,name'])
                 ->orderBy('name')
                 ->get(['id', 'name', 'nature']),
+            'requirements' => [
+                'attachments' => $requirements(FundRequestAttachmentRequirement::class),
+                'checklists' => $requirements(FundRequestChecklistRequirement::class),
+            ],
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace, TransactionType $transactionType, string $kind)
+    /**
+     * Add a requirement to the workspace, linking it straight to the type it was
+     * added from, if any.
+     */
+    public function store(Request $request, Workspace $workspace, string $kind)
     {
-        $this->guard($request, $workspace, $transactionType);
+        $this->guard($request, $workspace);
         $this->authorize(Permission::CreateFinanceTransactions->value, $workspace);
 
-        $items = $this->items($transactionType, $kind);
-        $validated = $request->validate($this->rules($items));
+        $validated = $request->validate([
+            ...$this->rules($workspace, $kind),
+            'transaction_type_id' => [
+                'nullable',
+                Rule::exists('finance_transaction_types', 'id')->where('workspace_id', $workspace->id),
+            ],
+        ]);
 
-        $items->create([
+        $requirement = self::KINDS[$kind][0]::create([
             'workspace_id' => $workspace->id,
             'name' => trim($validated['name']),
         ]);
 
-        return redirect()->back()->with('success', self::KINDS[$kind][1].' added.');
+        if (! empty($validated['transaction_type_id'])) {
+            $requirement->transactionTypes()->attach($validated['transaction_type_id']);
+        }
+
+        return redirect()->back()->with('success', self::KINDS[$kind][2].' added.');
     }
 
-    public function update(Request $request, Workspace $workspace, TransactionType $transactionType, string $kind, int $id)
+    public function update(Request $request, Workspace $workspace, string $kind, int $id)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
+
+        $requirement = $this->requirement($workspace, $kind, $id);
+        $validated = $request->validate($this->rules($workspace, $kind, $requirement->id));
+
+        $requirement->update(['name' => trim($validated['name'])]);
+
+        return redirect()->back()->with('success', self::KINDS[$kind][2].' renamed.');
+    }
+
+    public function destroy(Request $request, Workspace $workspace, string $kind, int $id)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::DeleteFinanceTransactions->value, $workspace);
+
+        $this->requirement($workspace, $kind, $id)->delete();
+
+        return redirect()->back()->with('success', self::KINDS[$kind][2].' deleted.');
+    }
+
+    /** Have the type call for one of the workspace's requirements. */
+    public function link(Request $request, Workspace $workspace, TransactionType $transactionType, string $kind, int $id)
     {
         $this->guard($request, $workspace, $transactionType);
         $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
 
-        // Looked up through the type, so another type's row 404s.
-        $items = $this->items($transactionType, $kind);
-        $item = (clone $items)->findOrFail($id);
-        $validated = $request->validate($this->rules($items, $item->id));
+        $requirement = $this->requirement($workspace, $kind, $id);
+        $transactionType->{self::KINDS[$kind][1]}()->syncWithoutDetaching([$requirement->id]);
 
-        $item->update(['name' => trim($validated['name'])]);
-
-        return redirect()->back()->with('success', self::KINDS[$kind][1].' renamed.');
+        return redirect()->back()->with('success', self::KINDS[$kind][2].' added to '.$transactionType->name.'.');
     }
 
-    public function destroy(Request $request, Workspace $workspace, TransactionType $transactionType, string $kind, int $id)
+    /** Stop the type calling for a requirement; the requirement itself stays. */
+    public function unlink(Request $request, Workspace $workspace, TransactionType $transactionType, string $kind, int $id)
     {
         $this->guard($request, $workspace, $transactionType);
-        $this->authorize(Permission::DeleteFinanceTransactions->value, $workspace);
+        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
 
-        $this->items($transactionType, $kind)->findOrFail($id)->delete();
+        $requirement = $this->requirement($workspace, $kind, $id);
+        $transactionType->{self::KINDS[$kind][1]}()->detach($requirement->id);
 
-        return redirect()->back()->with('success', self::KINDS[$kind][1].' deleted.');
+        return redirect()->back()->with('success', self::KINDS[$kind][2].' removed from '.$transactionType->name.'.');
     }
 }

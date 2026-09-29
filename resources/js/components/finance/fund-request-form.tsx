@@ -83,7 +83,7 @@ export interface FundRequestType extends TransactionTypeItem {
 /** A file already uploaded against one of the request's attachments. */
 export interface FundRequestFile {
     id: number;
-    attachment_id: number;
+    attachment_requirement_id: number;
     file_name: string;
     size: number;
     url: string;
@@ -273,7 +273,7 @@ export function FundRequestForm({
         !!data.attachments[attachmentId] ||
         savedFiles.some(
             (f) =>
-                f.attachment_id === attachmentId &&
+                f.attachment_requirement_id === attachmentId &&
                 !data.remove_attachments.includes(attachmentId),
         );
     const missingAttachments = attachments.filter((a) => !hasFile(a.id));
@@ -493,7 +493,9 @@ export function FundRequestForm({
                                         key={a.id}
                                         name={a.name}
                                         saved={savedFiles.find(
-                                            (f) => f.attachment_id === a.id,
+                                            (f) =>
+                                                f.attachment_requirement_id ===
+                                                a.id,
                                         )}
                                         removed={data.remove_attachments.includes(
                                             a.id,

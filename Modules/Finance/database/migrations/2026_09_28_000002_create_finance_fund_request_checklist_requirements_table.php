@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * The checklist items a fund request can be checked against. The workspace keeps one list, managed on the finance
+     * management page; which transaction types call for each is set in
+     * finance_fund_request_transaction_type_checklists.
+     */
+    public function up(): void
+    {
+        Schema::create('finance_fund_request_checklist_requirements', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('workspace_id')->constrained(indexName: 'fund_req_checklist_req_workspace_foreign')->cascadeOnDelete();
+            $table->string('name');
+
+            $table->unique(['workspace_id', 'name'], 'fund_req_checklist_req_workspace_name_unique');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('finance_fund_request_checklist_requirements');
+    }
+};

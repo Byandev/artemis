@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Modules\Finance\Http\Requests\Concerns\SplitsShares;
 use Modules\Finance\Models\FundRequest;
-use Modules\Finance\Models\FundRequestAttachment;
+use Modules\Finance\Models\FundRequestAttachmentRequirement;
 
 class FundRequestRequest extends FormRequest
 {
@@ -69,16 +69,17 @@ class FundRequestRequest extends FormRequest
             'checklist_ids.*' => [
                 'integer',
                 'distinct',
-                Rule::exists('finance_fund_request_checklists', 'id')
+                Rule::exists('finance_fund_request_transaction_type_checklists', 'checklist_requirement_id')
                     ->where('transaction_type_id', $this->input('transaction_type_id') ?: 0),
             ],
 
-            // Files keyed by the attachment they answer: attachments[<id>] = file.
-            // That each key is one of the chosen type's attachments is checked
-            // in after(), since the keys aren't values a rule can see.
+            // Files keyed by the attachment requirement they answer:
+            // attachments[<requirement id>] = file. That each key is one the
+            // chosen type calls for is checked in after(), since the keys
+            // aren't values a rule can see.
             'attachments' => ['nullable', 'array'],
             'attachments.*' => ['file', 'mimes:'.implode(',', self::ATTACHMENT_MIMES), 'max:10240'],
-            // Attachment ids whose file on file should be removed (edit only).
+            // Attachment requirement ids whose file should be removed (edit only).
             'remove_attachments' => ['nullable', 'array'],
             'remove_attachments.*' => ['integer'],
         ];
@@ -102,7 +103,7 @@ class FundRequestRequest extends FormRequest
             $this->assertSharesCoverAmount($validator, 'products', 'product', $this->productShares(), $total);
 
             $required = $this->input('transaction_type_id')
-                ? FundRequestAttachment::where('transaction_type_id', $this->input('transaction_type_id'))->pluck('name', 'id')
+                ? FundRequestAttachmentRequirement::whereRelation('transactionTypes', 'finance_transaction_types.id', $this->input('transaction_type_id'))->pluck('name', 'id')
                 : collect();
             $uploaded = array_map('intval', array_keys($this->file('attachments', [])));
 
@@ -125,8 +126,8 @@ class FundRequestRequest extends FormRequest
     }
 
     /**
-     * The attachment ids the request being edited already has a file for; none
-     * when creating.
+     * The attachment requirement ids the request being edited already has a
+     * file for; none when creating.
      *
      * @return list<int>
      */
@@ -138,9 +139,7 @@ class FundRequestRequest extends FormRequest
             return [];
         }
 
-        return $fundRequest->getMedia(FundRequest::ATTACHMENTS_COLLECTION)
-            ->map(fn ($media) => (int) $media->getCustomProperty('attachment_id'))
-            ->all();
+        return $fundRequest->attachments()->pluck('attachment_requirement_id')->map(fn ($id) => (int) $id)->all();
     }
 
     /** The amount the charge-to and product shares have to cover. */

@@ -5,6 +5,7 @@ use App\Models\Workspace;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Modules\Finance\Models\FundRequest;
+use Modules\Finance\Models\FundRequestAttachment;
 use Modules\Finance\Models\TransactionType;
 
 beforeEach(function () {
@@ -48,9 +49,11 @@ function adSpentFiles(string $prefix = ''): array
     ];
 }
 
+/** The request's uploaded files, each tagged with the requirement it answers. */
 function requestMedia(FundRequest $request)
 {
-    return $request->fresh()->getMedia(FundRequest::ATTACHMENTS_COLLECTION);
+    return $request->attachments()->with('media')->get()
+        ->map(fn (FundRequestAttachment $attachment) => tap($attachment->file(), fn ($media) => $media->requirement_id = $attachment->attachment_requirement_id));
 }
 
 test('the create page lists each type with its attachments and checklist', function () {
@@ -76,11 +79,11 @@ test('stores uploaded attachments on the attachment disk and ticks the checklist
 
     $request = FundRequest::sole();
     expect(requestMedia($request))->toHaveCount(2);
-    $media = requestMedia($request)->first(fn ($m) => $m->getCustomProperty('attachment_id') === $this->statement->id);
+    $media = requestMedia($request)->first(fn ($m) => $m->requirement_id === $this->statement->id);
 
     expect($media->disk)->toBe($this->disk)
         ->and($media->file_name)->toBe('statement.pdf')
-        ->and($media->getCustomProperty('attachment_id'))->toBe($this->statement->id)
+        ->and($media->requirement_id)->toBe($this->statement->id)
         ->and($request->checkedChecklists()->pluck('name')->all())->toBe(['Budget']);
     Storage::disk($this->disk)->assertExists($media->getPathRelativeToRoot());
 });
@@ -115,7 +118,7 @@ test('an edit replaces a file and updates the checklist', function () {
         'attachments' => adSpentFiles('old-'),
     ]));
     $request = FundRequest::sole();
-    $oldStatement = requestMedia($request)->first(fn ($m) => $m->getCustomProperty('attachment_id') === $this->statement->id);
+    $oldStatement = requestMedia($request)->first(fn ($m) => $m->requirement_id === $this->statement->id);
 
     // Multipart can't be PUT, so the form POSTs with method spoofing.
     $this->actingAs($this->user)
@@ -214,7 +217,7 @@ test('the edit page carries the saved files and ticked checklist', function () {
             ->component('workspaces/finance/request-funds/edit')
             ->where('requestFund.checklist_ids', [$this->budget->id])
             ->has('requestFund.files', 2)
-            ->where('requestFund.files.0.attachment_id', $this->statement->id)
+            ->where('requestFund.files.0.attachment_requirement_id', $this->statement->id)
             ->where('requestFund.files.0.file_name', 'statement.pdf'));
 });
 
@@ -225,11 +228,11 @@ test('downloads a file only through the request it belongs to', function () {
         ]));
     }
     [$first, $second] = FundRequest::orderBy('id')->get()->all();
-    $media = requestMedia($first)->first();
+    $attachment = $first->attachments()->first();
 
     // The bucket is private: the file is handed out as a short-lived signed URL.
-    $this->actingAs($this->user)->get("{$this->url}/{$first->id}/attachments/{$media->id}")->assertRedirectContains($media->file_name);
-    $this->actingAs($this->user)->get("{$this->url}/{$second->id}/attachments/{$media->id}")->assertNotFound();
+    $this->actingAs($this->user)->get("{$this->url}/{$first->id}/attachments/{$attachment->id}")->assertRedirectContains($attachment->file()->file_name);
+    $this->actingAs($this->user)->get("{$this->url}/{$second->id}/attachments/{$attachment->id}")->assertNotFound();
 });
 
 test('deleting a request deletes its files', function () {
@@ -242,4 +245,23 @@ test('deleting a request deletes its files', function () {
     $this->actingAs($this->user)->delete("{$this->url}/{$request->id}")->assertRedirect();
 
     $paths->each(fn ($path) => Storage::disk($this->disk)->assertMissing($path));
+});
+
+test('one requirement can be called for by several types', function () {
+    $this->salary->attachments()->attach($this->statement);
+    $this->salary->checklists()->attach($this->budget);
+
+    $this->actingAs($this->user)
+        ->post($this->url, requirementsPayload($this->salary, [
+            'checklist_ids' => [$this->budget->id, $this->approved->id],
+            'attachments' => [
+                $this->payslip->id => UploadedFile::fake()->create('payslip.pdf', 10, 'application/pdf'),
+                $this->statement->id => UploadedFile::fake()->create('statement.pdf', 10, 'application/pdf'),
+            ],
+        ]))
+        ->assertSessionHasNoErrors();
+
+    $request = FundRequest::sole();
+    expect($request->attachments()->pluck('attachment_requirement_id')->sort()->values()->all())->toBe([$this->statement->id, $this->payslip->id])
+        ->and($request->checkedChecklists()->pluck('name')->sort()->values()->all())->toBe(['Approved', 'Budget']);
 });

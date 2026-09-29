@@ -707,7 +707,7 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceRequestFunds,
                           },
                           {
-                              title: 'Management',
+                              title: 'RF Requirements',
                               href: `/workspaces/${currentWorkspace.slug}/finance/management`,
                               icon: SlidersHorizontal,
                               permission: PERMISSIONS.ViewFinanceTransactions,

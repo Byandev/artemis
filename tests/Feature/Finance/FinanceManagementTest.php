@@ -2,8 +2,8 @@
 
 use App\Models\User;
 use App\Models\Workspace;
-use Modules\Finance\Models\FundRequestAttachment;
-use Modules\Finance\Models\FundRequestChecklist;
+use Modules\Finance\Models\FundRequestAttachmentRequirement;
+use Modules\Finance\Models\FundRequestChecklistRequirement;
 use Modules\Finance\Models\TransactionType;
 
 beforeEach(function () {
@@ -17,15 +17,16 @@ beforeEach(function () {
 });
 
 dataset('kinds', [
-    'attachments' => ['attachments', FundRequestAttachment::class],
-    'checklists' => ['checklists', FundRequestChecklist::class],
+    'attachments' => ['attachments', FundRequestAttachmentRequirement::class],
+    'checklists' => ['checklists', FundRequestChecklistRequirement::class],
 ]);
 
-test('lists each transaction type with its own attachments and checklist', function () {
+test('lists each transaction type with its requirements, and the workspace\'s requirements', function () {
     $salary = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Salary', 'nature' => 'debit']);
-    $this->type->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
+    $receipt = $this->type->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
+    $salary->attachments()->attach($receipt);
     $this->type->checklists()->create(['workspace_id' => $this->workspace->id, 'name' => 'Budget approved']);
-    $salary->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Payslip']);
+    FundRequestAttachmentRequirement::create(['workspace_id' => $this->workspace->id, 'name' => 'Unused']);
 
     $this->actingAs($this->user)
         ->get($this->url)
@@ -36,68 +37,90 @@ test('lists each transaction type with its own attachments and checklist', funct
             ->where('types.0.attachments.0.name', 'Receipt')
             ->where('types.0.checklists.0.name', 'Budget approved')
             ->where('types.1.name', 'Salary')
-            ->where('types.1.attachments.0.name', 'Payslip')
-            ->has('types.1.checklists', 0));
+            ->where('types.1.attachments.0.name', 'Receipt')
+            ->has('types.1.checklists', 0)
+            ->where('requirements.attachments.0.name', 'Receipt')
+            ->where('requirements.attachments.0.transaction_types_count', 2)
+            ->where('requirements.attachments.1.name', 'Unused')
+            ->where('requirements.attachments.1.transaction_types_count', 0)
+            ->has('requirements.checklists', 1));
 });
 
-test('adds, renames and deletes an item under a type', function (string $kind, string $model) {
-    $url = "{$this->url}/transaction-types/{$this->type->id}/{$kind}";
-
-    $this->actingAs($this->user)->post($url, ['name' => '  Receipt  '])->assertRedirect();
+test('adds a requirement linked to the type it was added from, renames and deletes it', function (string $kind, string $model) {
+    $this->actingAs($this->user)
+        ->post("{$this->url}/{$kind}", ['name' => '  Receipt  ', 'transaction_type_id' => $this->type->id])
+        ->assertRedirect();
     $item = $model::sole();
     expect($item->name)->toBe('Receipt')
-        ->and($item->transaction_type_id)->toBe($this->type->id)
-        ->and($item->workspace_id)->toBe($this->workspace->id);
+        ->and($item->workspace_id)->toBe($this->workspace->id)
+        ->and($this->type->{$kind}()->pluck('id')->all())->toBe([$item->id]);
 
-    $this->actingAs($this->user)->put("{$url}/{$item->id}", ['name' => 'Invoice'])->assertRedirect();
+    $this->actingAs($this->user)->put("{$this->url}/{$kind}/{$item->id}", ['name' => 'Invoice'])->assertRedirect();
     expect($item->fresh()->name)->toBe('Invoice');
 
-    $this->actingAs($this->user)->delete("{$url}/{$item->id}")->assertRedirect();
-    expect($model::count())->toBe(0);
+    $this->actingAs($this->user)->delete("{$this->url}/{$kind}/{$item->id}")->assertRedirect();
+    expect($model::count())->toBe(0)
+        ->and($this->type->{$kind}()->count())->toBe(0);
 })->with('kinds');
 
-test('the same name may repeat across types but not within one', function (string $kind, string $model) {
+test('adds a requirement without linking it to a type', function (string $kind, string $model) {
+    $this->actingAs($this->user)->post("{$this->url}/{$kind}", ['name' => 'Receipt'])->assertSessionHasNoErrors();
+
+    expect($model::sole()->transactionTypes()->count())->toBe(0);
+})->with('kinds');
+
+test('links one requirement to several types and unlinks it from one', function (string $kind, string $model) {
     $salary = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Salary', 'nature' => 'debit']);
-    $this->type->{$kind}()->create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
+    $item = $model::create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
 
-    $this->actingAs($this->user)
-        ->post("{$this->url}/transaction-types/{$this->type->id}/{$kind}", ['name' => 'Receipt'])
-        ->assertSessionHasErrors('name');
+    foreach ([$this->type, $salary] as $type) {
+        $this->actingAs($this->user)->put("{$this->url}/transaction-types/{$type->id}/{$kind}/{$item->id}")->assertRedirect();
+    }
+    // Linking twice is a no-op, not a duplicate-key error.
+    $this->actingAs($this->user)->put("{$this->url}/transaction-types/{$salary->id}/{$kind}/{$item->id}")->assertRedirect();
+    expect($item->transactionTypes()->pluck('name')->sort()->values()->all())->toBe(['Adspent', 'Salary']);
 
-    $this->actingAs($this->user)
-        ->post("{$this->url}/transaction-types/{$salary->id}/{$kind}", ['name' => 'Receipt'])
-        ->assertSessionHasNoErrors();
+    $this->actingAs($this->user)->delete("{$this->url}/transaction-types/{$this->type->id}/{$kind}/{$item->id}")->assertRedirect();
+    expect($item->transactionTypes()->pluck('name')->all())->toBe(['Salary'])
+        ->and($item->fresh())->not->toBeNull();
+})->with('kinds');
+
+test('a name is unique within the workspace, not across workspaces', function (string $kind, string $model) {
+    $other = Workspace::factory()->create(['finance_module_enabled' => true]);
+    $model::create(['workspace_id' => $other->id, 'name' => 'Receipt']);
+
+    $this->actingAs($this->user)->post("{$this->url}/{$kind}", ['name' => 'Receipt'])->assertSessionHasNoErrors();
+    $this->actingAs($this->user)->post("{$this->url}/{$kind}", ['name' => 'Receipt'])->assertSessionHasErrors('name');
+
     expect($model::count())->toBe(2);
 })->with('kinds');
 
-test('cannot reach an item through a different type', function (string $kind) {
-    $salary = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Salary', 'nature' => 'debit']);
-    $item = $salary->{$kind}()->create(['workspace_id' => $this->workspace->id, 'name' => 'Payslip']);
-    $url = "{$this->url}/transaction-types/{$this->type->id}/{$kind}/{$item->id}";
-
-    $this->actingAs($this->user)->put($url, ['name' => 'Moved'])->assertNotFound();
-    $this->actingAs($this->user)->delete($url)->assertNotFound();
-    expect($item->fresh()->name)->toBe('Payslip');
-})->with('kinds');
-
-test('cannot add to another workspace\'s transaction type', function (string $kind, string $model) {
+test('cannot touch another workspace\'s requirement or type', function (string $kind, string $model) {
     $other = Workspace::factory()->create(['finance_module_enabled' => true]);
     $foreignType = TransactionType::create(['workspace_id' => $other->id, 'name' => 'Theirs', 'nature' => 'debit']);
+    $foreignItem = $model::create(['workspace_id' => $other->id, 'name' => 'Theirs']);
+    $ownItem = $model::create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
 
+    $this->actingAs($this->user)->put("{$this->url}/{$kind}/{$foreignItem->id}", ['name' => 'Mine'])->assertNotFound();
+    $this->actingAs($this->user)->delete("{$this->url}/{$kind}/{$foreignItem->id}")->assertNotFound();
+    $this->actingAs($this->user)->put("{$this->url}/transaction-types/{$this->type->id}/{$kind}/{$foreignItem->id}")->assertNotFound();
+    $this->actingAs($this->user)->put("{$this->url}/transaction-types/{$foreignType->id}/{$kind}/{$ownItem->id}")->assertNotFound();
     $this->actingAs($this->user)
-        ->post("{$this->url}/transaction-types/{$foreignType->id}/{$kind}", ['name' => 'Receipt'])
-        ->assertNotFound();
-    expect($model::count())->toBe(0);
+        ->post("{$this->url}/{$kind}", ['name' => 'New', 'transaction_type_id' => $foreignType->id])
+        ->assertSessionHasErrors('transaction_type_id');
+
+    expect($foreignItem->fresh()->name)->toBe('Theirs')
+        ->and($model::count())->toBe(2);
 })->with('kinds');
 
-test('deleting a type deletes its attachments and checklist', function () {
+test('deleting a type unlinks its requirements but keeps them', function () {
     $this->type->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
     $this->type->checklists()->create(['workspace_id' => $this->workspace->id, 'name' => 'Budget approved']);
 
     $this->type->delete();
 
-    expect(FundRequestAttachment::count())->toBe(0)
-        ->and(FundRequestChecklist::count())->toBe(0);
+    expect(FundRequestAttachmentRequirement::sole()->transactionTypes()->count())->toBe(0)
+        ->and(FundRequestChecklistRequirement::sole()->transactionTypes()->count())->toBe(0);
 });
 
 test('404s when the finance module is off', function () {
