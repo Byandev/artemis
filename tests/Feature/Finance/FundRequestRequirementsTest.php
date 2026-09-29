@@ -34,7 +34,7 @@ function requirementsPayload(TransactionType $type, array $extra = []): array
 {
     return [
         'transaction_type_id' => $type->id,
-        'amount_requested' => 500,
+        'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 500]],
         'charge_to' => [['user_id' => test()->user->id]],
         ...$extra,
     ];
@@ -176,7 +176,7 @@ test('an edit without files keeps the ones on file', function () {
     $request = FundRequest::sole();
 
     $this->actingAs($this->user)
-        ->put("{$this->url}/{$request->id}", requirementsPayload($this->adSpent, ['amount_requested' => 800]))
+        ->put("{$this->url}/{$request->id}", requirementsPayload($this->adSpent, ['particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 800]]]))
         ->assertSessionHasNoErrors();
 
     expect(requestMedia($request)->pluck('file_name')->sort()->values()->all())->toBe(['statement.pdf', 'tracker.pdf'])

@@ -110,6 +110,7 @@ class FundRequestController extends Controller
         $this->ensureOwns($workspace, $requestFund);
 
         $requestFund->load([
+            'particulars',
             'chargeToUsers:users.id,users.name',
             'productShares',
             'approver:id,name',
@@ -167,7 +168,7 @@ class FundRequestController extends Controller
             // updateStatus. The request date is the creation date and the
             // requester is the signed-in user — neither is entered on the form.
             $fundRequest = FundRequest::create([
-                ...$this->attributesFor($validated, $workspace),
+                ...$this->attributesFor($validated, $request),
                 'workspace_id' => $workspace->id,
                 'reference_no' => $this->nextReferenceNo($workspace),
                 'request_date' => now()->toDateString(),
@@ -176,6 +177,7 @@ class FundRequestController extends Controller
                 'approved_by' => null,
             ]);
 
+            $this->syncParticulars($fundRequest, $request);
             $this->syncShares($fundRequest, $request, $workspace);
             $this->syncRequirements($fundRequest, $request);
         });
@@ -194,8 +196,9 @@ class FundRequestController extends Controller
 
         DB::transaction(function () use ($validated, $request, $workspace, $requestFund) {
             // reference_no is intentionally omitted from validated data, so it stays put.
-            $requestFund->update($this->attributesFor($validated, $workspace));
+            $requestFund->update($this->attributesFor($validated, $request));
 
+            $this->syncParticulars($requestFund, $request);
             $this->syncShares($requestFund, $request, $workspace);
             $this->syncRequirements($requestFund, $request);
         });
@@ -271,13 +274,33 @@ class FundRequestController extends Controller
     }
 
     /**
-     * The column values for a request. charge_to / products are pivots, and the
-     * checklist and attachments live in their own tables, so they are stripped
-     * here and synced after the row exists.
+     * The column values for a request. The particulars, charge_to / products
+     * pivots, checklist and attachments live in their own tables, so they are
+     * stripped here and synced after the row exists. The amount requested is
+     * the particulars' total.
      */
-    protected function attributesFor(array $validated, Workspace $workspace): array
+    protected function attributesFor(array $validated, FundRequestRequest $request): array
     {
-        return collect($validated)->except(['charge_to', 'products', 'checklist_ids', 'attachments', 'remove_attachments'])->all();
+        return [
+            ...collect($validated)->except(['particulars', 'charge_to', 'products', 'checklist_ids', 'attachments', 'remove_attachments'])->all(),
+            'amount_requested' => $request->requestTotal(),
+        ];
+    }
+
+    /**
+     * Replace a request's particulars with the submitted rows, rewritten rather
+     * than diffed: the rows have no natural key, and their order on the form is
+     * the order that matters.
+     */
+    protected function syncParticulars(FundRequest $fundRequest, FundRequestRequest $request): void
+    {
+        $fundRequest->particulars()->delete();
+
+        $fundRequest->particulars()->createMany(
+            collect($request->particulars())
+                ->map(fn ($particular, $index) => [...$particular, 'sort_order' => $index])
+                ->all()
+        );
     }
 
     /**

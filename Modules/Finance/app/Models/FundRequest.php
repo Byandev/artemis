@@ -76,6 +76,15 @@ class FundRequest extends Model
     }
 
     /**
+     * The line items the request is for, in the order they were entered. They
+     * sum to the amount requested.
+     */
+    public function particulars(): HasMany
+    {
+        return $this->hasMany(FundRequestParticular::class, 'fund_request_id')->orderBy('sort_order');
+    }
+
+    /**
      * The products this request covers, each with its share of the amount. Set
      * independently of the ad-spend line items.
      */

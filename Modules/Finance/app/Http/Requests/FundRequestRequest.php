@@ -57,7 +57,13 @@ class FundRequestRequest extends FormRequest
             'charge_to' => ['required', 'array', 'min:1'],
             'charge_to.*.user_id' => ['required', 'distinct', $memberRule],
             'charge_to.*.amount' => ['nullable', 'numeric', 'min:0'],
-            'amount_requested' => ['required', 'numeric', 'min:0'],
+            // What the funds are for, line by line. The amount requested is
+            // their total and each row's amount its quantity × unit price, both
+            // worked out here rather than taken from the client.
+            'particulars' => ['required', 'array', 'min:1'],
+            'particulars.*.name' => ['required', 'string', 'max:255'],
+            'particulars.*.quantity' => ['required', 'numeric', 'gt:0', 'max:9999999999'],
+            'particulars.*.unit_price' => ['required', 'numeric', 'min:0', 'max:9999999999999'],
             'remarks' => ['nullable', 'string', 'max:2000'],
 
             // The products the request covers, each bearing a share of the amount.
@@ -147,10 +153,29 @@ class FundRequestRequest extends FormRequest
         return $fundRequest->attachments()->pluck('attachment_requirement_id')->map(fn ($id) => (int) $id)->all();
     }
 
-    /** The amount the charge-to and product shares have to cover. */
+    /**
+     * The submitted particulars as `{name, quantity, unit_price, amount}`, each
+     * amount being its quantity × unit price.
+     *
+     * @return list<array{name:string, quantity:float, unit_price:float, amount:float}>
+     */
+    public function particulars(): array
+    {
+        return array_map(fn ($row) => [
+            'name' => trim($row['name']),
+            'quantity' => round((float) $row['quantity'], 2),
+            'unit_price' => round((float) $row['unit_price'], 2),
+            'amount' => round(round((float) $row['quantity'], 2) * round((float) $row['unit_price'], 2), 2),
+        ], array_values($this->input('particulars', [])));
+    }
+
+    /**
+     * The amount requested — the particulars' total — which the charge-to and
+     * product shares have to cover.
+     */
     public function requestTotal(): float
     {
-        return round((float) $this->input('amount_requested'), 2);
+        return round(array_sum(array_column($this->particulars(), 'amount')), 2);
     }
 
     /**
@@ -184,6 +209,10 @@ class FundRequestRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'particulars.required' => 'Add at least one particular.',
+            'particulars.min' => 'Add at least one particular.',
+            'particulars.*.name.required' => 'Name every particular.',
+            'particulars.*.quantity.gt' => 'The quantity must be more than zero.',
             'charge_to.required' => 'Charge the request to at least one member.',
             'charge_to.*.user_id.required' => 'Select a member for every charge-to row.',
             'charge_to.*.user_id.exists' => 'The charge-to user must be a member of this workspace.',
@@ -203,6 +232,9 @@ class FundRequestRequest extends FormRequest
         return [
             'charge_to.*.user_id' => 'charge-to user',
             'products.*.product_id' => 'product',
+            'particulars.*.name' => 'particular name',
+            'particulars.*.quantity' => 'quantity',
+            'particulars.*.unit_price' => 'unit price',
         ];
     }
 }

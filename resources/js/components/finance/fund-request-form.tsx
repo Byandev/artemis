@@ -22,6 +22,8 @@ import {
     Download,
     FileText,
     Paperclip,
+    Plus,
+    Trash2,
     Upload,
     X,
 } from 'lucide-react';
@@ -56,6 +58,22 @@ export interface RequestFundProduct {
     product_id: number | null;
     product_label: string;
     amount: number | string;
+}
+
+/** A line item of a request; `amount` is quantity × unit price. */
+export interface FundRequestParticular {
+    id: number;
+    name: string;
+    quantity: number | string;
+    unit_price: number | string;
+    amount: number | string;
+}
+
+/** A particular as the form edits and submits it. */
+interface ParticularRow {
+    name: string;
+    quantity: string;
+    unit_price: string;
 }
 
 /** One allocation row as the form submits it. */
@@ -101,6 +119,7 @@ export interface RequestFund {
     department?: { id: number; name: string } | null;
     charge_to_users?: ChargedUser[];
     product_shares?: RequestFundProduct[];
+    particulars?: FundRequestParticular[];
     amount_requested: number | string;
     approved_by: number | null;
     status: string;
@@ -131,6 +150,47 @@ const money = (n: number) =>
         maximumFractionDigits: 2,
     });
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** A particular's amount, as the server works it out: quantity × unit price. */
+const particularAmount = (row: ParticularRow) =>
+    round2(
+        round2(parseFloat(row.quantity) || 0) *
+            round2(parseFloat(row.unit_price) || 0),
+    );
+
+const emptyParticular = (): ParticularRow => ({
+    name: '',
+    quantity: '1',
+    unit_price: '',
+});
+
+/**
+ * The particulars to start the form with: the saved ones, or — for a request
+ * saved before particulars existed — one row carrying its amount, to be named.
+ */
+const initialParticulars = (
+    requestFund?: RequestFund | null,
+): ParticularRow[] => {
+    if (requestFund?.particulars?.length) {
+        return requestFund.particulars.map((p) => ({
+            name: p.name,
+            quantity: String(Number(p.quantity)),
+            unit_price: Number(p.unit_price).toFixed(2),
+        }));
+    }
+    if (requestFund && Number(requestFund.amount_requested) > 0) {
+        return [
+            {
+                name: '',
+                quantity: '1',
+                unit_price: Number(requestFund.amount_requested).toFixed(2),
+            },
+        ];
+    }
+    return [emptyParticular()];
+};
+
 const fileSize = (bytes: number) =>
     bytes < 1024 * 1024
         ? `${Math.max(1, Math.round(bytes / 1024))} KB`
@@ -155,9 +215,8 @@ export function FundRequestForm({
                 ? String(requestFund.transaction_type_id)
                 : (typeOptions[0]?.value ?? ''),
         department_id: (requestFund?.department_id ?? '') as number | '',
-        amount_requested: requestFund
-            ? String(requestFund.amount_requested ?? '')
-            : '',
+        // The amount requested is their total, worked out by the server.
+        particulars: initialParticulars(requestFund),
         charge_to: (requestFund?.charge_to_users ?? []).map((u) => ({
             user_id: u.id,
             amount: Number(u.pivot?.amount ?? 0).toFixed(2),
@@ -190,7 +249,9 @@ export function FundRequestForm({
         (requestFund?.product_shares ?? []).length === 0,
     );
 
-    const total = parseFloat(data.amount_requested) || 0;
+    const total = round2(
+        data.particulars.reduce((sum, row) => sum + particularAmount(row), 0),
+    );
 
     const chargeToRows: Share[] = data.charge_to.map((r) => ({
         key: String(r.user_id),
@@ -363,22 +424,13 @@ export function FundRequestForm({
                         </select>
                     </Field>
 
-                    <Field
-                        label="Amount Requested"
-                        required
-                        error={errors.amount_requested}
-                    >
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={data.amount_requested}
-                            onChange={(e) =>
-                                setData('amount_requested', e.target.value)
-                            }
-                            placeholder="0.00"
-                            className={inputCls}
-                        />
+                    <Field label="Amount Requested">
+                        <div className="flex h-10 items-center font-mono text-[13px] font-medium text-gray-800 dark:text-gray-100">
+                            {money(total)}
+                            <span className="ml-2 text-[11px] font-normal text-gray-400">
+                                total of the particulars
+                            </span>
+                        </div>
                     </Field>
 
                     {isEditing && (
@@ -390,6 +442,20 @@ export function FundRequestForm({
                             </div>
                         </Field>
                     )}
+                </Section>
+
+                <Section
+                    title="Particulars"
+                    hint="What the funds are for, line by line. Each amount is the quantity × unit price, and they add up to the amount requested."
+                >
+                    <Wide>
+                        <ParticularsEditor
+                            rows={data.particulars}
+                            onChange={(rows) => setData('particulars', rows)}
+                            errors={fieldErrors}
+                            total={total}
+                        />
+                    </Wide>
                 </Section>
 
                 <Section
@@ -729,6 +795,133 @@ function AttachmentSlot({
             {error && (
                 <p className="mt-1.5 text-[11px] text-red-500">{error}</p>
             )}
+        </div>
+    );
+}
+
+/**
+ * The request's line items: name, quantity and unit price per row, with the
+ * row's amount and the running total worked out as they are typed.
+ */
+function ParticularsEditor({
+    rows,
+    onChange,
+    errors,
+    total,
+}: {
+    rows: ParticularRow[];
+    onChange: (rows: ParticularRow[]) => void;
+    errors: Record<string, string | undefined>;
+    total: number;
+}) {
+    const update = (index: number, field: keyof ParticularRow, value: string) =>
+        onChange(
+            rows.map((row, i) =>
+                i === index ? { ...row, [field]: value } : row,
+            ),
+        );
+
+    const rowError = (index: number) =>
+        errors[`particulars.${index}.name`] ??
+        errors[`particulars.${index}.quantity`] ??
+        errors[`particulars.${index}.unit_price`];
+
+    return (
+        <div className="space-y-2">
+            <div className="hidden grid-cols-[minmax(0,1fr)_88px_128px_112px_32px] gap-2 px-1 font-mono text-[10px] tracking-wider text-gray-400 uppercase sm:grid">
+                <span>
+                    Name<span className="ml-0.5 text-red-500">*</span>
+                </span>
+                <span>
+                    Qty<span className="ml-0.5 text-red-500">*</span>
+                </span>
+                <span>
+                    Unit Price<span className="ml-0.5 text-red-500">*</span>
+                </span>
+                <span className="text-right">Amount</span>
+                <span />
+            </div>
+
+            {rows.map((row, index) => (
+                <div key={index}>
+                    <div className="grid grid-cols-[1fr_1fr_32px] gap-2 rounded-[10px] border border-black/6 bg-stone-50 p-2 sm:grid-cols-[minmax(0,1fr)_88px_128px_112px_32px] sm:items-center sm:border-0 sm:bg-transparent sm:p-0 dark:border-white/6 dark:bg-zinc-800/60 sm:dark:bg-transparent">
+                        <input
+                            type="text"
+                            value={row.name}
+                            onChange={(e) =>
+                                update(index, 'name', e.target.value)
+                            }
+                            placeholder="e.g. Bond paper"
+                            aria-label="Particular name"
+                            className={`${inputCls} col-span-2 sm:col-span-1`}
+                        />
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onChange(rows.filter((_, i) => i !== index))
+                            }
+                            disabled={rows.length === 1}
+                            className="flex h-10 w-8 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-30 sm:order-last dark:hover:bg-red-950/40"
+                            aria-label="Remove particular"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={row.quantity}
+                            onChange={(e) =>
+                                update(index, 'quantity', e.target.value)
+                            }
+                            placeholder="Qty"
+                            aria-label="Quantity"
+                            className={inputCls}
+                        />
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={row.unit_price}
+                            onChange={(e) =>
+                                update(index, 'unit_price', e.target.value)
+                            }
+                            placeholder="0.00"
+                            aria-label="Unit price"
+                            className={inputCls}
+                        />
+                        <div className="col-span-2 flex h-10 items-center justify-end font-mono text-[12px] text-gray-700 sm:col-span-1 dark:text-gray-200">
+                            {money(particularAmount(row))}
+                        </div>
+                    </div>
+                    {rowError(index) && (
+                        <p className="mt-1 px-1 text-[11px] text-red-500">
+                            {rowError(index)}
+                        </p>
+                    )}
+                </div>
+            ))}
+
+            {errors.particulars && (
+                <p className="text-[11px] text-red-500">{errors.particulars}</p>
+            )}
+
+            <div className="flex items-center justify-between gap-3 pt-1">
+                <button
+                    type="button"
+                    onClick={() => onChange([...rows, emptyParticular()])}
+                    className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3 font-mono! text-[11px]! text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-700"
+                >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add particular
+                </button>
+                <p className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
+                    Total{' '}
+                    <span className="font-medium text-gray-800 dark:text-gray-100">
+                        {money(total)}
+                    </span>
+                </p>
+            </div>
         </div>
     );
 }
