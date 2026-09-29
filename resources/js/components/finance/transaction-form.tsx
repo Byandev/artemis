@@ -139,7 +139,7 @@ const money = (n: number) =>
  * grid on the right. Defined at module scope so the inputs it wraps keep focus
  * across re-renders.
  */
-function Section({
+export function Section({
     title,
     hint,
     children,
@@ -166,7 +166,7 @@ function Section({
 }
 
 /** Spans both columns of a Section's field grid. */
-function Wide({
+export function Wide({
     children,
     ref,
 }: {

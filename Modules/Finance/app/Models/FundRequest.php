@@ -22,6 +22,20 @@ class FundRequest extends Model
     /** Statuses that represent a decision made by an approver. */
     public const APPROVED_STATUSES = ['approved', 'released'];
 
+    /** How the funds can be released, keyed by stored value => label. */
+    public const PAYMENT_METHODS = [
+        'online_banking' => 'Online Banking',
+        'e_wallet' => 'E-Wallet',
+        'cheque' => 'Cheque',
+        'cash' => 'Cash',
+    ];
+
+    /**
+     * The methods that send the funds to an account, and so need the bank (or
+     * e-wallet provider), account name and account number.
+     */
+    public const PAYMENT_METHODS_WITH_ACCOUNT = ['online_banking', 'e_wallet'];
+
     protected $fillable = [
         'workspace_id',
         'request_date',
@@ -30,6 +44,12 @@ class FundRequest extends Model
         'transaction_type_id',
         'department_id',
         'amount_requested',
+        'liquidation_required',
+        'liquidation_deadline',
+        'payment_method',
+        'bank_name',
+        'account_name',
+        'account_number',
         'approved_by',
         'status',
         'remarks',
@@ -38,7 +58,17 @@ class FundRequest extends Model
     protected $casts = [
         'request_date' => 'date',
         'amount_requested' => 'decimal:2',
+        'liquidation_required' => 'boolean',
+        'liquidation_deadline' => 'date:Y-m-d',
     ];
+
+    protected static function booted(): void
+    {
+        // The attachment rows would go with the request by cascade, but their
+        // files would stay in the bucket: delete them one model at a time so
+        // media-library removes each.
+        static::deleting(fn (FundRequest $fundRequest) => $fundRequest->attachments()->get()->each->delete());
+    }
 
     public function workspace(): BelongsTo
     {
@@ -65,6 +95,15 @@ class FundRequest extends Model
         return $this->belongsToMany(User::class, 'finance_fund_request_user_shares', 'fund_request_id', 'user_id')
             ->withPivot('amount')
             ->withTimestamps();
+    }
+
+    /**
+     * The line items the request is for, in the order they were entered. They
+     * sum to the amount requested.
+     */
+    public function particulars(): HasMany
+    {
+        return $this->hasMany(FundRequestParticular::class, 'fund_request_id')->orderBy('sort_order');
     }
 
     /**
@@ -99,5 +138,24 @@ class FundRequest extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * The files on this request, one per attachment requirement of its
+     * transaction type that it answers.
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(FundRequestAttachment::class, 'fund_request_id');
+    }
+
+    /**
+     * The checklist requirements ticked off on this request, out of its
+     * transaction type's checklist.
+     */
+    public function checkedChecklists(): BelongsToMany
+    {
+        return $this->belongsToMany(FundRequestChecklistRequirement::class, 'finance_fund_request_checklists', 'fund_request_id', 'checklist_requirement_id')
+            ->withTimestamps();
     }
 }

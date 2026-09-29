@@ -3,8 +3,10 @@
 namespace Modules\Finance\Models;
 
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class TransactionType extends Model
 {
@@ -48,6 +50,11 @@ class TransactionType extends Model
         'nature',
         'income_statement_section',
         'opex_allocation_basis',
+        'fund_requestable',
+    ];
+
+    protected $casts = [
+        'fund_requestable' => 'boolean',
     ];
 
     /**
@@ -78,8 +85,30 @@ class TransactionType extends Model
         return $this->opex_allocation_basis ?: self::DEFAULT_ALLOCATION_BASIS;
     }
 
+    /** Types a fund request can be raised against. */
+    public function scopeFundRequestable(Builder $query): void
+    {
+        $query->where('fund_requestable', true);
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    /**
+     * The attachments a fund request of this type calls for.
+     */
+    public function attachments(): BelongsToMany
+    {
+        return $this->belongsToMany(FundRequestAttachmentRequirement::class, 'finance_fund_request_transaction_type_attachments', 'transaction_type_id', 'attachment_requirement_id')->orderBy('name');
+    }
+
+    /**
+     * The checklist items a fund request of this type is checked against.
+     */
+    public function checklists(): BelongsToMany
+    {
+        return $this->belongsToMany(FundRequestChecklistRequirement::class, 'finance_fund_request_transaction_type_checklists', 'transaction_type_id', 'checklist_requirement_id')->orderBy('name');
     }
 }
