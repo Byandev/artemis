@@ -8,6 +8,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Finance\Models\FundRequestAttachmentRequirement;
@@ -15,8 +16,9 @@ use Modules\Finance\Models\FundRequestChecklistRequirement;
 use Modules\Finance\Models\TransactionType;
 
 /**
- * Finance management: the workspace's attachment and checklist requirements,
- * and which transaction types call for each. A requirement is the workspace's,
+ * Finance management: the workspace's attachment and checklist requirements
+ * (the RF Requirements page), and which transaction types call for each (the
+ * Transaction Types page's "Manage Requirements"). A requirement is the workspace's,
  * so one can be linked to any number of types; renaming or deleting it touches
  * every type it is linked to.
  */
@@ -64,26 +66,29 @@ class ManagementController extends Controller
         ];
     }
 
+    /**
+     * The workspace's requirements of each kind, with how many types call for each.
+     *
+     * @return array<string, Collection>
+     */
+    public static function requirementsFor(Workspace $workspace): array
+    {
+        return collect(self::KINDS)
+            ->map(fn (array $kind) => $kind[0]::where('workspace_id', $workspace->id)
+                ->withCount('transactionTypes')
+                ->orderBy('name')
+                ->get(['id', 'name']))
+            ->all();
+    }
+
     public function index(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
-        $requirements = fn (string $model) => $model::where('workspace_id', $workspace->id)
-            ->withCount('transactionTypes')
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
         return Inertia::render('workspaces/finance/management/index', [
             'workspace' => $workspace,
-            'types' => TransactionType::where('workspace_id', $workspace->id)
-                ->with(['attachments:id,name', 'checklists:id,name'])
-                ->orderBy('name')
-                ->get(['id', 'name', 'nature']),
-            'requirements' => [
-                'attachments' => $requirements(FundRequestAttachmentRequirement::class),
-                'checklists' => $requirements(FundRequestChecklistRequirement::class),
-            ],
+            'requirements' => self::requirementsFor($workspace),
         ]);
     }
 
@@ -137,6 +142,29 @@ class ManagementController extends Controller
         $this->requirement($workspace, $kind, $id)->delete();
 
         return redirect()->back()->with('success', self::KINDS[$kind][2].' deleted.');
+    }
+
+    /**
+     * Set every requirement the type calls for in one go (the Manage
+     * Requirements dialog's Save). Ids must be the workspace's own.
+     */
+    public function sync(Request $request, Workspace $workspace, TransactionType $transactionType)
+    {
+        $this->guard($request, $workspace, $transactionType);
+        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
+
+        $rules = [];
+        foreach (self::KINDS as $kind => [$model]) {
+            $rules[$kind] = ['present', 'array'];
+            $rules["{$kind}.*"] = ['integer', Rule::exists((new $model)->getTable(), 'id')->where('workspace_id', $workspace->id)];
+        }
+        $validated = $request->validate($rules);
+
+        foreach (self::KINDS as $kind => [, $relation]) {
+            $transactionType->{$relation}()->sync($validated[$kind]);
+        }
+
+        return redirect()->back()->with('success', 'Requirements for '.$transactionType->name.' saved.');
     }
 
     /** Have the type call for one of the workspace's requirements. */

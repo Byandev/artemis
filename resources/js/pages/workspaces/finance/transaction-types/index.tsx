@@ -5,6 +5,11 @@ import {
     inputCls,
 } from '@/components/finance/account-form-dialog';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
+import {
+    ManageRequirementsDialog,
+    NamedItem,
+    Requirements,
+} from '@/components/finance/fund-request-requirements';
 import { transactionTypeStyle } from '@/components/finance/transaction-type';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -30,7 +35,13 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import {
+    ClipboardCheck,
+    MoreHorizontal,
+    Pencil,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 type Nature = 'debit' | 'credit';
@@ -46,6 +57,9 @@ interface TransactionType {
     // Which company metric an OPEX pool is split across products by; null =
     // the default. Only meaningful when the section is `opex`.
     opex_allocation_basis: string | null;
+    // What a fund request of this type calls for.
+    attachments: NamedItem[];
+    checklists: NamedItem[];
 }
 
 interface AllocationBasis {
@@ -58,6 +72,7 @@ interface Props {
     types: PaginatedData<TransactionType>;
     allocationBases: AllocationBasis[];
     defaultAllocationBasis: string;
+    requirements: Requirements;
     query?: {
         sort?: string | null;
         per_page?: number | string | null;
@@ -70,6 +85,7 @@ export default function TransactionTypesIndex({
     types,
     allocationBases,
     defaultAllocationBasis,
+    requirements,
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -79,6 +95,7 @@ export default function TransactionTypesIndex({
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<TransactionType | null>(null);
     const [toDelete, setToDelete] = useState<TransactionType | null>(null);
+    const [managingId, setManagingId] = useState<number | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/transaction-types`;
@@ -86,6 +103,10 @@ export default function TransactionTypesIndex({
     const canEdit = usePermission(PERMISSIONS.EditFinanceTransactions);
     const canDelete = usePermission(PERMISSIONS.DeleteFinanceTransactions);
     const showActions = canEdit || canDelete;
+
+    // Read the type from props on every render so the dialog shows its
+    // requirements as the server returns them after each change.
+    const managing = types.data.find((t) => t.id === managingId) ?? null;
 
     const performQuery = useCallback(
         debounce((s: string) => {
@@ -231,7 +252,7 @@ export default function TransactionTypesIndex({
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent
                                       align="end"
-                                      className="w-36"
+                                      className="w-48"
                                   >
                                       {canEdit && (
                                           <DropdownMenuItem
@@ -241,6 +262,16 @@ export default function TransactionTypesIndex({
                                           >
                                               <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
                                               Edit
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEdit && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  setManagingId(row.original.id)
+                                              }
+                                          >
+                                              <ClipboardCheck className="mr-2 h-3.5 w-3.5" />{' '}
+                                              Manage Requirements
                                           </DropdownMenuItem>
                                       )}
                                       {canEdit && canDelete && (
@@ -335,6 +366,15 @@ export default function TransactionTypesIndex({
                         baseUrl={baseUrl}
                         allocationBases={allocationBases}
                         defaultAllocationBasis={defaultAllocationBasis}
+                    />
+                )}
+                {canEdit && (
+                    <ManageRequirementsDialog
+                        type={managing}
+                        requirements={requirements}
+                        financeUrl={`/workspaces/${workspace.slug}/finance`}
+                        can={{ canCreate, canEdit, canDelete }}
+                        onClose={() => setManagingId(null)}
                     />
                 )}
                 {canDelete && (

@@ -21,7 +21,7 @@ dataset('kinds', [
     'checklists' => ['checklists', FundRequestChecklistRequirement::class],
 ]);
 
-test('lists each transaction type with its requirements, and the workspace\'s requirements', function () {
+test('lists the workspace\'s requirements', function () {
     $salary = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Salary', 'nature' => 'debit']);
     $receipt = $this->type->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
     $salary->attachments()->attach($receipt);
@@ -33,17 +33,27 @@ test('lists each transaction type with its requirements, and the workspace\'s re
         ->assertOk()
         ->assertInertia(fn ($p) => $p
             ->component('workspaces/finance/management/index')
-            ->where('types.0.name', 'Adspent')
-            ->where('types.0.attachments.0.name', 'Receipt')
-            ->where('types.0.checklists.0.name', 'Budget approved')
-            ->where('types.1.name', 'Salary')
-            ->where('types.1.attachments.0.name', 'Receipt')
-            ->has('types.1.checklists', 0)
             ->where('requirements.attachments.0.name', 'Receipt')
             ->where('requirements.attachments.0.transaction_types_count', 2)
             ->where('requirements.attachments.1.name', 'Unused')
             ->where('requirements.attachments.1.transaction_types_count', 0)
             ->has('requirements.checklists', 1));
+});
+
+test('the transaction types page carries each type\'s requirements and the workspace\'s, for Manage Requirements', function () {
+    $receipt = $this->type->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
+    FundRequestChecklistRequirement::create(['workspace_id' => $this->workspace->id, 'name' => 'Budget approved']);
+
+    $this->actingAs($this->user)
+        ->get("/workspaces/{$this->workspace->slug}/finance/transaction-types")
+        ->assertOk()
+        ->assertInertia(fn ($p) => $p
+            ->component('workspaces/finance/transaction-types/index')
+            ->where('types.data.0.attachments.0.id', $receipt->id)
+            ->has('types.data.0.checklists', 0)
+            ->where('requirements.attachments.0.name', 'Receipt')
+            ->where('requirements.attachments.0.transaction_types_count', 1)
+            ->where('requirements.checklists.0.name', 'Budget approved'));
 });
 
 test('adds a requirement linked to the type it was added from, renames and deletes it', function (string $kind, string $model) {
@@ -84,6 +94,37 @@ test('links one requirement to several types and unlinks it from one', function 
     expect($item->transactionTypes()->pluck('name')->all())->toBe(['Salary'])
         ->and($item->fresh())->not->toBeNull();
 })->with('kinds');
+
+test('saves every requirement a type calls for in one go', function () {
+    $receipt = FundRequestAttachmentRequirement::create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
+    $invoice = FundRequestAttachmentRequirement::create(['workspace_id' => $this->workspace->id, 'name' => 'Invoice']);
+    $budget = FundRequestChecklistRequirement::create(['workspace_id' => $this->workspace->id, 'name' => 'Budget approved']);
+    $this->type->attachments()->attach($receipt);
+    $this->type->checklists()->attach($budget);
+
+    $this->actingAs($this->user)
+        ->put("{$this->url}/transaction-types/{$this->type->id}", ['attachments' => [$invoice->id], 'checklists' => []])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect($this->type->attachments()->pluck('name')->all())->toBe(['Invoice'])
+        ->and($this->type->checklists()->count())->toBe(0);
+});
+
+test('saving a type\'s requirements rejects another workspace\'s', function () {
+    $other = Workspace::factory()->create(['finance_module_enabled' => true]);
+    $foreign = FundRequestAttachmentRequirement::create(['workspace_id' => $other->id, 'name' => 'Theirs']);
+    $foreignType = TransactionType::create(['workspace_id' => $other->id, 'name' => 'Theirs', 'nature' => 'debit']);
+
+    $this->actingAs($this->user)
+        ->put("{$this->url}/transaction-types/{$this->type->id}", ['attachments' => [$foreign->id], 'checklists' => []])
+        ->assertSessionHasErrors('attachments.0');
+    $this->actingAs($this->user)
+        ->put("{$this->url}/transaction-types/{$foreignType->id}", ['attachments' => [], 'checklists' => []])
+        ->assertNotFound();
+
+    expect($this->type->attachments()->count())->toBe(0);
+});
 
 test('a name is unique within the workspace, not across workspaces', function (string $kind, string $model) {
     $other = Workspace::factory()->create(['finance_module_enabled' => true]);

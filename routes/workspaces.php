@@ -732,6 +732,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/management/{kind}', [FinanceManagementController::class, 'store'])->whereIn('kind', ['attachments', 'checklists'])->name('management.requirements.store');
         Route::put('/management/{kind}/{id}', [FinanceManagementController::class, 'update'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.update');
         Route::delete('/management/{kind}/{id}', [FinanceManagementController::class, 'destroy'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.destroy');
+        Route::put('/management/transaction-types/{transactionType}', [FinanceManagementController::class, 'sync'])->name('management.requirements.sync');
         Route::put('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'link'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.link');
         Route::delete('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'unlink'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.unlink');
     });

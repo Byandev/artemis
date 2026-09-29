@@ -36,7 +36,8 @@ class TransactionTypeController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
-        $types = QueryBuilder::for(TransactionType::where('workspace_id', $workspace->id))
+        $types = QueryBuilder::for(TransactionType::where('workspace_id', $workspace->id)
+            ->with(['attachments:id,name', 'checklists:id,name']))
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where('name', 'like', "%{$v}%")),
             ])
@@ -53,6 +54,8 @@ class TransactionTypeController extends Controller
                 ->map(fn ($label, $value) => ['value' => $value, 'label' => $label])
                 ->values(),
             'defaultAllocationBasis' => TransactionType::DEFAULT_ALLOCATION_BASIS,
+            // Every requirement, for the "Manage Requirements" dialog.
+            'requirements' => ManagementController::requirementsFor($workspace),
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
