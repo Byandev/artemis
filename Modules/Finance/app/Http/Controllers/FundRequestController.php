@@ -163,7 +163,7 @@ class FundRequestController extends Controller
         $validated = $request->validated();
 
         DB::transaction(function () use ($validated, $request, $workspace) {
-            // New requests always start pending; the reference number is generated
+            // New requests always start for approval; the reference number is generated
             // here (never supplied by the client) and approval happens via
             // updateStatus. The request date is the creation date and the
             // requester is the signed-in user — neither is entered on the form.
@@ -173,7 +173,7 @@ class FundRequestController extends Controller
                 'reference_no' => $this->nextReferenceNo($workspace),
                 'request_date' => now()->toDateString(),
                 'requested_by' => $request->user()->id,
-                'status' => 'pending',
+                'status' => FundRequest::DEFAULT_STATUS,
                 'approved_by' => null,
             ]);
 
@@ -220,9 +220,10 @@ class FundRequestController extends Controller
     }
 
     /**
-     * Approve / release / cancel a request. Gated by a dedicated permission so
-     * that status changes are separated from ordinary edits. The approver is
-     * stamped when moving into an approved/released state and cleared otherwise.
+     * Approve / send for liquidation / hold a request. Gated by a dedicated
+     * permission so that status changes are separated from ordinary edits. The
+     * approver is stamped when moving into an approved / for-liquidation state
+     * and cleared otherwise.
      */
     public function updateStatus(Request $request, Workspace $workspace, FundRequest $requestFund)
     {

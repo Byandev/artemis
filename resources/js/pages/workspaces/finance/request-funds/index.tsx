@@ -1,6 +1,9 @@
 import PageHeader from '@/components/common/PageHeader';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
-import { RequestFund } from '@/components/finance/fund-request-form';
+import {
+    fundRequestStatusLabel,
+    RequestFund,
+} from '@/components/finance/fund-request-form';
 import { StatusFilter } from '@/components/finance/status-filter';
 import { transactionTypeLabel } from '@/components/finance/transaction-type';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
@@ -44,19 +47,19 @@ interface Props {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-    pending:
+    for_approval:
         'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
     approved: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
-    released:
+    for_liquidation:
         'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
-    cancelled: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
+    hold: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
 };
 
 const STATUS_TEXT: Record<string, string> = {
-    pending: 'text-amber-600 dark:text-amber-400',
+    for_approval: 'text-amber-600 dark:text-amber-400',
     approved: 'text-blue-600 dark:text-blue-400',
-    released: 'text-emerald-600 dark:text-emerald-400',
-    cancelled: 'text-gray-500 dark:text-gray-400',
+    for_liquidation: 'text-emerald-600 dark:text-emerald-400',
+    hold: 'text-gray-500 dark:text-gray-400',
 };
 
 const fmt = (v: number | string) =>
@@ -91,7 +94,7 @@ export default function RequestFundsIndex({
         () =>
             statuses.map((s) => ({
                 value: s,
-                label: s.charAt(0).toUpperCase() + s.slice(1),
+                label: fundRequestStatusLabel(s),
             })),
         [statuses],
     );
@@ -224,14 +227,16 @@ export default function RequestFundsIndex({
             ),
             cell: ({ row }) => {
                 const rf = row.original;
-                const badgeCls = `inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium capitalize ${
-                    STATUS_STYLES[rf.status] ?? STATUS_STYLES.cancelled
+                const badgeCls = `inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${
+                    STATUS_STYLES[rf.status] ?? STATUS_STYLES.hold
                 }`;
 
                 if (!canApproveStatus) {
                     return (
                         <div className="text-center">
-                            <span className={badgeCls}>{rf.status}</span>
+                            <span className={badgeCls}>
+                                {fundRequestStatusLabel(rf.status)}
+                            </span>
                         </div>
                     );
                 }
@@ -243,7 +248,7 @@ export default function RequestFundsIndex({
                                 <button
                                     className={`${badgeCls} transition-all hover:opacity-80`}
                                 >
-                                    {rf.status}
+                                    {fundRequestStatusLabel(rf.status)}
                                     <ChevronDown className="h-3 w-3 opacity-60" />
                                 </button>
                             </DropdownMenuTrigger>
@@ -255,12 +260,11 @@ export default function RequestFundsIndex({
                                     <DropdownMenuItem
                                         key={s}
                                         onClick={() => changeStatus(rf, s)}
-                                        className={`font-mono text-[11px] font-medium capitalize ${
-                                            STATUS_TEXT[s] ??
-                                            STATUS_TEXT.cancelled
+                                        className={`font-mono text-[11px] font-medium ${
+                                            STATUS_TEXT[s] ?? STATUS_TEXT.hold
                                         }`}
                                     >
-                                        {s}
+                                        {fundRequestStatusLabel(s)}
                                         {s === rf.status && (
                                             <Check className="ml-auto h-3.5 w-3.5" />
                                         )}

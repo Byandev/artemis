@@ -224,6 +224,8 @@ class TransactionController extends Controller
                 'status' => $fundRequest->status,
                 // Copied onto the transaction when one is filled in from here.
                 'transaction_type_id' => $fundRequest->transaction_type_id,
+                'requested_by' => $fundRequest->requested_by,
+                'approved_by' => $fundRequest->approved_by,
                 'department' => $fundRequest->department?->name,
                 'charge_to' => $fundRequest->chargeToUsers->map(fn ($user) => [
                     'user_id' => $user->id,

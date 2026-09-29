@@ -17,10 +17,13 @@ class FundRequest extends Model
     /**
      * The statuses a fund request can move through.
      */
-    public const STATUSES = ['pending', 'approved', 'released', 'cancelled'];
+    public const STATUSES = ['for_approval', 'approved', 'for_liquidation', 'hold'];
+
+    /** The status every new request starts in. */
+    public const DEFAULT_STATUS = 'for_approval';
 
     /** Statuses that represent a decision made by an approver. */
-    public const APPROVED_STATUSES = ['approved', 'released'];
+    public const APPROVED_STATUSES = ['approved', 'for_liquidation'];
 
     /** How the funds can be released, keyed by stored value => label. */
     public const PAYMENT_METHODS = [
