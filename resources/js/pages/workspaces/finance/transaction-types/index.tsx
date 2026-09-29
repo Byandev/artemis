@@ -60,6 +60,7 @@ interface TransactionType {
     opex_allocation_basis: string | null;
     // Whether the fund request form offers this type.
     fund_requestable: boolean;
+    fund_requestable_per_product: boolean;
     // What a fund request of this type calls for.
     attachments: NamedItem[];
     checklists: NamedItem[];
@@ -216,7 +217,9 @@ export default function TransactionTypesIndex({
             cell: ({ row }) =>
                 row.original.fund_requestable ? (
                     <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] text-emerald-700 uppercase dark:bg-emerald-950/40 dark:text-emerald-300">
-                        Yes
+                        {row.original.fund_requestable_per_product
+                            ? 'Yes · Per product'
+                            : 'Yes'}
                     </span>
                 ) : (
                     <span className="text-gray-300 dark:text-gray-600">—</span>
@@ -435,12 +438,14 @@ function TypeFormDialog({
             income_statement_section: IncomeStatementSection;
             opex_allocation_basis: string | null;
             fund_requestable: boolean;
+            fund_requestable_per_product: boolean;
         }>({
             name: '',
             nature: 'debit',
             income_statement_section: 'opex',
             opex_allocation_basis: null,
             fund_requestable: false,
+            fund_requestable_per_product: false,
         });
 
     useEffect(() => {
@@ -454,6 +459,10 @@ function TypeFormDialog({
                 );
                 setData('opex_allocation_basis', type.opex_allocation_basis);
                 setData('fund_requestable', type.fund_requestable);
+                setData(
+                    'fund_requestable_per_product',
+                    type.fund_requestable_per_product,
+                );
             } else {
                 reset();
                 clearErrors();
@@ -627,6 +636,29 @@ function TypeFormDialog({
                             <p className="-mt-3 text-[11px] text-red-500">
                                 {errors.fund_requestable}
                             </p>
+                        )}
+
+                        {data.fund_requestable && (
+                            <label className="flex cursor-pointer items-start justify-between gap-3 rounded-[10px] border border-black/6 bg-stone-50 p-3 dark:border-white/6 dark:bg-zinc-800/50">
+                                <span className="text-[12px] leading-snug text-gray-600 dark:text-gray-300">
+                                    <span className="font-medium text-gray-800 dark:text-gray-100">
+                                        Per product
+                                    </span>
+                                    <br />
+                                    Each particular picks a product, and the
+                                    request is split across products by their
+                                    totals instead of on the allocation.
+                                </span>
+                                <Switch
+                                    checked={data.fund_requestable_per_product}
+                                    onCheckedChange={(v) =>
+                                        setData(
+                                            'fund_requestable_per_product',
+                                            v,
+                                        )
+                                    }
+                                />
+                            </label>
                         )}
 
                         {/* A shared OPEX pool is split across products by its

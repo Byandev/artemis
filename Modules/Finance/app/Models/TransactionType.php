@@ -51,10 +51,12 @@ class TransactionType extends Model
         'income_statement_section',
         'opex_allocation_basis',
         'fund_requestable',
+        'fund_requestable_per_product',
     ];
 
     protected $casts = [
         'fund_requestable' => 'boolean',
+        'fund_requestable_per_product' => 'boolean',
     ];
 
     /**
