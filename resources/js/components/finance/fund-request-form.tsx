@@ -75,7 +75,7 @@ export interface PaymentMethodOption {
 /** A line item of a request; `amount` is quantity × unit price. */
 export interface FundRequestParticular {
     id: number;
-    // Only on ad-spend requests, where `name` is the product's.
+    // Only on per-product types, where `name` is the product's.
     product_id: number | null;
     name: string;
     quantity: number | string;
@@ -111,6 +111,9 @@ interface NamedItem {
 export interface FundRequestType extends TransactionTypeItem {
     attachments: NamedItem[];
     checklists: NamedItem[];
+    // Its particulars each pick a product, and the product shares are worked
+    // out from them instead of being allocated by hand.
+    fund_requestable_per_product: boolean;
 }
 
 /** A file already uploaded against one of the request's attachments. */
@@ -158,11 +161,6 @@ interface Props {
     users: UserOption[];
     products: ProductOption[];
     transactionTypes: FundRequestType[];
-    /**
-     * Ad-spend types: their particulars each pick a product, and the product
-     * shares are worked out from them (see TransactionType::isAdSpent()).
-     */
-    adSpentTypeIds: number[];
     departments: DepartmentOption[];
     paymentMethods: PaymentMethodOption[];
     onCancel: () => void;
@@ -232,7 +230,6 @@ export function FundRequestForm({
     users,
     products,
     transactionTypes,
-    adSpentTypeIds,
     departments,
     paymentMethods,
     onCancel,
@@ -276,9 +273,9 @@ export function FundRequestForm({
     const type = transactionTypes.find(
         (t) => String(t.id) === data.transaction_type_id,
     );
-    // Ad spend is split by product in the particulars themselves, so the
-    // product allocation is left to the server to work out from them.
-    const isAdSpent = !!type && adSpentTypeIds.includes(type.id);
+    // A per-product type is split by product in the particulars themselves,
+    // so the product allocation is left to the server to work out from them.
+    const isPerProduct = !!type?.fund_requestable_per_product;
     const savedFiles = requestFund?.files ?? [];
 
     // The shares carry on splitting evenly until someone types their own
@@ -318,7 +315,7 @@ export function FundRequestForm({
     const chargeToRef = useRef<HTMLDivElement>(null);
     const productsRef = useRef<HTMLDivElement>(null);
     const chargeToBalanced = sharesBalanced(chargeToRows, total);
-    const productsBalanced = isAdSpent || sharesBalanced(productRows, total);
+    const productsBalanced = isPerProduct || sharesBalanced(productRows, total);
 
     const unbalancedMessage = (label: string, rows: Share[]) =>
         `The ${label} shares add up to ${money(
@@ -410,7 +407,7 @@ export function FundRequestForm({
         // POSTed with Laravel's method spoofing instead.
         transform((d) => ({
             ...d,
-            ...(isAdSpent ? { products: [] } : {}),
+            ...(isPerProduct ? { products: [] } : {}),
             ...(isEditing ? { _method: 'put' } : {}),
         }));
         post(isEditing ? `${base}/${requestFund!.id}` : base, {
@@ -494,14 +491,14 @@ export function FundRequestForm({
                 <Section
                     title="Particulars"
                     hint={
-                        isAdSpent
-                            ? 'The products the ad spend is for, line by line. Each amount is the quantity × unit price; together they make the amount requested, and each product’s total is its share.'
+                        isPerProduct
+                            ? 'The products the funds are for, line by line. Each amount is the quantity × unit price; together they make the amount requested, and each product’s total is its share.'
                             : 'What the funds are for, line by line. Each amount is the quantity × unit price; together they make the amount requested.'
                     }
                 >
                     <Wide>
                         <ParticularsEditor
-                            products={isAdSpent ? products : null}
+                            products={isPerProduct ? products : null}
                             rows={data.particulars}
                             onChange={(rows) => setData('particulars', rows)}
                             errors={fieldErrors}
@@ -674,7 +671,7 @@ export function FundRequestForm({
                 <Section
                     title="Allocation"
                     hint={
-                        isAdSpent
+                        isPerProduct
                             ? 'Who the request is charged to. Pick as many as apply — the amount is split between them. The products come from the particulars.'
                             : 'Who the request is charged to and the products it covers. Pick as many as apply — the amount is split between them.'
                     }
@@ -713,7 +710,7 @@ export function FundRequestForm({
                         />
                     </Wide>
 
-                    {!isAdSpent && (
+                    {!isPerProduct && (
                         <Wide ref={productsRef}>
                             <ShareAllocator
                                 label="Products Involved"
@@ -1020,7 +1017,7 @@ function AttachmentSlot({
 /**
  * The request's line items: name, quantity and unit price per row, with the
  * row's amount and the running total worked out as they are typed. Given
- * `products` (an ad-spend request), each row picks a product instead of
+ * `products` (a per-product type), each row picks a product instead of
  * being named.
  */
 function ParticularsEditor({

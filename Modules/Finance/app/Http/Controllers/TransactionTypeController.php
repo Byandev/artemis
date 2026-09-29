@@ -79,6 +79,9 @@ class TransactionTypeController extends Controller
             'opex_allocation_basis' => ['nullable', Rule::in(array_keys(TransactionType::ALLOCATION_BASES))],
             // Whether the fund request form offers this type.
             'fund_requestable' => ['boolean'],
+            // Whether its fund requests pick a product per particular in place
+            // of the product allocation. Only kept on a requestable type.
+            'fund_requestable_per_product' => ['boolean'],
         ];
     }
 
@@ -96,6 +99,7 @@ class TransactionTypeController extends Controller
             'income_statement_section' => $validated['income_statement_section'] ?? null,
             'opex_allocation_basis' => $validated['opex_allocation_basis'] ?? null,
             'fund_requestable' => $request->boolean('fund_requestable'),
+            'fund_requestable_per_product' => $request->boolean('fund_requestable') && $request->boolean('fund_requestable_per_product'),
         ]);
 
         return redirect()->back()->with('success', 'Transaction type created.');
@@ -115,6 +119,7 @@ class TransactionTypeController extends Controller
             'income_statement_section' => $validated['income_statement_section'] ?? null,
             'opex_allocation_basis' => $validated['opex_allocation_basis'] ?? null,
             'fund_requestable' => $request->boolean('fund_requestable'),
+            'fund_requestable_per_product' => $request->boolean('fund_requestable') && $request->boolean('fund_requestable_per_product'),
         ]);
 
         return redirect()->back()->with('success', 'Transaction type updated.');

@@ -9,8 +9,8 @@ use Modules\Products\Models\Product;
 /**
  * One line item of a fund request. `amount` is `quantity` × `unit_price`,
  * worked out on save (see FundRequestRequest::particulars()); a request's
- * particulars sum to its amount requested. On an ad-spend request each row is
- * for a product, `name` holding a snapshot of that product's name.
+ * particulars sum to its amount requested. On a type fund-requestable per
+ * product each row is for a product, `name` holding a snapshot of its name.
  */
 class FundRequestParticular extends Model
 {

@@ -22,8 +22,8 @@ class FundRequestRequest extends FormRequest
      */
     public const ATTACHMENT_MIMES = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'];
 
-    /** Memo for isAdSpent(). */
-    private ?bool $adSpent = null;
+    /** Memo for isPerProduct(). */
+    private ?bool $perProduct = null;
 
     public function authorize(): bool
     {
@@ -65,12 +65,12 @@ class FundRequestRequest extends FormRequest
             // What the funds are for, line by line. The amount requested is
             // their total and each row's amount its quantity × unit price, both
             // worked out here rather than taken from the client.
-            // On an ad-spend request each row is for a product instead of a
-            // typed name; the name is then that product's, set in particulars().
+            // On a per-product type each row is for a product instead of a typed
+            // name; the name is then that product's, set in particulars().
             'particulars' => ['required', 'array', 'min:1'],
-            'particulars.*.name' => [Rule::requiredIf(! $this->isAdSpent()), 'nullable', 'string', 'max:255'],
+            'particulars.*.name' => [Rule::requiredIf(! $this->isPerProduct()), 'nullable', 'string', 'max:255'],
             'particulars.*.product_id' => [
-                Rule::requiredIf($this->isAdSpent()),
+                Rule::requiredIf($this->isPerProduct()),
                 'nullable',
                 Rule::exists('products', 'id')->where('workspace_id', $workspace->id),
             ],
@@ -96,7 +96,7 @@ class FundRequestRequest extends FormRequest
             'account_number' => [Rule::requiredIf($this->needsAccount()), 'nullable', 'string', 'max:255'],
 
             // The products the request covers, each bearing a share of the amount.
-            // Not asked for on an ad-spend request, whose particulars say it.
+            // Not asked for on a per-product type, whose particulars say it.
             'products' => ['nullable', 'array'],
             'products.*.product_id' => [
                 'required',
@@ -184,20 +184,20 @@ class FundRequestRequest extends FormRequest
     }
 
     /**
-     * Whether the chosen transaction type is ad spend, whose particulars are
-     * each for a product (see TransactionType::isAdSpent()).
+     * Whether the chosen transaction type is fund-requestable per product,
+     * its particulars each being for a product.
      */
-    public function isAdSpent(): bool
+    public function isPerProduct(): bool
     {
-        return $this->adSpent ??= (bool) TransactionType::where('workspace_id', $this->route('workspace')->id)
+        return $this->perProduct ??= (bool) TransactionType::where('workspace_id', $this->route('workspace')->id)
             ->find($this->input('transaction_type_id'))
-            ?->isAdSpent();
+            ?->fund_requestable_per_product;
     }
 
     /**
      * The submitted particulars as `{product_id, name, quantity, unit_price,
-     * amount}`, each amount being its quantity × unit price. On an ad-spend
-     * request the name is the product's; otherwise there is no product.
+     * amount}`, each amount being its quantity × unit price. On a per-product
+     * type the name is the product's; otherwise there is no product.
      *
      * @return list<array{product_id:?int, name:string, quantity:float, unit_price:float, amount:float}>
      */
@@ -205,14 +205,14 @@ class FundRequestRequest extends FormRequest
     {
         $rows = array_values($this->input('particulars', []));
 
-        $names = $this->isAdSpent()
+        $names = $this->isPerProduct()
             ? Product::where('workspace_id', $this->route('workspace')->id)
                 ->whereIn('id', array_filter(array_column($rows, 'product_id')))
                 ->pluck('name', 'id')
             : collect();
 
         return array_map(function ($row) use ($names) {
-            $productId = $this->isAdSpent() ? (int) $row['product_id'] : null;
+            $productId = $this->isPerProduct() ? (int) $row['product_id'] : null;
 
             return [
                 'product_id' => $productId,
@@ -255,7 +255,7 @@ class FundRequestRequest extends FormRequest
 
     /**
      * The submitted product rows as `{product_id, amount}`, blank shares taking
-     * an even cut of the remainder (see SplitsShares). On an ad-spend request
+     * an even cut of the remainder (see SplitsShares). On a per-product type
      * they come from the particulars instead: each product's share is the total
      * of its rows, so a transaction filled in from the request still gets them.
      *
@@ -263,7 +263,7 @@ class FundRequestRequest extends FormRequest
      */
     public function productShares(): array
     {
-        if ($this->isAdSpent()) {
+        if ($this->isPerProduct()) {
             return collect($this->particulars())
                 ->groupBy('product_id')
                 ->map(fn ($rows, $productId) => [

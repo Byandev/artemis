@@ -403,27 +403,23 @@ class FundRequestController extends Controller
 
     /**
      * Option lists for the create / edit form. Each transaction type carries the
-     * attachments and checklist it calls for, so the form can show them the
-     * moment the type is picked. Only fund-requestable types are offered, plus
-     * the type of the request being edited, so an edit doesn't lose its type
-     * when that type has since been switched off.
+     * attachments and checklist it calls for, and whether it picks a product
+     * per particular, so the form can show them the moment the type is picked.
+     * Only fund-requestable types are offered, plus the type of the request
+     * being edited, so an edit doesn't lose its type when that type has since
+     * been switched off.
      */
     protected function formOptions(Request $request, Workspace $workspace, ?FundRequest $fundRequest = null): array
     {
-        $types = TransactionType::where('workspace_id', $workspace->id)
-            ->where(fn ($q) => $q->fundRequestable()
-                ->when($fundRequest?->transaction_type_id, fn ($q, $id) => $q->orWhere('id', $id)))
-            ->with(['attachments:id,name', 'checklists:id,name'])
-            ->orderBy('name')
-            ->get(['id', 'name', 'nature']);
-
         return [
             'users' => $workspace->users()->orderBy('users.name')->get(['users.id', 'users.name']),
             'products' => $this->productOptions($request, $workspace),
-            'transactionTypes' => $types,
-            // Requests of these types pick a product per particular in place of
-            // the product allocation. See TransactionType::isAdSpent().
-            'adSpentTypeIds' => $types->filter->isAdSpent()->pluck('id')->values(),
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->where(fn ($q) => $q->fundRequestable()
+                    ->when($fundRequest?->transaction_type_id, fn ($q, $id) => $q->orWhere('id', $id)))
+                ->with(['attachments:id,name', 'checklists:id,name'])
+                ->orderBy('name')
+                ->get(['id', 'name', 'nature', 'fund_requestable_per_product']),
             'paymentMethods' => collect(FundRequest::PAYMENT_METHODS)
                 ->map(fn ($label, $value) => [
                     'value' => $value,

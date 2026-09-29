@@ -11,11 +11,12 @@ beforeEach(function () {
     $this->workspace = Workspace::factory()->create(['owner_id' => $this->user->id]);
     $this->url = "/workspaces/{$this->workspace->slug}/finance/request-funds";
 
-    $this->adSpent = TransactionType::create([
+    $this->perProduct = TransactionType::create([
         'workspace_id' => $this->workspace->id,
         'name' => 'Ad Spent',
         'nature' => 'debit',
         'fund_requestable' => true,
+        'fund_requestable_per_product' => true,
     ]);
 
     $this->widget = Product::factory()->create([
@@ -30,11 +31,11 @@ beforeEach(function () {
     ]);
 });
 
-/** An ad-spend request charged to the signed-in user, with the given particulars. */
-function adSpentPayload(array $particulars, array $extra = []): array
+/** A request of the per-product type charged to the signed-in user, with the given particulars. */
+function perProductPayload(array $particulars, array $extra = []): array
 {
     return [
-        'transaction_type_id' => test()->adSpent->id,
+        'transaction_type_id' => test()->perProduct->id,
         'payment_method' => 'cash',
         'particulars' => $particulars,
         'charge_to' => [['user_id' => test()->user->id]],
@@ -42,9 +43,9 @@ function adSpentPayload(array $particulars, array $extra = []): array
     ];
 }
 
-test('ad-spend particulars are each for a product, named after it', function () {
+test('per-product particulars are each for a product, named after it', function () {
     $this->actingAs($this->user)
-        ->post($this->url, adSpentPayload([
+        ->post($this->url, perProductPayload([
             ['product_id' => $this->widget->id, 'quantity' => 1, 'unit_price' => 500],
             ['product_id' => $this->gadget->id, 'quantity' => 2, 'unit_price' => 100],
         ]))
@@ -58,9 +59,9 @@ test('ad-spend particulars are each for a product, named after it', function () 
         ->and($particulars[1]->name)->toBe('Gadget');
 });
 
-test('the product shares of an ad-spend request are its particulars summed per product', function () {
+test('the product shares of a per-product request are its particulars summed per product', function () {
     $this->actingAs($this->user)
-        ->post($this->url, adSpentPayload([
+        ->post($this->url, perProductPayload([
             ['product_id' => $this->widget->id, 'quantity' => 1, 'unit_price' => 500],
             ['product_id' => $this->gadget->id, 'quantity' => 2, 'unit_price' => 100],
             ['product_id' => $this->widget->id, 'quantity' => 1, 'unit_price' => 300],
@@ -80,14 +81,14 @@ test('the product shares of an ad-spend request are its particulars summed per p
         ->and((float) $shares[1]->amount)->toBe(200.0);
 });
 
-test('every ad-spend particular needs a product of this workspace', function () {
+test('every per-product particular needs a product of this workspace', function () {
     $foreign = Product::factory()->create([
         'workspace_id' => Workspace::factory()->create(['owner_id' => $this->user->id])->id,
         'owner_id' => $this->user->id,
     ]);
 
     $this->actingAs($this->user)
-        ->post($this->url, adSpentPayload([
+        ->post($this->url, perProductPayload([
             ['name' => 'Typed name', 'quantity' => 1, 'unit_price' => 100],
             ['product_id' => $foreign->id, 'quantity' => 1, 'unit_price' => 100],
         ]))
@@ -96,18 +97,13 @@ test('every ad-spend particular needs a product of this workspace', function () 
     expect(FundRequest::count())->toBe(0);
 });
 
-test('other types keep typed particulars and drop any product', function () {
-    $supplies = TransactionType::create([
-        'workspace_id' => $this->workspace->id,
-        'name' => 'Office Supplies',
-        'nature' => 'debit',
-        'fund_requestable' => true,
-    ]);
+test('a type without the flag keeps typed particulars and drops any product, whatever its name', function () {
+    $this->perProduct->update(['fund_requestable_per_product' => false]);
 
     $this->actingAs($this->user)
-        ->post($this->url, adSpentPayload([
+        ->post($this->url, perProductPayload([
             ['name' => 'Bond paper', 'product_id' => $this->widget->id, 'quantity' => 1, 'unit_price' => 100],
-        ], ['transaction_type_id' => $supplies->id]))
+        ]))
         ->assertSessionHasNoErrors();
 
     $request = FundRequest::sole();
@@ -117,8 +113,32 @@ test('other types keep typed particulars and drop any product', function () {
         ->and($request->productShares)->toHaveCount(0);
 });
 
-test('the form is told which types are ad spend', function () {
+test('the form is told which types are per product', function () {
     $this->actingAs($this->user)
         ->get("{$this->url}/create")
-        ->assertInertia(fn ($p) => $p->where('adSpentTypeIds', [$this->adSpent->id]));
+        ->assertInertia(fn ($p) => $p
+            ->where('transactionTypes.0.id', $this->perProduct->id)
+            ->where('transactionTypes.0.fund_requestable_per_product', true));
+});
+
+test('the flag is set on the transaction type, and only kept on a requestable one', function () {
+    $url = "/workspaces/{$this->workspace->slug}/finance/transaction-types";
+
+    $this->actingAs($this->user)
+        ->post($url, ['name' => 'Boosting', 'nature' => 'debit', 'fund_requestable' => true, 'fund_requestable_per_product' => true])
+        ->assertSessionHasNoErrors();
+    $this->actingAs($this->user)
+        ->post($url, ['name' => 'Rent', 'nature' => 'debit', 'fund_requestable' => false, 'fund_requestable_per_product' => true])
+        ->assertSessionHasNoErrors();
+
+    expect(TransactionType::where('name', 'Boosting')->sole()->fund_requestable_per_product)->toBeTrue()
+        ->and(TransactionType::where('name', 'Rent')->sole()->fund_requestable_per_product)->toBeFalse();
+
+    $boosting = TransactionType::where('name', 'Boosting')->sole();
+
+    $this->actingAs($this->user)
+        ->put("{$url}/{$boosting->id}", ['name' => 'Boosting', 'nature' => 'debit', 'fund_requestable' => true, 'fund_requestable_per_product' => false])
+        ->assertSessionHasNoErrors();
+
+    expect($boosting->fresh()->fund_requestable_per_product)->toBeFalse();
 });

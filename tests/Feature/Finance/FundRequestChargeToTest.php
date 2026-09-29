@@ -256,7 +256,7 @@ test('only fund-requestable types are offered and accepted', function () {
 });
 
 test('an edit keeps a type that has since stopped being fund-requestable', function () {
-    $type = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Office Supplies', 'fund_requestable' => true]);
+    $type = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Ad Spent', 'fund_requestable' => true]);
 
     $this->actingAs($this->user)->post($this->url, fundRequestPayload([
         'transaction_type_id' => $type->id,
