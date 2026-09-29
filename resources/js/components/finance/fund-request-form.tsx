@@ -75,6 +75,8 @@ export interface PaymentMethodOption {
 /** A line item of a request; `amount` is quantity × unit price. */
 export interface FundRequestParticular {
     id: number;
+    // Only on ad-spend requests, where `name` is the product's.
+    product_id: number | null;
     name: string;
     quantity: number | string;
     unit_price: number | string;
@@ -83,6 +85,7 @@ export interface FundRequestParticular {
 
 /** A particular as the form edits and submits it. */
 interface ParticularRow {
+    product_id: number | '';
     name: string;
     quantity: string;
     unit_price: string;
@@ -155,6 +158,11 @@ interface Props {
     users: UserOption[];
     products: ProductOption[];
     transactionTypes: FundRequestType[];
+    /**
+     * Ad-spend types: their particulars each pick a product, and the product
+     * shares are worked out from them (see TransactionType::isAdSpent()).
+     */
+    adSpentTypeIds: number[];
     departments: DepartmentOption[];
     paymentMethods: PaymentMethodOption[];
     onCancel: () => void;
@@ -179,6 +187,7 @@ const particularAmount = (row: ParticularRow) =>
     );
 
 const emptyParticular = (): ParticularRow => ({
+    product_id: '',
     name: '',
     quantity: '1',
     unit_price: '',
@@ -193,6 +202,7 @@ const initialParticulars = (
 ): ParticularRow[] => {
     if (requestFund?.particulars?.length) {
         return requestFund.particulars.map((p) => ({
+            product_id: p.product_id ?? '',
             name: p.name,
             quantity: String(Number(p.quantity)),
             unit_price: Number(p.unit_price).toFixed(2),
@@ -201,6 +211,7 @@ const initialParticulars = (
     if (requestFund && Number(requestFund.amount_requested) > 0) {
         return [
             {
+                product_id: '',
                 name: '',
                 quantity: '1',
                 unit_price: Number(requestFund.amount_requested).toFixed(2),
@@ -221,6 +232,7 @@ export function FundRequestForm({
     users,
     products,
     transactionTypes,
+    adSpentTypeIds,
     departments,
     paymentMethods,
     onCancel,
@@ -264,6 +276,9 @@ export function FundRequestForm({
     const type = transactionTypes.find(
         (t) => String(t.id) === data.transaction_type_id,
     );
+    // Ad spend is split by product in the particulars themselves, so the
+    // product allocation is left to the server to work out from them.
+    const isAdSpent = !!type && adSpentTypeIds.includes(type.id);
     const savedFiles = requestFund?.files ?? [];
 
     // The shares carry on splitting evenly until someone types their own
@@ -303,7 +318,7 @@ export function FundRequestForm({
     const chargeToRef = useRef<HTMLDivElement>(null);
     const productsRef = useRef<HTMLDivElement>(null);
     const chargeToBalanced = sharesBalanced(chargeToRows, total);
-    const productsBalanced = sharesBalanced(productRows, total);
+    const productsBalanced = isAdSpent || sharesBalanced(productRows, total);
 
     const unbalancedMessage = (label: string, rows: Share[]) =>
         `The ${label} shares add up to ${money(
@@ -393,7 +408,11 @@ export function FundRequestForm({
 
         // Files only travel as multipart, which PUT can't carry — so an edit is
         // POSTed with Laravel's method spoofing instead.
-        transform((d) => (isEditing ? { ...d, _method: 'put' } : d));
+        transform((d) => ({
+            ...d,
+            ...(isAdSpent ? { products: [] } : {}),
+            ...(isEditing ? { _method: 'put' } : {}),
+        }));
         post(isEditing ? `${base}/${requestFund!.id}` : base, {
             preserveScroll: true,
         });
@@ -474,10 +493,15 @@ export function FundRequestForm({
 
                 <Section
                     title="Particulars"
-                    hint="What the funds are for, line by line. Each amount is the quantity × unit price; together they make the amount requested."
+                    hint={
+                        isAdSpent
+                            ? 'The products the ad spend is for, line by line. Each amount is the quantity × unit price; together they make the amount requested, and each product’s total is its share.'
+                            : 'What the funds are for, line by line. Each amount is the quantity × unit price; together they make the amount requested.'
+                    }
                 >
                     <Wide>
                         <ParticularsEditor
+                            products={isAdSpent ? products : null}
                             rows={data.particulars}
                             onChange={(rows) => setData('particulars', rows)}
                             errors={fieldErrors}
@@ -649,7 +673,11 @@ export function FundRequestForm({
 
                 <Section
                     title="Allocation"
-                    hint="Who the request is charged to and the products it covers. Pick as many as apply — the amount is split between them."
+                    hint={
+                        isAdSpent
+                            ? 'Who the request is charged to. Pick as many as apply — the amount is split between them. The products come from the particulars.'
+                            : 'Who the request is charged to and the products it covers. Pick as many as apply — the amount is split between them.'
+                    }
                 >
                     <Wide ref={chargeToRef}>
                         <ShareAllocator
@@ -685,36 +713,41 @@ export function FundRequestForm({
                         />
                     </Wide>
 
-                    <Wide ref={productsRef}>
-                        <ShareAllocator
-                            label="Products Involved"
-                            options={products.map((p) => ({
-                                value: String(p.id),
-                                label: p.name,
-                            }))}
-                            rows={productRows}
-                            total={total}
-                            onChange={(rows) =>
-                                setData(
-                                    'products',
-                                    rows.map((r) => ({
-                                        product_id: Number(r.key),
-                                        amount: r.amount,
-                                    })),
-                                )
-                            }
-                            placeholder="Select products…"
-                            error={
-                                errorFor('products') ??
-                                (showShareErrors && !productsBalanced
-                                    ? unbalancedMessage('product', productRows)
-                                    : undefined)
-                            }
-                            autoSplit={autoSplitProducts}
-                            onAutoSplitChange={setAutoSplitProducts}
-                            hint="Optional — leave empty if it isn’t for any product in particular."
-                        />
-                    </Wide>
+                    {!isAdSpent && (
+                        <Wide ref={productsRef}>
+                            <ShareAllocator
+                                label="Products Involved"
+                                options={products.map((p) => ({
+                                    value: String(p.id),
+                                    label: p.name,
+                                }))}
+                                rows={productRows}
+                                total={total}
+                                onChange={(rows) =>
+                                    setData(
+                                        'products',
+                                        rows.map((r) => ({
+                                            product_id: Number(r.key),
+                                            amount: r.amount,
+                                        })),
+                                    )
+                                }
+                                placeholder="Select products…"
+                                error={
+                                    errorFor('products') ??
+                                    (showShareErrors && !productsBalanced
+                                        ? unbalancedMessage(
+                                              'product',
+                                              productRows,
+                                          )
+                                        : undefined)
+                                }
+                                autoSplit={autoSplitProducts}
+                                onAutoSplitChange={setAutoSplitProducts}
+                                hint="Optional — leave empty if it isn’t for any product in particular."
+                            />
+                        </Wide>
+                    )}
                 </Section>
 
                 <Section
@@ -986,27 +1019,45 @@ function AttachmentSlot({
 
 /**
  * The request's line items: name, quantity and unit price per row, with the
- * row's amount and the running total worked out as they are typed.
+ * row's amount and the running total worked out as they are typed. Given
+ * `products` (an ad-spend request), each row picks a product instead of
+ * being named.
  */
 function ParticularsEditor({
+    products,
     rows,
     onChange,
     errors,
     total,
 }: {
+    products: ProductOption[] | null;
     rows: ParticularRow[];
     onChange: (rows: ParticularRow[]) => void;
     errors: Record<string, string | undefined>;
     total: number;
 }) {
-    const update = (index: number, field: keyof ParticularRow, value: string) =>
+    const update = (
+        index: number,
+        field: keyof ParticularRow,
+        value: string | number,
+    ) =>
         onChange(
             rows.map((row, i) =>
                 i === index ? { ...row, [field]: value } : row,
             ),
         );
 
+    // A saved row's product may since have gone out of the user's list; it
+    // keeps showing under its saved name rather than as a blank pick.
+    const productOptions = (row: ParticularRow) =>
+        products &&
+        row.product_id !== '' &&
+        !products.some((p) => p.id === row.product_id)
+            ? [...products, { id: row.product_id, name: row.name }]
+            : (products ?? []);
+
     const rowError = (index: number) =>
+        errors[`particulars.${index}.product_id`] ??
         errors[`particulars.${index}.name`] ??
         errors[`particulars.${index}.quantity`] ??
         errors[`particulars.${index}.unit_price`];
@@ -1020,7 +1071,8 @@ function ParticularsEditor({
                 className={`hidden gap-2 border-b border-black/6 bg-stone-50 px-3 py-2 font-mono text-[10px] tracking-wider text-gray-400 uppercase sm:grid dark:border-white/6 dark:bg-zinc-800/60 ${cols}`}
             >
                 <span>
-                    Name<span className="ml-0.5 text-red-500">*</span>
+                    {products ? 'Product' : 'Name'}
+                    <span className="ml-0.5 text-red-500">*</span>
                 </span>
                 <span>
                     Qty<span className="ml-0.5 text-red-500">*</span>
@@ -1038,16 +1090,40 @@ function ParticularsEditor({
                         <div
                             className={`grid grid-cols-[1fr_1fr_36px] gap-2 ${cols}`}
                         >
-                            <input
-                                type="text"
-                                value={row.name}
-                                onChange={(e) =>
-                                    update(index, 'name', e.target.value)
-                                }
-                                placeholder="e.g. Bond paper"
-                                aria-label="Particular name"
-                                className={`${inputCls} col-span-2 sm:col-span-1`}
-                            />
+                            {products ? (
+                                <select
+                                    value={row.product_id}
+                                    onChange={(e) =>
+                                        update(
+                                            index,
+                                            'product_id',
+                                            e.target.value
+                                                ? Number(e.target.value)
+                                                : '',
+                                        )
+                                    }
+                                    aria-label="Product"
+                                    className={`${inputCls} col-span-2 sm:col-span-1`}
+                                >
+                                    <option value="">Select product…</option>
+                                    {productOptions(row).map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={row.name}
+                                    onChange={(e) =>
+                                        update(index, 'name', e.target.value)
+                                    }
+                                    placeholder="e.g. Bond paper"
+                                    aria-label="Particular name"
+                                    className={`${inputCls} col-span-2 sm:col-span-1`}
+                                />
+                            )}
                             <button
                                 type="button"
                                 onClick={() =>

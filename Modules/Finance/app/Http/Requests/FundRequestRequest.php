@@ -9,6 +9,8 @@ use Illuminate\Validation\Rule;
 use Modules\Finance\Http\Requests\Concerns\SplitsShares;
 use Modules\Finance\Models\FundRequest;
 use Modules\Finance\Models\FundRequestAttachmentRequirement;
+use Modules\Finance\Models\TransactionType;
+use Modules\Products\Models\Product;
 
 class FundRequestRequest extends FormRequest
 {
@@ -19,6 +21,9 @@ class FundRequestRequest extends FormRequest
      * iOS photos are often detected as the former), PDFs, and office files.
      */
     public const ATTACHMENT_MIMES = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'];
+
+    /** Memo for isAdSpent(). */
+    private ?bool $adSpent = null;
 
     public function authorize(): bool
     {
@@ -60,8 +65,15 @@ class FundRequestRequest extends FormRequest
             // What the funds are for, line by line. The amount requested is
             // their total and each row's amount its quantity × unit price, both
             // worked out here rather than taken from the client.
+            // On an ad-spend request each row is for a product instead of a
+            // typed name; the name is then that product's, set in particulars().
             'particulars' => ['required', 'array', 'min:1'],
-            'particulars.*.name' => ['required', 'string', 'max:255'],
+            'particulars.*.name' => [Rule::requiredIf(! $this->isAdSpent()), 'nullable', 'string', 'max:255'],
+            'particulars.*.product_id' => [
+                Rule::requiredIf($this->isAdSpent()),
+                'nullable',
+                Rule::exists('products', 'id')->where('workspace_id', $workspace->id),
+            ],
             'particulars.*.quantity' => ['required', 'numeric', 'gt:0', 'max:9999999999'],
             'particulars.*.unit_price' => ['required', 'numeric', 'min:0', 'max:9999999999999'],
             'remarks' => ['nullable', 'string', 'max:2000'],
@@ -84,6 +96,7 @@ class FundRequestRequest extends FormRequest
             'account_number' => [Rule::requiredIf($this->needsAccount()), 'nullable', 'string', 'max:255'],
 
             // The products the request covers, each bearing a share of the amount.
+            // Not asked for on an ad-spend request, whose particulars say it.
             'products' => ['nullable', 'array'],
             'products.*.product_id' => [
                 'required',
@@ -171,19 +184,44 @@ class FundRequestRequest extends FormRequest
     }
 
     /**
-     * The submitted particulars as `{name, quantity, unit_price, amount}`, each
-     * amount being its quantity × unit price.
+     * Whether the chosen transaction type is ad spend, whose particulars are
+     * each for a product (see TransactionType::isAdSpent()).
+     */
+    public function isAdSpent(): bool
+    {
+        return $this->adSpent ??= (bool) TransactionType::where('workspace_id', $this->route('workspace')->id)
+            ->find($this->input('transaction_type_id'))
+            ?->isAdSpent();
+    }
+
+    /**
+     * The submitted particulars as `{product_id, name, quantity, unit_price,
+     * amount}`, each amount being its quantity × unit price. On an ad-spend
+     * request the name is the product's; otherwise there is no product.
      *
-     * @return list<array{name:string, quantity:float, unit_price:float, amount:float}>
+     * @return list<array{product_id:?int, name:string, quantity:float, unit_price:float, amount:float}>
      */
     public function particulars(): array
     {
-        return array_map(fn ($row) => [
-            'name' => trim($row['name']),
-            'quantity' => round((float) $row['quantity'], 2),
-            'unit_price' => round((float) $row['unit_price'], 2),
-            'amount' => round(round((float) $row['quantity'], 2) * round((float) $row['unit_price'], 2), 2),
-        ], array_values($this->input('particulars', [])));
+        $rows = array_values($this->input('particulars', []));
+
+        $names = $this->isAdSpent()
+            ? Product::where('workspace_id', $this->route('workspace')->id)
+                ->whereIn('id', array_filter(array_column($rows, 'product_id')))
+                ->pluck('name', 'id')
+            : collect();
+
+        return array_map(function ($row) use ($names) {
+            $productId = $this->isAdSpent() ? (int) $row['product_id'] : null;
+
+            return [
+                'product_id' => $productId,
+                'name' => $productId ? ($names[$productId] ?? '') : trim($row['name']),
+                'quantity' => round((float) $row['quantity'], 2),
+                'unit_price' => round((float) $row['unit_price'], 2),
+                'amount' => round(round((float) $row['quantity'], 2) * round((float) $row['unit_price'], 2), 2),
+            ];
+        }, $rows);
     }
 
     /** Whether the chosen payment method sends the funds to an account. */
@@ -217,12 +255,25 @@ class FundRequestRequest extends FormRequest
 
     /**
      * The submitted product rows as `{product_id, amount}`, blank shares taking
-     * an even cut of the remainder (see SplitsShares).
+     * an even cut of the remainder (see SplitsShares). On an ad-spend request
+     * they come from the particulars instead: each product's share is the total
+     * of its rows, so a transaction filled in from the request still gets them.
      *
      * @return list<array{product_id:int, amount:float}>
      */
     public function productShares(): array
     {
+        if ($this->isAdSpent()) {
+            return collect($this->particulars())
+                ->groupBy('product_id')
+                ->map(fn ($rows, $productId) => [
+                    'product_id' => (int) $productId,
+                    'amount' => round($rows->sum('amount'), 2),
+                ])
+                ->values()
+                ->all();
+        }
+
         return array_map(
             fn ($row) => ['product_id' => (int) $row['product_id'], 'amount' => $row['amount']],
             $this->splitShares('products', 'product_id', $this->requestTotal()),
@@ -240,6 +291,8 @@ class FundRequestRequest extends FormRequest
             'particulars.required' => 'Add at least one particular.',
             'particulars.min' => 'Add at least one particular.',
             'particulars.*.name.required' => 'Name every particular.',
+            'particulars.*.product_id.required' => 'Pick a product for every particular.',
+            'particulars.*.product_id.exists' => 'The product must belong to this workspace.',
             'particulars.*.quantity.gt' => 'The quantity must be more than zero.',
             'charge_to.required' => 'Charge the request to at least one member.',
             'charge_to.*.user_id.required' => 'Select a member for every charge-to row.',

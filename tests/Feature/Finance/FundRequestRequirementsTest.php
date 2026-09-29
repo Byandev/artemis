@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Modules\Finance\Models\FundRequest;
 use Modules\Finance\Models\FundRequestAttachment;
 use Modules\Finance\Models\TransactionType;
+use Modules\Products\Models\Product;
 
 beforeEach(function () {
     $this->disk = config('filesystems.fund_request_attachment_disk');
@@ -27,15 +28,20 @@ beforeEach(function () {
     $this->salary = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Salary', 'nature' => 'debit', 'fund_requestable' => true]);
     $this->payslip = $this->salary->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Payslip']);
     $this->approved = $this->salary->checklists()->create(['workspace_id' => $this->workspace->id, 'name' => 'Approved']);
+
+    $this->product = Product::factory()->create(['workspace_id' => $this->workspace->id, 'owner_id' => $this->user->id]);
 });
 
-/** A valid request body for the given type, with extra fields merged in. */
+/**
+ * A valid request body for the given type, with extra fields merged in. The
+ * particular carries a product for Ad Spent, which the other types ignore.
+ */
 function requirementsPayload(TransactionType $type, array $extra = []): array
 {
     return [
         'transaction_type_id' => $type->id,
         'payment_method' => 'cash',
-        'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 500]],
+        'particulars' => [['name' => 'Item', 'product_id' => test()->product->id, 'quantity' => 1, 'unit_price' => 500]],
         'charge_to' => [['user_id' => test()->user->id]],
         ...$extra,
     ];
@@ -177,7 +183,7 @@ test('an edit without files keeps the ones on file', function () {
     $request = FundRequest::sole();
 
     $this->actingAs($this->user)
-        ->put("{$this->url}/{$request->id}", requirementsPayload($this->adSpent, ['particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 800]]]))
+        ->put("{$this->url}/{$request->id}", requirementsPayload($this->adSpent, ['particulars' => [['name' => 'Item', 'product_id' => $this->product->id, 'quantity' => 1, 'unit_price' => 800]]]))
         ->assertSessionHasNoErrors();
 
     expect(requestMedia($request)->pluck('file_name')->sort()->values()->all())->toBe(['statement.pdf', 'tracker.pdf'])

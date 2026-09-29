@@ -79,6 +79,19 @@ class TransactionType extends Model
         return $isCogs && $isDelivery;
     }
 
+    /**
+     * Whether this is the ad-spend type — "Ad Spent", "Adspent", "Ad Spend".
+     * A fund request of this type is split by product line by line: each
+     * particular is for a product, and the product shares are their totals.
+     *
+     * Matched on the name, as isCogsDelivery() is and as the statements find
+     * ad spend (TransactionTotals::AD_SPENT).
+     */
+    public function isAdSpent(): bool
+    {
+        return str_contains(str_replace(' ', '', mb_strtolower($this->name ?? '')), 'adspen');
+    }
+
     /** The effective basis: the configured one, or the default when unset. */
     public function allocationBasis(): string
     {

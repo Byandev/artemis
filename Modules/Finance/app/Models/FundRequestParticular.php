@@ -4,11 +4,13 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Products\Models\Product;
 
 /**
  * One line item of a fund request. `amount` is `quantity` × `unit_price`,
  * worked out on save (see FundRequestRequest::particulars()); a request's
- * particulars sum to its amount requested.
+ * particulars sum to its amount requested. On an ad-spend request each row is
+ * for a product, `name` holding a snapshot of that product's name.
  */
 class FundRequestParticular extends Model
 {
@@ -16,6 +18,7 @@ class FundRequestParticular extends Model
 
     protected $fillable = [
         'fund_request_id',
+        'product_id',
         'name',
         'quantity',
         'unit_price',
@@ -33,5 +36,10 @@ class FundRequestParticular extends Model
     public function fundRequest(): BelongsTo
     {
         return $this->belongsTo(FundRequest::class, 'fund_request_id');
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 }

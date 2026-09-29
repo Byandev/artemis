@@ -19,6 +19,7 @@ interface Props {
     users: UserOption[];
     products: ProductOption[];
     transactionTypes: FundRequestType[];
+    adSpentTypeIds: number[];
     departments: DepartmentOption[];
     paymentMethods: PaymentMethodOption[];
 }
@@ -29,6 +30,7 @@ export default function RequestFundEdit({
     users,
     products,
     transactionTypes,
+    adSpentTypeIds,
     departments,
     paymentMethods,
 }: Props) {
@@ -57,6 +59,7 @@ export default function RequestFundEdit({
                         users={users}
                         products={products}
                         transactionTypes={transactionTypes}
+                        adSpentTypeIds={adSpentTypeIds}
                         departments={departments}
                         paymentMethods={paymentMethods}
                         onCancel={() => router.get(backTo)}
