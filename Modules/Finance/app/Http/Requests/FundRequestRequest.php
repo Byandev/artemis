@@ -39,9 +39,14 @@ class FundRequestRequest extends FormRequest
             // creation time and the signed-in user (see the controller), so they
             // are not accepted from the client. reference_no is likewise
             // system-generated and never changes.
+            // A fund-requestable type, or (on an edit) the type the request
+            // already has, should that type since have been switched off.
             'transaction_type_id' => [
                 'nullable',
-                Rule::exists('finance_transaction_types', 'id')->where('workspace_id', $workspace->id),
+                Rule::exists('finance_transaction_types', 'id')
+                    ->where('workspace_id', $workspace->id)
+                    ->where(fn ($q) => $q->where('fund_requestable', true)
+                        ->when($this->route('requestFund')?->transaction_type_id, fn ($q, $id) => $q->orWhere('id', $id))),
             ],
             'department_id' => [
                 'nullable',
@@ -186,6 +191,7 @@ class FundRequestRequest extends FormRequest
             'products.*.product_id.required' => 'Select a product for every product row.',
             'products.*.product_id.exists' => 'The product must belong to this workspace.',
             'products.*.product_id.distinct' => 'Each product can only be listed once.',
+            'transaction_type_id.exists' => 'Pick a transaction type that fund requests can use.',
             'checklist_ids.*.exists' => 'That checklist item is not on the selected type\'s checklist.',
             'attachments.*.mimes' => 'Upload an image, PDF, Word, Excel or CSV file.',
             'attachments.*.max' => 'The file may not be larger than 10 MB.',

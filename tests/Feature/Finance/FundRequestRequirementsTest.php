@@ -19,12 +19,12 @@ beforeEach(function () {
     ]);
     $this->url = "/workspaces/{$this->workspace->slug}/finance/request-funds";
 
-    $this->adSpent = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Ad Spent', 'nature' => 'debit']);
+    $this->adSpent = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Ad Spent', 'nature' => 'debit', 'fund_requestable' => true]);
     $this->statement = $this->adSpent->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Bank Statement']);
     $this->tracker = $this->adSpent->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Liquidation Tracker']);
     $this->budget = $this->adSpent->checklists()->create(['workspace_id' => $this->workspace->id, 'name' => 'Budget']);
 
-    $this->salary = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Salary', 'nature' => 'debit']);
+    $this->salary = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Salary', 'nature' => 'debit', 'fund_requestable' => true]);
     $this->payslip = $this->salary->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Payslip']);
     $this->approved = $this->salary->checklists()->create(['workspace_id' => $this->workspace->id, 'name' => 'Approved']);
 });
@@ -149,7 +149,7 @@ test('cannot save without a file for every attachment the type calls for', funct
 });
 
 test('a type with no attachments needs no files', function () {
-    $bare = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Refund', 'nature' => 'credit']);
+    $bare = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Refund', 'nature' => 'credit', 'fund_requestable' => true]);
 
     $this->actingAs($this->user)
         ->post($this->url, requirementsPayload($bare))

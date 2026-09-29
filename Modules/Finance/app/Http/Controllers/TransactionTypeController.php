@@ -77,6 +77,8 @@ class TransactionTypeController extends Controller
             'income_statement_section' => ['nullable', Rule::in(TransactionType::INCOME_STATEMENT_SECTIONS)],
             // How an OPEX pool is split across products; null = the default.
             'opex_allocation_basis' => ['nullable', Rule::in(array_keys(TransactionType::ALLOCATION_BASES))],
+            // Whether the fund request form offers this type.
+            'fund_requestable' => ['boolean'],
         ];
     }
 
@@ -93,6 +95,7 @@ class TransactionTypeController extends Controller
             'nature' => $validated['nature'],
             'income_statement_section' => $validated['income_statement_section'] ?? null,
             'opex_allocation_basis' => $validated['opex_allocation_basis'] ?? null,
+            'fund_requestable' => $request->boolean('fund_requestable'),
         ]);
 
         return redirect()->back()->with('success', 'Transaction type created.');
@@ -111,6 +114,7 @@ class TransactionTypeController extends Controller
             'nature' => $validated['nature'],
             'income_statement_section' => $validated['income_statement_section'] ?? null,
             'opex_allocation_basis' => $validated['opex_allocation_basis'] ?? null,
+            'fund_requestable' => $request->boolean('fund_requestable'),
         ]);
 
         return redirect()->back()->with('success', 'Transaction type updated.');

@@ -26,6 +26,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -57,6 +58,8 @@ interface TransactionType {
     // Which company metric an OPEX pool is split across products by; null =
     // the default. Only meaningful when the section is `opex`.
     opex_allocation_basis: string | null;
+    // Whether the fund request form offers this type.
+    fund_requestable: boolean;
     // What a fund request of this type calls for.
     attachments: NamedItem[];
     checklists: NamedItem[];
@@ -201,6 +204,23 @@ export default function TransactionTypesIndex({
                     </span>
                 );
             },
+        },
+        {
+            accessorKey: 'fund_requestable',
+            enableSorting: false,
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                    Fund Request
+                </div>
+            ),
+            cell: ({ row }) =>
+                row.original.fund_requestable ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] text-emerald-700 uppercase dark:bg-emerald-950/40 dark:text-emerald-300">
+                        Yes
+                    </span>
+                ) : (
+                    <span className="text-gray-300 dark:text-gray-600">—</span>
+                ),
         },
         {
             accessorKey: 'opex_allocation_basis',
@@ -414,11 +434,13 @@ function TypeFormDialog({
             nature: Nature;
             income_statement_section: IncomeStatementSection;
             opex_allocation_basis: string | null;
+            fund_requestable: boolean;
         }>({
             name: '',
             nature: 'debit',
             income_statement_section: 'opex',
             opex_allocation_basis: null,
+            fund_requestable: false,
         });
 
     useEffect(() => {
@@ -431,6 +453,7 @@ function TypeFormDialog({
                     type.income_statement_section,
                 );
                 setData('opex_allocation_basis', type.opex_allocation_basis);
+                setData('fund_requestable', type.fund_requestable);
             } else {
                 reset();
                 clearErrors();
@@ -584,6 +607,27 @@ function TypeFormDialog({
                                 })}
                             </div>
                         </Field>
+
+                        <label className="flex cursor-pointer items-start justify-between gap-3 rounded-[10px] border border-black/6 bg-stone-50 p-3 dark:border-white/6 dark:bg-zinc-800/50">
+                            <span className="text-[12px] leading-snug text-gray-600 dark:text-gray-300">
+                                <span className="font-medium text-gray-800 dark:text-gray-100">
+                                    Fund requestable
+                                </span>
+                                <br />
+                                Offer this type on the fund request form.
+                            </span>
+                            <Switch
+                                checked={data.fund_requestable}
+                                onCheckedChange={(v) =>
+                                    setData('fund_requestable', v)
+                                }
+                            />
+                        </label>
+                        {errors.fund_requestable && (
+                            <p className="-mt-3 text-[11px] text-red-500">
+                                {errors.fund_requestable}
+                            </p>
+                        )}
 
                         {/* A shared OPEX pool is split across products by its
                             share of some company metric — and which metric fits

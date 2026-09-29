@@ -3,6 +3,7 @@
 namespace Modules\Finance\Models;
 
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -49,6 +50,11 @@ class TransactionType extends Model
         'nature',
         'income_statement_section',
         'opex_allocation_basis',
+        'fund_requestable',
+    ];
+
+    protected $casts = [
+        'fund_requestable' => 'boolean',
     ];
 
     /**
@@ -77,6 +83,12 @@ class TransactionType extends Model
     public function allocationBasis(): string
     {
         return $this->opex_allocation_basis ?: self::DEFAULT_ALLOCATION_BASIS;
+    }
+
+    /** Types a fund request can be raised against. */
+    public function scopeFundRequestable(Builder $query): void
+    {
+        $query->where('fund_requestable', true);
     }
 
     public function workspace(): BelongsTo

@@ -188,3 +188,24 @@ test('404s when the finance module is off', function () {
 
     $this->actingAs($this->user)->get($this->url)->assertNotFound();
 });
+
+test('a type is fund-requestable only when marked so, and can be switched off', function () {
+    $url = "/workspaces/{$this->workspace->slug}/finance/transaction-types";
+
+    $this->actingAs($this->user)
+        ->post($url, ['name' => 'Salary', 'nature' => 'debit', 'fund_requestable' => true])
+        ->assertRedirect();
+    $this->actingAs($this->user)
+        ->post($url, ['name' => 'Sales', 'nature' => 'credit'])
+        ->assertRedirect();
+
+    $salary = TransactionType::where('name', 'Salary')->sole();
+    expect($salary->fund_requestable)->toBeTrue()
+        ->and(TransactionType::where('name', 'Sales')->sole()->fund_requestable)->toBeFalse();
+
+    $this->actingAs($this->user)
+        ->put("{$url}/{$salary->id}", ['name' => 'Salary', 'nature' => 'debit', 'fund_requestable' => false])
+        ->assertRedirect();
+
+    expect($salary->fresh()->fund_requestable)->toBeFalse();
+});

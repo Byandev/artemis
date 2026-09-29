@@ -123,7 +123,7 @@ class FundRequestController extends Controller
                 'checklist_ids' => $requestFund->checkedChecklists->pluck('id'),
                 'files' => $this->filesFor($workspace, $requestFund),
             ],
-            ...$this->formOptions($request, $workspace),
+            ...$this->formOptions($request, $workspace, $requestFund),
         ]);
     }
 
@@ -370,14 +370,18 @@ class FundRequestController extends Controller
     /**
      * Option lists for the create / edit form. Each transaction type carries the
      * attachments and checklist it calls for, so the form can show them the
-     * moment the type is picked.
+     * moment the type is picked. Only fund-requestable types are offered, plus
+     * the type of the request being edited, so an edit doesn't lose its type
+     * when that type has since been switched off.
      */
-    protected function formOptions(Request $request, Workspace $workspace): array
+    protected function formOptions(Request $request, Workspace $workspace, ?FundRequest $fundRequest = null): array
     {
         return [
             'users' => $workspace->users()->orderBy('users.name')->get(['users.id', 'users.name']),
             'products' => $this->productOptions($request, $workspace),
             'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->where(fn ($q) => $q->fundRequestable()
+                    ->when($fundRequest?->transaction_type_id, fn ($q, $id) => $q->orWhere('id', $id)))
                 ->with(['attachments:id,name', 'checklists:id,name'])
                 ->orderBy('name')
                 ->get(['id', 'name', 'nature']),
