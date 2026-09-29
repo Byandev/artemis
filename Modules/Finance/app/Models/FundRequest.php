@@ -22,6 +22,20 @@ class FundRequest extends Model
     /** Statuses that represent a decision made by an approver. */
     public const APPROVED_STATUSES = ['approved', 'released'];
 
+    /** How the funds can be released, keyed by stored value => label. */
+    public const PAYMENT_METHODS = [
+        'online_banking' => 'Online Banking',
+        'e_wallet' => 'E-Wallet',
+        'cheque' => 'Cheque',
+        'cash' => 'Cash',
+    ];
+
+    /**
+     * The methods that send the funds to an account, and so need the bank (or
+     * e-wallet provider), account name and account number.
+     */
+    public const PAYMENT_METHODS_WITH_ACCOUNT = ['online_banking', 'e_wallet'];
+
     protected $fillable = [
         'workspace_id',
         'request_date',
@@ -30,6 +44,12 @@ class FundRequest extends Model
         'transaction_type_id',
         'department_id',
         'amount_requested',
+        'liquidation_required',
+        'liquidation_deadline',
+        'payment_method',
+        'bank_name',
+        'account_name',
+        'account_number',
         'approved_by',
         'status',
         'remarks',
@@ -38,6 +58,8 @@ class FundRequest extends Model
     protected $casts = [
         'request_date' => 'date',
         'amount_requested' => 'decimal:2',
+        'liquidation_required' => 'boolean',
+        'liquidation_deadline' => 'date:Y-m-d',
     ];
 
     protected static function booted(): void

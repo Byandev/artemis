@@ -15,6 +15,7 @@ function createFundRequest(): void
 {
     test()->actingAs(test()->user)
         ->post(test()->url, [
+            'payment_method' => 'cash',
             'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 500]],
             'charge_to' => [['user_id' => test()->user->id]],
         ])
@@ -53,6 +54,7 @@ test('numbering is per workspace', function () {
 
     $this->actingAs($this->user)
         ->post("/workspaces/{$other->slug}/finance/request-funds", [
+            'payment_method' => 'cash',
             'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 500]],
             'charge_to' => [['user_id' => $this->user->id]],
         ])

@@ -14,6 +14,7 @@ beforeEach(function () {
 function particularsPayload(array $particulars, array $extra = []): array
 {
     return [
+        'payment_method' => 'cash',
         'particulars' => $particulars,
         'charge_to' => [['user_id' => test()->user->id]],
         ...$extra,

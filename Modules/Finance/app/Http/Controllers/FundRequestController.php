@@ -277,13 +277,23 @@ class FundRequestController extends Controller
      * The column values for a request. The particulars, charge_to / products
      * pivots, checklist and attachments live in their own tables, so they are
      * stripped here and synced after the row exists. The amount requested is
-     * the particulars' total.
+     * the particulars' total, a deadline is dropped when liquidation isn't
+     * required, and the account details when the payment method doesn't send
+     * the funds to an account.
      */
     protected function attributesFor(array $validated, FundRequestRequest $request): array
     {
         return [
             ...collect($validated)->except(['particulars', 'charge_to', 'products', 'checklist_ids', 'attachments', 'remove_attachments'])->all(),
             'amount_requested' => $request->requestTotal(),
+            'liquidation_required' => $request->boolean('liquidation_required'),
+            'liquidation_deadline' => $request->boolean('liquidation_required')
+                ? $validated['liquidation_deadline']
+                : null,
+            // Only online banking and e-wallets go to an account.
+            ...collect(['bank_name', 'account_name', 'account_number'])
+                ->mapWithKeys(fn ($field) => [$field => $request->needsAccount() ? trim($validated[$field]) : null])
+                ->all(),
         ];
     }
 
@@ -408,6 +418,13 @@ class FundRequestController extends Controller
                 ->with(['attachments:id,name', 'checklists:id,name'])
                 ->orderBy('name')
                 ->get(['id', 'name', 'nature']),
+            'paymentMethods' => collect(FundRequest::PAYMENT_METHODS)
+                ->map(fn ($label, $value) => [
+                    'value' => $value,
+                    'label' => $label,
+                    'needs_account' => in_array($value, FundRequest::PAYMENT_METHODS_WITH_ACCOUNT, true),
+                ])
+                ->values(),
             'departments' => Department::ofWorkspace($workspace)
                 ->where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ];

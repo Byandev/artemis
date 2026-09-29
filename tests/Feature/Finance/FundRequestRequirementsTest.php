@@ -34,6 +34,7 @@ function requirementsPayload(TransactionType $type, array $extra = []): array
 {
     return [
         'transaction_type_id' => $type->id,
+        'payment_method' => 'cash',
         'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 500]],
         'charge_to' => [['user_id' => test()->user->id]],
         ...$extra,

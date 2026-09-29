@@ -66,6 +66,23 @@ class FundRequestRequest extends FormRequest
             'particulars.*.unit_price' => ['required', 'numeric', 'min:0', 'max:9999999999999'],
             'remarks' => ['nullable', 'string', 'max:2000'],
 
+            // Whether the funds have to be liquidated, and by when. The deadline
+            // is only kept when liquidation is required (see the controller).
+            'liquidation_required' => ['boolean'],
+            'liquidation_deadline' => [
+                Rule::requiredIf(fn () => $this->boolean('liquidation_required')),
+                'nullable',
+                'date',
+            ],
+
+            // How the funds are released. Online banking and e-wallets send them
+            // to an account, which has to be given; for the others the account
+            // fields are dropped (see the controller).
+            'payment_method' => ['required', Rule::in(array_keys(FundRequest::PAYMENT_METHODS))],
+            'bank_name' => [Rule::requiredIf($this->needsAccount()), 'nullable', 'string', 'max:255'],
+            'account_name' => [Rule::requiredIf($this->needsAccount()), 'nullable', 'string', 'max:255'],
+            'account_number' => [Rule::requiredIf($this->needsAccount()), 'nullable', 'string', 'max:255'],
+
             // The products the request covers, each bearing a share of the amount.
             'products' => ['nullable', 'array'],
             'products.*.product_id' => [
@@ -169,6 +186,12 @@ class FundRequestRequest extends FormRequest
         ], array_values($this->input('particulars', [])));
     }
 
+    /** Whether the chosen payment method sends the funds to an account. */
+    public function needsAccount(): bool
+    {
+        return in_array($this->input('payment_method'), FundRequest::PAYMENT_METHODS_WITH_ACCOUNT, true);
+    }
+
     /**
      * The amount requested — the particulars' total — which the charge-to and
      * product shares have to cover.
@@ -209,6 +232,11 @@ class FundRequestRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'payment_method.required' => 'Pick how the funds are to be released.',
+            'bank_name.required' => 'Enter the bank or e-wallet.',
+            'account_name.required' => 'Enter the account name.',
+            'account_number.required' => 'Enter the account number.',
+            'liquidation_deadline.required' => 'Set the liquidation deadline.',
             'particulars.required' => 'Add at least one particular.',
             'particulars.min' => 'Add at least one particular.',
             'particulars.*.name.required' => 'Name every particular.',

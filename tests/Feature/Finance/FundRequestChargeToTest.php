@@ -19,6 +19,7 @@ beforeEach(function () {
 function fundRequestPayload(array $attrs = []): array
 {
     return array_merge([
+        'payment_method' => 'cash',
         'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 900]],
     ], $attrs);
 }
@@ -75,6 +76,7 @@ test('an uneven split keeps every centavo, the odd ones going to the first user'
 
     $this->actingAs($this->user)
         ->post($this->url, fundRequestPayload([
+            'payment_method' => 'cash',
             'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 100]],
             'charge_to' => [
                 ['user_id' => $this->user->id],

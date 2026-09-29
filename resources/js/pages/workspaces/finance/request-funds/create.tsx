@@ -3,6 +3,7 @@ import {
     DepartmentOption,
     FundRequestForm,
     FundRequestType,
+    PaymentMethodOption,
     ProductOption,
     UserOption,
 } from '@/components/finance/fund-request-form';
@@ -17,6 +18,7 @@ interface Props {
     products: ProductOption[];
     transactionTypes: FundRequestType[];
     departments: DepartmentOption[];
+    paymentMethods: PaymentMethodOption[];
 }
 
 export default function RequestFundCreate({
@@ -25,6 +27,7 @@ export default function RequestFundCreate({
     products,
     transactionTypes,
     departments,
+    paymentMethods,
 }: Props) {
     const backTo = `/workspaces/${workspace.slug}/finance/request-funds`;
 
@@ -53,6 +56,7 @@ export default function RequestFundCreate({
                         products={products}
                         transactionTypes={transactionTypes}
                         departments={departments}
+                        paymentMethods={paymentMethods}
                         onCancel={() => router.get(backTo)}
                     />
                 </div>

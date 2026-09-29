@@ -15,6 +15,7 @@ import {
     TransactionTypeItem,
 } from '@/components/finance/transaction-type';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Link, useForm } from '@inertiajs/react';
 import {
     CheckCircle2,
@@ -58,6 +59,13 @@ export interface RequestFundProduct {
     product_id: number | null;
     product_label: string;
     amount: number | string;
+}
+
+/** A way the funds can be released; `needs_account` ones go to an account. */
+export interface PaymentMethodOption {
+    value: string;
+    label: string;
+    needs_account: boolean;
 }
 
 /** A line item of a request; `amount` is quantity × unit price. */
@@ -121,6 +129,12 @@ export interface RequestFund {
     product_shares?: RequestFundProduct[];
     particulars?: FundRequestParticular[];
     amount_requested: number | string;
+    liquidation_required: boolean;
+    liquidation_deadline: string | null;
+    payment_method: string | null;
+    bank_name: string | null;
+    account_name: string | null;
+    account_number: string | null;
     approved_by: number | null;
     status: string;
     remarks: string | null;
@@ -138,6 +152,7 @@ interface Props {
     products: ProductOption[];
     transactionTypes: FundRequestType[];
     departments: DepartmentOption[];
+    paymentMethods: PaymentMethodOption[];
     onCancel: () => void;
 }
 
@@ -203,6 +218,7 @@ export function FundRequestForm({
     products,
     transactionTypes,
     departments,
+    paymentMethods,
     onCancel,
 }: Props) {
     const isEditing = !!requestFund;
@@ -217,6 +233,12 @@ export function FundRequestForm({
         department_id: (requestFund?.department_id ?? '') as number | '',
         // The amount requested is their total, worked out by the server.
         particulars: initialParticulars(requestFund),
+        liquidation_required: requestFund?.liquidation_required ?? false,
+        liquidation_deadline: requestFund?.liquidation_deadline ?? '',
+        payment_method: requestFund?.payment_method ?? '',
+        bank_name: requestFund?.bank_name ?? '',
+        account_name: requestFund?.account_name ?? '',
+        account_number: requestFund?.account_number ?? '',
         charge_to: (requestFund?.charge_to_users ?? []).map((u) => ({
             user_id: u.id,
             amount: Number(u.pivot?.amount ?? 0).toFixed(2),
@@ -373,6 +395,11 @@ export function FundRequestForm({
         });
     };
 
+    const needsAccount = !!paymentMethods.find(
+        (m) => m.value === data.payment_method,
+    )?.needs_account;
+    const isEWallet = data.payment_method === 'e_wallet';
+
     const checklists = type?.checklists ?? [];
     const managementUrl = `/workspaces/${workspaceSlug}/finance/management`;
 
@@ -381,7 +408,7 @@ export function FundRequestForm({
             <div className="divide-y divide-black/6 dark:divide-white/6">
                 <Section
                     title="Request"
-                    hint="What the funds are for, which department asks, and how much."
+                    hint="What kind of request this is and which department asks for it."
                 >
                     <Field label="Type" error={errors.transaction_type_id}>
                         <select
@@ -424,29 +451,23 @@ export function FundRequestForm({
                         </select>
                     </Field>
 
-                    <Field label="Amount Requested">
-                        <div className="flex h-10 items-center font-mono text-[13px] font-medium text-gray-800 dark:text-gray-100">
-                            {money(total)}
-                            <span className="ml-2 text-[11px] font-normal text-gray-400">
-                                total of the particulars
-                            </span>
-                        </div>
-                    </Field>
-
                     {isEditing && (
-                        <Field label="Status">
-                            <div className="flex h-10 items-center font-mono text-[12px] text-gray-500 capitalize dark:text-gray-400">
-                                {requestFund?.status}
+                        <Wide>
+                            <p className="flex items-center gap-2 font-mono text-[11px] text-gray-400">
+                                Status
+                                <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-gray-600 capitalize dark:bg-zinc-800 dark:text-gray-300">
+                                    {requestFund?.status}
+                                </span>
                                 {requestFund?.approver &&
-                                    ` · approved by ${requestFund.approver.name}`}
-                            </div>
-                        </Field>
+                                    `approved by ${requestFund.approver.name}`}
+                            </p>
+                        </Wide>
                     )}
                 </Section>
 
                 <Section
                     title="Particulars"
-                    hint="What the funds are for, line by line. Each amount is the quantity × unit price, and they add up to the amount requested."
+                    hint="What the funds are for, line by line. Each amount is the quantity × unit price; together they make the amount requested."
                 >
                     <Wide>
                         <ParticularsEditor
@@ -455,6 +476,167 @@ export function FundRequestForm({
                             errors={fieldErrors}
                             total={total}
                         />
+                    </Wide>
+                </Section>
+
+                <Section
+                    title="Payment"
+                    hint="How the funds are to be released. Online banking and e-wallets need the account to send them to."
+                >
+                    <Wide>
+                        <Field
+                            label="Payment Method"
+                            required
+                            error={errors.payment_method}
+                        >
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                {paymentMethods.map((m) => {
+                                    const active =
+                                        data.payment_method === m.value;
+                                    return (
+                                        <button
+                                            key={m.value}
+                                            type="button"
+                                            onClick={() =>
+                                                setData(
+                                                    'payment_method',
+                                                    m.value,
+                                                )
+                                            }
+                                            className={`h-10 rounded-[10px] border font-mono text-[12px] transition-all ${
+                                                active
+                                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                                    : 'border-black/6 bg-stone-50 text-gray-500 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400'
+                                            }`}
+                                        >
+                                            {m.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </Field>
+                    </Wide>
+
+                    {needsAccount && (
+                        <Wide>
+                            <div className="grid grid-cols-1 gap-4 rounded-[12px] border border-black/6 bg-stone-50/60 p-4 sm:grid-cols-2 dark:border-white/6 dark:bg-zinc-800/40">
+                                <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase sm:col-span-2">
+                                    Send to
+                                </p>
+                                <div className="sm:col-span-2">
+                                    <Field
+                                        label={isEWallet ? 'E-Wallet' : 'Bank'}
+                                        required
+                                        error={errors.bank_name}
+                                    >
+                                        <input
+                                            type="text"
+                                            value={data.bank_name}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'bank_name',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder={
+                                                isEWallet
+                                                    ? 'e.g. GCash'
+                                                    : 'e.g. BDO'
+                                            }
+                                            className={inputCls}
+                                        />
+                                    </Field>
+                                </div>
+                                <Field
+                                    label="Account Name"
+                                    required
+                                    error={errors.account_name}
+                                >
+                                    <input
+                                        type="text"
+                                        value={data.account_name}
+                                        onChange={(e) =>
+                                            setData(
+                                                'account_name',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g. Juan dela Cruz"
+                                        className={inputCls}
+                                    />
+                                </Field>
+                                <Field
+                                    label="Account Number"
+                                    required
+                                    error={errors.account_number}
+                                >
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={data.account_number}
+                                        onChange={(e) =>
+                                            setData(
+                                                'account_number',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder={
+                                            isEWallet
+                                                ? 'e.g. 09171234567'
+                                                : 'e.g. 001234567890'
+                                        }
+                                        className={inputCls}
+                                    />
+                                </Field>
+                            </div>
+                        </Wide>
+                    )}
+                </Section>
+
+                <Section
+                    title="Liquidation"
+                    hint="Whether the requester has to account for how the funds were spent, and by when."
+                >
+                    <Wide>
+                        <div className="rounded-[12px] border border-black/6 bg-stone-50/60 dark:border-white/6 dark:bg-zinc-800/40">
+                            <label className="flex cursor-pointer items-center justify-between gap-3 p-4">
+                                <span className="text-[12px] leading-snug text-gray-600 dark:text-gray-300">
+                                    <span className="font-medium text-gray-800 dark:text-gray-100">
+                                        Liquidation required
+                                    </span>
+                                    <br />
+                                    Receipts or a report are due after the funds
+                                    are released.
+                                </span>
+                                <Switch
+                                    checked={data.liquidation_required}
+                                    onCheckedChange={(v) =>
+                                        setData('liquidation_required', v)
+                                    }
+                                />
+                            </label>
+                            {data.liquidation_required && (
+                                <div className="border-t border-black/6 p-4 sm:max-w-xs dark:border-white/6">
+                                    <Field
+                                        label="Liquidation Deadline"
+                                        required
+                                        error={errors.liquidation_deadline}
+                                    >
+                                        <input
+                                            type="date"
+                                            value={data.liquidation_deadline}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'liquidation_deadline',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={inputCls}
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+                        </div>
                     </Wide>
                 </Section>
 
@@ -587,17 +769,13 @@ export function FundRequestForm({
                     </Wide>
                 </Section>
 
-                <Section
-                    title="Checklist"
-                    hint="Tick off each item this type of request is checked against."
-                >
-                    <Wide>
-                        {checklists.length === 0 ? (
-                            <EmptyRequirement
-                                what="checklist items"
-                                href={managementUrl}
-                            />
-                        ) : (
+                {/* A type with no checklist shows no Checklist section. */}
+                {checklists.length > 0 && (
+                    <Section
+                        title="Checklist"
+                        hint="Tick off each item this type of request is checked against."
+                    >
+                        <Wide>
                             <div className="space-y-1">
                                 <p className="mb-2 font-mono text-[10px] text-gray-400">
                                     {
@@ -634,9 +812,9 @@ export function FundRequestForm({
                                     </p>
                                 )}
                             </div>
-                        )}
-                    </Wide>
-                </Section>
+                        </Wide>
+                    </Section>
+                )}
 
                 <Section title="Notes" hint="Any additional remarks.">
                     <Wide>
@@ -826,9 +1004,14 @@ function ParticularsEditor({
         errors[`particulars.${index}.quantity`] ??
         errors[`particulars.${index}.unit_price`];
 
+    const cols =
+        'sm:grid-cols-[minmax(0,1fr)_88px_128px_120px_36px] sm:items-center';
+
     return (
-        <div className="space-y-2">
-            <div className="hidden grid-cols-[minmax(0,1fr)_88px_128px_112px_32px] gap-2 px-1 font-mono text-[10px] tracking-wider text-gray-400 uppercase sm:grid">
+        <div className="overflow-hidden rounded-[12px] border border-black/6 dark:border-white/6">
+            <div
+                className={`hidden gap-2 border-b border-black/6 bg-stone-50 px-3 py-2 font-mono text-[10px] tracking-wider text-gray-400 uppercase sm:grid dark:border-white/6 dark:bg-zinc-800/60 ${cols}`}
+            >
                 <span>
                     Name<span className="ml-0.5 text-red-500">*</span>
                 </span>
@@ -842,71 +1025,80 @@ function ParticularsEditor({
                 <span />
             </div>
 
-            {rows.map((row, index) => (
-                <div key={index}>
-                    <div className="grid grid-cols-[1fr_1fr_32px] gap-2 rounded-[10px] border border-black/6 bg-stone-50 p-2 sm:grid-cols-[minmax(0,1fr)_88px_128px_112px_32px] sm:items-center sm:border-0 sm:bg-transparent sm:p-0 dark:border-white/6 dark:bg-zinc-800/60 sm:dark:bg-transparent">
-                        <input
-                            type="text"
-                            value={row.name}
-                            onChange={(e) =>
-                                update(index, 'name', e.target.value)
-                            }
-                            placeholder="e.g. Bond paper"
-                            aria-label="Particular name"
-                            className={`${inputCls} col-span-2 sm:col-span-1`}
-                        />
-                        <button
-                            type="button"
-                            onClick={() =>
-                                onChange(rows.filter((_, i) => i !== index))
-                            }
-                            disabled={rows.length === 1}
-                            className="flex h-10 w-8 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-30 sm:order-last dark:hover:bg-red-950/40"
-                            aria-label="Remove particular"
+            <div className="divide-y divide-black/6 dark:divide-white/6">
+                {rows.map((row, index) => (
+                    <div key={index} className="px-3 py-2.5">
+                        <div
+                            className={`grid grid-cols-[1fr_1fr_36px] gap-2 ${cols}`}
                         >
-                            <Trash2 className="h-4 w-4" />
-                        </button>
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={row.quantity}
-                            onChange={(e) =>
-                                update(index, 'quantity', e.target.value)
-                            }
-                            placeholder="Qty"
-                            aria-label="Quantity"
-                            className={inputCls}
-                        />
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={row.unit_price}
-                            onChange={(e) =>
-                                update(index, 'unit_price', e.target.value)
-                            }
-                            placeholder="0.00"
-                            aria-label="Unit price"
-                            className={inputCls}
-                        />
-                        <div className="col-span-2 flex h-10 items-center justify-end font-mono text-[12px] text-gray-700 sm:col-span-1 dark:text-gray-200">
-                            {money(particularAmount(row))}
+                            <input
+                                type="text"
+                                value={row.name}
+                                onChange={(e) =>
+                                    update(index, 'name', e.target.value)
+                                }
+                                placeholder="e.g. Bond paper"
+                                aria-label="Particular name"
+                                className={`${inputCls} col-span-2 sm:col-span-1`}
+                            />
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    onChange(rows.filter((_, i) => i !== index))
+                                }
+                                disabled={rows.length === 1}
+                                className="flex h-10 w-9 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-30 sm:order-last dark:hover:bg-red-950/40"
+                                aria-label="Remove particular"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={row.quantity}
+                                onChange={(e) =>
+                                    update(index, 'quantity', e.target.value)
+                                }
+                                placeholder="Qty"
+                                aria-label="Quantity"
+                                className={inputCls}
+                            />
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={row.unit_price}
+                                onChange={(e) =>
+                                    update(index, 'unit_price', e.target.value)
+                                }
+                                placeholder="Unit price"
+                                aria-label="Unit price"
+                                className={inputCls}
+                            />
+                            <div className="col-span-2 flex h-8 items-center justify-between font-mono text-[12px] text-gray-700 sm:col-span-1 sm:h-10 sm:justify-end dark:text-gray-200">
+                                <span className="text-[10px] tracking-wider text-gray-400 uppercase sm:hidden">
+                                    Amount
+                                </span>
+                                {money(particularAmount(row))}
+                            </div>
                         </div>
+                        {rowError(index) && (
+                            <p className="mt-1 text-[11px] text-red-500">
+                                {rowError(index)}
+                            </p>
+                        )}
                     </div>
-                    {rowError(index) && (
-                        <p className="mt-1 px-1 text-[11px] text-red-500">
-                            {rowError(index)}
-                        </p>
-                    )}
-                </div>
-            ))}
+                ))}
+            </div>
 
             {errors.particulars && (
-                <p className="text-[11px] text-red-500">{errors.particulars}</p>
+                <p className="border-t border-black/6 px-3 py-2 text-[11px] text-red-500 dark:border-white/6">
+                    {errors.particulars}
+                </p>
             )}
 
-            <div className="flex items-center justify-between gap-3 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/6 bg-stone-50 px-3 py-3 dark:border-white/6 dark:bg-zinc-800/60">
                 <button
                     type="button"
                     onClick={() => onChange([...rows, emptyParticular()])}
@@ -915,9 +1107,11 @@ function ParticularsEditor({
                     <Plus className="h-3.5 w-3.5" />
                     Add particular
                 </button>
-                <p className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
-                    Total{' '}
-                    <span className="font-medium text-gray-800 dark:text-gray-100">
+                <p className="flex items-baseline gap-3 font-mono">
+                    <span className="text-[10px] tracking-wider text-gray-400 uppercase">
+                        Amount Requested
+                    </span>
+                    <span className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
                         {money(total)}
                     </span>
                 </p>
