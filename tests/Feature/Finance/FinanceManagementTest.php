@@ -40,6 +40,25 @@ test('lists the workspace\'s requirements', function () {
             ->has('requirements.checklists', 1));
 });
 
+test('sorts the requirements by name, A→Z by default and Z→A on -name', function (string $kind, string $class) {
+    foreach (['Beta', 'alpha', 'Gamma'] as $name) {
+        $class::create(['workspace_id' => $this->workspace->id, 'name' => $name]);
+    }
+
+    $this->actingAs($this->user)
+        ->get($this->url)
+        ->assertInertia(fn ($p) => $p
+            ->where("requirements.{$kind}.0.name", 'alpha')
+            ->where("requirements.{$kind}.2.name", 'Gamma'));
+
+    $this->actingAs($this->user)
+        ->get("{$this->url}?sort=-name")
+        ->assertInertia(fn ($p) => $p
+            ->where('query.sort', '-name')
+            ->where("requirements.{$kind}.0.name", 'Gamma')
+            ->where("requirements.{$kind}.2.name", 'alpha'));
+})->with('kinds');
+
 test('the transaction types page carries each type\'s requirements and the workspace\'s, for Manage Requirements', function () {
     $receipt = $this->type->attachments()->create(['workspace_id' => $this->workspace->id, 'name' => 'Receipt']);
     FundRequestChecklistRequirement::create(['workspace_id' => $this->workspace->id, 'name' => 'Budget approved']);

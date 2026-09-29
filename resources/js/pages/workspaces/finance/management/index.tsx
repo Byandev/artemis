@@ -30,13 +30,15 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
 interface Props {
     workspace: Workspace;
     requirements: Requirements;
+    query: { sort?: string | null };
 }
 
 /**
@@ -47,6 +49,7 @@ interface Props {
 export default function FinanceManagementIndex({
     workspace,
     requirements,
+    query,
 }: Props) {
     const canCreate = usePermission(PERMISSIONS.CreateFinanceTransactions);
     const canEdit = usePermission(PERMISSIONS.EditFinanceTransactions);
@@ -57,6 +60,13 @@ export default function FinanceManagementIndex({
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<Requirement | null>(null);
     const [toDelete, setToDelete] = useState<Requirement | null>(null);
+    const sortDir = query?.sort === '-name' ? 'desc' : 'asc';
+    const toggleSort = () =>
+        router.get(
+            `/workspaces/${workspace.slug}/finance/management`,
+            { sort: sortDir === 'asc' ? '-name' : 'name' },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
 
     const current = REQUIREMENT_KINDS.find((k) => k.kind === tab)!;
     const url = `/workspaces/${workspace.slug}/finance/management/${tab}`;
@@ -109,8 +119,26 @@ export default function FinanceManagementIndex({
                                 <table className="w-full text-left">
                                     <thead>
                                         <tr className="border-b border-black/6 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:border-white/6">
-                                            <th className="px-4 py-3 font-normal">
-                                                Name
+                                            <th
+                                                className="cursor-pointer px-4 py-3 font-normal select-none"
+                                                aria-sort={
+                                                    sortDir === 'asc'
+                                                        ? 'ascending'
+                                                        : 'descending'
+                                                }
+                                                onClick={toggleSort}
+                                            >
+                                                <span className="flex items-center gap-1">
+                                                    Name
+                                                    <span className="flex flex-col">
+                                                        <TriangleUpIcon
+                                                            className={`-mb-1 ${sortDir === 'asc' ? 'text-brand-500' : 'text-gray-300'}`}
+                                                        />
+                                                        <TriangleDownIcon
+                                                            className={`-mt-1 ${sortDir === 'desc' ? 'text-brand-500' : 'text-gray-300'}`}
+                                                        />
+                                                    </span>
+                                                </span>
                                             </th>
                                             {showActions && (
                                                 <th className="w-24 px-4 py-3 text-center font-normal">

@@ -14,6 +14,7 @@ use Inertia\Inertia;
 use Modules\Finance\Models\FundRequestAttachmentRequirement;
 use Modules\Finance\Models\FundRequestChecklistRequirement;
 use Modules\Finance\Models\TransactionType;
+use Spatie\QueryBuilder\QueryBuilder;
 
 /**
  * Finance management: the workspace's attachment and checklist requirements
@@ -68,15 +69,18 @@ class ManagementController extends Controller
 
     /**
      * The workspace's requirements of each kind, with how many types call for each.
+     * Pass a request to sort by its `?sort=` (`name` / `-name`); without one they
+     * come A→Z.
      *
      * @return array<string, Collection>
      */
-    public static function requirementsFor(Workspace $workspace): array
+    public static function requirementsFor(Workspace $workspace, ?Request $request = null): array
     {
         return collect(self::KINDS)
-            ->map(fn (array $kind) => $kind[0]::where('workspace_id', $workspace->id)
+            ->map(fn (array $kind) => QueryBuilder::for($kind[0]::where('workspace_id', $workspace->id), $request ?? new Request)
                 ->withCount('transactionTypes')
-                ->orderBy('name')
+                ->allowedSorts(['name'])
+                ->defaultSort('name')
                 ->get(['id', 'name']))
             ->all();
     }
@@ -88,7 +92,8 @@ class ManagementController extends Controller
 
         return Inertia::render('workspaces/finance/management/index', [
             'workspace' => $workspace,
-            'requirements' => self::requirementsFor($workspace),
+            'requirements' => self::requirementsFor($workspace, $request),
+            'query' => $request->only(['sort']),
         ]);
     }
 
