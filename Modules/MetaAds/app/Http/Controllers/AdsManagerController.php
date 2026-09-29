@@ -267,9 +267,14 @@ class AdsManagerController extends Controller
      * top-level video_id, or its object_story_spec holds one — video_data for a
      * single video, or a video card inside a carousel's child_attachments. Many
      * SHARE / PRIVACY_CHECK_FAIL creatives are videos that only expose the id
-     * there. Everything else is treated as an image.
+     * there.
+     *
+     * Ads that reuse an existing page post (object_type=STATUS) carry none of
+     * that — no video_id, no spec — so the last check is the thumbnail itself:
+     * Meta serves video frames from the `/v/t15.*` CDN path, never photos.
+     * Everything else is treated as an image.
      */
-    private const IS_VIDEO_SQL = "(meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL OR meta_ads_creatives.object_story_spec LIKE '%\"video_id\"%')";
+    private const IS_VIDEO_SQL = "(meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL OR meta_ads_creatives.object_story_spec LIKE '%\"video_id\"%' OR meta_ads_creatives.thumbnail_url LIKE '%/v/t15.%')";
 
     private const MEDIA_TYPE_SQL = 'CASE WHEN '.self::IS_VIDEO_SQL." THEN 'video' ELSE 'image' END";
 

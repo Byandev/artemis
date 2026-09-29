@@ -31,6 +31,21 @@ function seedMediaTypes($workspace): void
         'object_type' => 'SHARE',
         'object_story_spec' => ['page_id' => '1', 'video_data' => ['video_id' => '4311688215808753']],
     ]);
+    // An existing page post reused as an ad — Meta gives no video_id or spec,
+    // only a thumbnail served from the video CDN path.
+    $postVideo = Creative::create([
+        'id' => 8904,
+        'meta_ads_account_id' => $account->id,
+        'object_type' => 'STATUS',
+        'thumbnail_url' => 'https://scontent.fcrk3-3.fna.fbcdn.net/v/t15.5256-10/485211335_948401_n.jpg',
+    ]);
+    // The same kind of post, but a photo — its thumbnail is on the photo path.
+    $postPhoto = Creative::create([
+        'id' => 8905,
+        'meta_ads_account_id' => $account->id,
+        'object_type' => 'STATUS',
+        'thumbnail_url' => 'https://scontent.fcrk3-3.fna.fbcdn.net/v/t39.30808-6/512345678_1234_n.jpg',
+    ]);
 
     $build = function (int $campaignId, string $label, array $ads) use ($account) {
         $campaign = Campaign::create(['id' => $campaignId, 'meta_ads_account_id' => $account->id, 'name' => "{$label} Campaign"]);
@@ -62,7 +77,7 @@ function seedMediaTypes($workspace): void
         }
     };
 
-    $build(8200, 'Mixed', [[8210, 'Video Ad', $video->id, 100], [8211, 'Image Ad', $image->id, 40], [8212, 'Spec Video Ad', $specVideo->id, 10]]);
+    $build(8200, 'Mixed', [[8210, 'Video Ad', $video->id, 100], [8211, 'Image Ad', $image->id, 40], [8212, 'Spec Video Ad', $specVideo->id, 10], [8213, 'Post Video Ad', $postVideo->id, 5], [8214, 'Post Photo Ad', $postPhoto->id, 3]]);
     $build(8300, 'Static', [[8310, 'Uncreatived Ad', null, 25]]);
 }
 
@@ -87,7 +102,7 @@ it('keeps only video ads', function () {
     seedMediaTypes($workspace);
 
     expect(spendByName(mediaTypeRows($workspace, ['group_by' => 'ad', 'media_type' => 'video'])))
-        ->toBe(['Spec Video Ad' => 10.0, 'Video Ad' => 100.0]);
+        ->toBe(['Post Video Ad' => 5.0, 'Spec Video Ad' => 10.0, 'Video Ad' => 100.0]);
 });
 
 it('treats ads without a synced creative as images', function () {
@@ -95,7 +110,7 @@ it('treats ads without a synced creative as images', function () {
     seedMediaTypes($workspace);
 
     expect(spendByName(mediaTypeRows($workspace, ['group_by' => 'ad', 'media_type' => 'image'])))
-        ->toBe(['Image Ad' => 40.0, 'Uncreatived Ad' => 25.0]);
+        ->toBe(['Image Ad' => 40.0, 'Post Photo Ad' => 3.0, 'Uncreatived Ad' => 25.0]);
 });
 
 it('sums only matching ads on campaign rows and drops campaigns without any', function () {
@@ -103,11 +118,11 @@ it('sums only matching ads on campaign rows and drops campaigns without any', fu
     seedMediaTypes($workspace);
 
     $video = mediaTypeRows($workspace, ['group_by' => 'campaign', 'media_type' => 'video']);
-    expect(spendByName($video))->toBe(['Mixed Campaign' => 110.0])
-        ->and($video[0]['ads_count'])->toBe(2);
+    expect(spendByName($video))->toBe(['Mixed Campaign' => 115.0])
+        ->and($video[0]['ads_count'])->toBe(3);
 
     expect(spendByName(mediaTypeRows($workspace, ['group_by' => 'campaign', 'media_type' => 'image'])))
-        ->toBe(['Mixed Campaign' => 40.0, 'Static Campaign' => 25.0]);
+        ->toBe(['Mixed Campaign' => 43.0, 'Static Campaign' => 25.0]);
 });
 
 it('narrows account totals to the chosen media type', function () {
@@ -115,7 +130,7 @@ it('narrows account totals to the chosen media type', function () {
     seedMediaTypes($workspace);
 
     expect(spendByName(mediaTypeRows($workspace, ['group_by' => 'account', 'media_type' => 'image'])))
-        ->toBe(['Account A' => 65.0]);
+        ->toBe(['Account A' => 68.0]);
 });
 
 it('ignores an unknown media type', function () {
@@ -123,5 +138,5 @@ it('ignores an unknown media type', function () {
     seedMediaTypes($workspace);
 
     expect(spendByName(mediaTypeRows($workspace, ['group_by' => 'account', 'media_type' => 'carousel'])))
-        ->toBe(['Account A' => 175.0]);
+        ->toBe(['Account A' => 183.0]);
 });
