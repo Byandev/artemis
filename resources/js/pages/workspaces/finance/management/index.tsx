@@ -173,7 +173,10 @@ export default function FinanceManagementIndex({
                                                 {showActions && (
                                                     <td className="px-4 py-3">
                                                         <div className="flex justify-center">
-                                                            <DropdownMenu>
+                                                            {/* Non-modal: a modal menu unmounting with its deleted row leaves body pointer-events: none behind, freezing the page. */}
+                                                            <DropdownMenu
+                                                                modal={false}
+                                                            >
                                                                 <DropdownMenuTrigger
                                                                     asChild
                                                                 >
