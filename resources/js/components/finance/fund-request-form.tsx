@@ -61,6 +61,10 @@ export interface RequestFundProduct {
     amount: number | string;
 }
 
+/** A stored fund request status as shown, e.g. `for_approval` → "For Approval". */
+export const fundRequestStatusLabel = (status: string) =>
+    status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
 /** A way the funds can be released; `needs_account` ones go to an account. */
 export interface PaymentMethodOption {
     value: string;
@@ -455,8 +459,11 @@ export function FundRequestForm({
                         <Wide>
                             <p className="flex items-center gap-2 font-mono text-[11px] text-gray-400">
                                 Status
-                                <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-gray-600 capitalize dark:bg-zinc-800 dark:text-gray-300">
-                                    {requestFund?.status}
+                                <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-gray-600 dark:bg-zinc-800 dark:text-gray-300">
+                                    {requestFund?.status &&
+                                        fundRequestStatusLabel(
+                                            requestFund.status,
+                                        )}
                                 </span>
                                 {requestFund?.approver &&
                                     `approved by ${requestFund.approver.name}`}
