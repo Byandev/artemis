@@ -77,7 +77,7 @@ export function AdminSidebar() {
                     <SidebarMenuItem>
                         <div className="flex flex-col p-2">
                             <SidebarMenuButton size="lg" asChild>
-                                <Link href="/admin/workspaces">
+                                <Link href="/admin/dashboard">
                                     <AppLogo />
                                 </Link>
                             </SidebarMenuButton>
