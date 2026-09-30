@@ -55,8 +55,8 @@ function StatCards({ stats }: { stats: DashboardStats }) {
             />
             <StatCard
                 label="Total Paid Invoices"
-                value={stats.paid_invoices_count.toLocaleString()}
-                sub={`${currencyFormatter(stats.paid_invoices_total)} collected`}
+                value={currencyFormatter(stats.paid_invoices_total)}
+                sub={`${stats.paid_invoices_count.toLocaleString()} invoices collected`}
                 icon={FileCheck}
                 accent="blue"
             />
