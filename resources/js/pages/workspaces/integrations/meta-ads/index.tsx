@@ -260,17 +260,17 @@ function useCreatorTagging(
         setRows((prev) =>
             prev
                 ? {
-                      ...prev,
-                      data: prev.data.map((r) =>
-                          ids.has(r.id)
-                              ? {
-                                    ...r,
-                                    creator_id: creator?.id ?? null,
-                                    creator_name: creator?.name ?? null,
-                                }
-                              : r,
-                      ),
-                  }
+                    ...prev,
+                    data: prev.data.map((r) =>
+                        ids.has(r.id)
+                            ? {
+                                ...r,
+                                creator_id: creator?.id ?? null,
+                                creator_name: creator?.name ?? null,
+                            }
+                            : r,
+                    ),
+                }
                 : prev,
         );
 
@@ -301,17 +301,17 @@ function useCreatorTagging(
             snapshot = prev;
             return prev
                 ? {
-                      ...prev,
-                      data: prev.data.map((r) =>
-                          ids.includes(r.id)
-                              ? {
-                                    ...r,
-                                    creator_id: next?.id ?? null,
-                                    creator_name: next?.name ?? null,
-                                }
-                              : r,
-                      ),
-                  }
+                    ...prev,
+                    data: prev.data.map((r) =>
+                        ids.includes(r.id)
+                            ? {
+                                ...r,
+                                creator_id: next?.id ?? null,
+                                creator_name: next?.name ?? null,
+                            }
+                            : r,
+                    ),
+                }
                 : prev;
         });
         axios
@@ -352,9 +352,9 @@ function useRowSelection() {
  * clear the creator across the currently selected ads.
  */
 function BulkCreatorControl({
-    members,
-    onAssign,
-}: {
+                                members,
+                                onAssign,
+                            }: {
     members: OwnerOption[];
     onAssign: (creatorId: number | null) => void;
 }) {
@@ -449,28 +449,28 @@ interface GroupTarget {
  * per-dimension column presets re-init when the dimension changes.
  */
 function GridTable({
-    groupBy,
-    groupLabel,
-    rows,
-    loading,
-    sort,
-    onFetch,
-    onSelectAd,
-    onOpenGroup,
-    onOpenTimeline,
-    // Creator tagging (only wired for the `ad` grouping + the ads-in-group modal).
-    showCreator = false,
-    members = [],
-    canEditCreator = false,
-    creatorSaving = {},
-    onAssignCreator,
-    // Bulk selection.
-    selectedIds,
-    onToggleRow,
-    onToggleAll,
-    onClearSelection,
-    onBulkAssignCreator,
-}: {
+                       groupBy,
+                       groupLabel,
+                       rows,
+                       loading,
+                       sort,
+                       onFetch,
+                       onSelectAd,
+                       onOpenGroup,
+                       onOpenTimeline,
+                       // Creator tagging (only wired for the `ad` grouping + the ads-in-group modal).
+                       showCreator = false,
+                       members = [],
+                       canEditCreator = false,
+                       creatorSaving = {},
+                       onAssignCreator,
+                       // Bulk selection.
+                       selectedIds,
+                       onToggleRow,
+                       onToggleAll,
+                       onClearSelection,
+                       onBulkAssignCreator,
+                   }: {
     groupBy: GroupBy;
     groupLabel: string;
     rows: PaginatedData<Row> | null;
@@ -639,79 +639,79 @@ function GridTable({
         },
         ...(showStatus
             ? [
-                  {
-                      id: 'status',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'status',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Status
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => (
-                          <StatusLabel
-                              status={
-                                  row.original.effective_status ??
-                                  row.original.status ??
-                                  null
-                              }
-                          />
-                      ),
-                  } as ColumnDef<Row>,
-              ]
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => (
+                        <StatusLabel
+                            status={
+                                row.original.effective_status ??
+                                row.original.status ??
+                                null
+                            }
+                        />
+                    ),
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...(showBudget
             ? [
-                  {
-                      id: 'budget',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="text-right font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'budget',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="text-right font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Budget
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => {
-                          const b = formatBudget(
-                              row.original.daily_budget ?? null,
-                              row.original.lifetime_budget ?? null,
-                          );
-                          return (
-                              <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
-                                  {b.value}
-                                  {b.label && (
-                                      <span className="block text-[10px] text-gray-400 dark:text-gray-500">
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => {
+                        const b = formatBudget(
+                            row.original.daily_budget ?? null,
+                            row.original.lifetime_budget ?? null,
+                        );
+                        return (
+                            <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                                {b.value}
+                                {b.label && (
+                                    <span className="block text-[10px] text-gray-400 dark:text-gray-500">
                                           {b.label}
                                       </span>
-                                  )}
-                              </div>
-                          );
-                      },
-                  } as ColumnDef<Row>,
-              ]
+                                )}
+                            </div>
+                        );
+                    },
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...(showCreator
             ? [
-                  {
-                      id: 'creator',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'creator',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Creator
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => (
-                          <InlineOwner
-                              label="Creator"
-                              owner={creatorOf(row.original)}
-                              users={members}
-                              canEdit={canEditCreator}
-                              saving={creatorSaving[row.original.id] ?? false}
-                              onAssign={(id) =>
-                                  onAssignCreator?.(row.original, id)
-                              }
-                          />
-                      ),
-                  } as ColumnDef<Row>,
-              ]
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => (
+                        <InlineOwner
+                            label="Creator"
+                            owner={creatorOf(row.original)}
+                            users={members}
+                            canEdit={canEditCreator}
+                            saving={creatorSaving[row.original.id] ?? false}
+                            onAssign={(id) =>
+                                onAssignCreator?.(row.original, id)
+                            }
+                        />
+                    ),
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...buildInsightsColumns<Row>(),
     ];
@@ -719,8 +719,8 @@ function GridTable({
     const rowClick = showThumbnail
         ? (r: unknown) => onSelectAd(r as Row)
         : onOpenGroup
-          ? (r: unknown) => onOpenGroup(r as Row)
-          : undefined;
+            ? (r: unknown) => onOpenGroup(r as Row)
+            : undefined;
 
     return (
         <div className="relative overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -788,17 +788,17 @@ function GridTable({
 }
 
 function GroupAdsModal({
-    slug,
-    target,
-    dateRange,
-    selectedAccounts,
-    accountsTotal,
-    members,
-    canEditCreator,
-    onClose,
-    onSelectAd,
-    onOpenTimeline,
-}: {
+                           slug,
+                           target,
+                           dateRange,
+                           selectedAccounts,
+                           accountsTotal,
+                           members,
+                           canEditCreator,
+                           onClose,
+                           onSelectAd,
+                           onOpenTimeline,
+                       }: {
     slug: string;
     target: GroupTarget | null;
     dateRange: { since: string; until: string };
@@ -943,10 +943,10 @@ interface AdDetail {
 }
 
 function DimRow({
-    label,
-    value,
-    mono,
-}: {
+                    label,
+                    value,
+                    mono,
+                }: {
     label: string;
     value: ReactNode;
     mono?: boolean;
@@ -969,10 +969,10 @@ function DimRow({
 }
 
 function CreativeDetailDrawer({
-    slug,
-    ad,
-    onClose,
-}: {
+                                  slug,
+                                  ad,
+                                  onClose,
+                              }: {
     slug: string;
     ad: Row | null;
     onClose: () => void;
@@ -1010,8 +1010,8 @@ function CreativeDetailDrawer({
     const isImage = dim?.media_type
         ? dim.media_type !== 'video'
         : ad
-          ? !isVideoCreative(ad)
-          : false;
+            ? !isVideoCreative(ad)
+            : false;
     // Spinner while the detail request is in flight OR the iframe is still painting.
     const showSpinner = loading || (!!src && !iframeLoaded);
 
@@ -1125,10 +1125,10 @@ interface AccountMultiPickerProps {
 }
 
 function AccountMultiPicker({
-    accounts,
-    selected,
-    onChange,
-}: AccountMultiPickerProps) {
+                                accounts,
+                                selected,
+                                onChange,
+                            }: AccountMultiPickerProps) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
 
@@ -1155,8 +1155,8 @@ function AccountMultiPicker({
     const label = allSelected
         ? 'All accounts'
         : selected.length === 0
-          ? 'No accounts'
-          : `${selected.length} of ${accounts.length} accounts`;
+            ? 'No accounts'
+            : `${selected.length} of ${accounts.length} accounts`;
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -1232,9 +1232,9 @@ function AccountMultiPicker({
 /* ───────────────────── Group-by selector ────────────────────── */
 
 function GroupBySelect({
-    value,
-    onChange,
-}: {
+                           value,
+                           onChange,
+                       }: {
     value: GroupBy;
     onChange: (next: GroupBy) => void;
 }) {
@@ -1285,14 +1285,14 @@ function GroupBySelect({
 }
 
 export default function MetaAdsManager({
-    workspace,
-    accounts,
-    members,
-    selectedAccounts,
-    objectives = [],
-    dateRange,
-    query,
-}: Props) {
+                                           workspace,
+                                           accounts,
+                                           members,
+                                           selectedAccounts,
+                                           objectives = [],
+                                           dateRange,
+                                           query,
+                                       }: Props) {
     const canEditCreator = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
 
     const [groupBy, setGroupBy] = useState<GroupBy>(

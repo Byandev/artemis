@@ -19,7 +19,12 @@ it('captures the creative thumbnail from each ad and upserts a creative row', fu
                 'name' => 'Ad A',
                 'adset_id' => '222',
                 'campaign_id' => '111',
-                'creative' => ['id' => '777', 'thumbnail_url' => 'https://example.test/thumb.jpg'],
+                'creative' => [
+                    'id' => '777',
+                    'thumbnail_url' => 'https://example.test/thumb.jpg',
+                    'object_type' => 'VIDEO',
+                    'video_id' => '4311688215808753',
+                ],
                 'status' => 'ACTIVE',
                 'effective_status' => 'ACTIVE',
             ]],
@@ -34,4 +39,8 @@ it('captures the creative thumbnail from each ad and upserts a creative row', fu
         ->and((string) $ad->meta_ads_creative_id)->toBe('777');
     // The creative row exists (even though /adcreatives was never called) with the thumbnail.
     expect(Creative::find(777)?->thumbnail_url)->toBe('https://example.test/thumb.jpg');
+    // ...and its media type, so the image / video filter is right before /adcreatives runs.
+    expect(Creative::find(777))
+        ->object_type->toBe('VIDEO')
+        ->video_id->toBe('4311688215808753');
 });

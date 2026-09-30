@@ -19,8 +19,18 @@ import DateOption = flatpickr.Options.DateOption;
 
 interface Metrics {
     orders: number;
+    /** Units on the day's orders — a count, like orders. */
+    item_quantity: number;
+    /** What the day's goods cost. Null when none of its lines were costed. */
+    order_cogs: number | null;
     sales: number;
     ad_spent: number;
+    /** Planned daily spend. Null when the page has no budget on record. */
+    ad_spend_budget: number | null;
+    /** Spend minus budget: positive is overspend, negative is underspend. */
+    budget_variance: number | null;
+    /** Spend as a percentage of budget — 100 is exactly on plan. */
+    budget_pace: number | null;
     ad_sales: number;
     ad_purchases: number;
     delivered_amount: number;
@@ -30,6 +40,21 @@ interface Metrics {
     rts_rate: number | null;
     ad_cpp: number | null;
     cpp: number | null;
+
+    /* The estimated margin and the costs it takes off. Amounts, so they sum
+       across pages and divide on the Average row like any other. */
+    /** The RTS the estimate discounted this cell's revenue by. */
+    est_rts: number | null;
+    est_delivered_amount: number;
+    est_cod_fee: number;
+    est_cod_fee_vat: number;
+    est_cogs: number;
+    est_shipping_fee: number;
+    est_gross_profit: number;
+    est_opex_share: number;
+    est_net_profit: number;
+    /** 5% of what the row nets, sign and all — a losing row owes a cut back. */
+    est_commission: number;
 }
 
 type MetricKey = keyof Metrics;
@@ -37,6 +62,8 @@ type MetricKey = keyof Metrics;
 interface PageSeries {
     page_id: number | string;
     name: string;
+    /** The RTS the estimate applied across the range, sales-weighted. */
+    assumed_rts: number;
     days: Record<string, Metrics>;
     total: Metrics;
     average: Metrics;
@@ -86,6 +113,12 @@ const format: Record<string, (n: number | null) => string> = {
     int: (n) => (n === null ? EMPTY : n.toLocaleString()),
     amount: (n) => (n === null ? EMPTY : whole(n)),
     peso: (n) => (n === null ? EMPTY : PESO + whole(n)),
+    // A gap against plan reads as a direction first: the sign says over or under
+    // before the eye gets to the digits.
+    signed: (n) =>
+        n === null
+            ? EMPTY
+            : (n > 0 ? '+' : n < 0 ? '\u2212' : '') + PESO + whole(Math.abs(n)),
     ratio: (n) => (n === null ? EMPTY : n.toFixed(2)),
     percent: (n) => (n === null ? EMPTY : `${n.toFixed(1)}%`),
 };
@@ -114,6 +147,44 @@ const roasTone = (n: number | null): Tone =>
 const rtsTone = (n: number | null): Tone =>
     n === null ? 'muted' : n <= 25 ? 'good' : n <= 35 ? 'warn' : 'bad';
 
+/**
+ * Budget pace, as a percentage of plan. Off-plan in either direction is what
+ * matters: a page 40% under budget has left the plan as far behind as one 40%
+ * over it, and both want explaining. Within 10% is on plan, within 25% drifting.
+ */
+const paceTone = (n: number | null): Tone =>
+    n === null
+        ? 'muted'
+        : Math.abs(n - 100) <= 10
+          ? 'good'
+          : Math.abs(n - 100) <= 25
+            ? 'warn'
+            : 'bad';
+
+/**
+ * The variance says the same thing in pesos, so it takes the same tone — but
+ * only the pace knows how far off the plan ₱2,000 actually is, so it reads that
+ * off the row rather than off its own figure.
+ */
+const varianceTone = (_: number | null, m: Metrics): Tone =>
+    paceTone(m?.budget_pace ?? null);
+
+/**
+ * An estimated profit, gross or net, judged against the revenue it came out of
+ * rather than on its own: ₱500 is a good day on ₱3,000 of sales and a bad one on
+ * ₱50,000. A loss is a loss at any size.
+ */
+const marginTone = (n: number | null, m: Metrics): Tone => {
+    const sales = m?.sales ?? 0;
+
+    if (n === null || sales <= 0) return 'muted';
+    if (n < 0) return 'bad';
+
+    const margin = (n / sales) * 100;
+
+    return margin >= 20 ? 'good' : margin >= 10 ? 'warn' : 'bad';
+};
+
 /* ── Columns ─────────────────────────────────────────────────────────────── */
 
 interface MetricColumn extends ColumnOption {
@@ -121,19 +192,31 @@ interface MetricColumn extends ColumnOption {
     /** Header text — shorter than the label the dropdown uses. */
     head: string;
     format: keyof typeof format;
-    tone?: (n: number | null) => Tone;
+    /** Gets the whole row too, for a figure judged against a sibling metric. */
+    tone?: (n: number | null, m: Metrics) => Tone;
 }
 
 /**
- * The four the tracker has always shown stay on by default; everything the
- * daily builder gained later is opt-in, so the table does not get wider for
- * people who never asked for it.
+ * The core four the tracker has always shown stay on, joined by the budget and
+ * the gap against it — spend is only readable next to what it was meant to be.
+ * Everything else the daily builder gained is opt-in, so the table does not get
+ * wider for people who never asked for it.
+ *
+ * Declaration order is column order, so the budget pair sits between Ad Spent
+ * and ROAS rather than trailing the group it belongs to.
  */
 const COLUMNS: MetricColumn[] = [
     {
         id: 'orders',
         label: 'Orders',
         head: 'Orders',
+        group: 'Core',
+        format: 'int',
+    },
+    {
+        id: 'item_quantity',
+        label: 'Item Quantities',
+        head: 'Units',
         group: 'Core',
         format: 'int',
     },
@@ -145,11 +228,42 @@ const COLUMNS: MetricColumn[] = [
         format: 'peso',
     },
     {
+        id: 'order_cogs',
+        label: 'Order COGS',
+        head: 'COGS',
+        group: 'Core',
+        format: 'peso',
+    },
+    {
         id: 'ad_spent',
         label: 'Ad Spent',
         head: 'Ad Spent',
         group: 'Core',
         format: 'peso',
+    },
+    {
+        id: 'ad_spend_budget',
+        label: 'Ad Spend Budget',
+        head: 'Budget',
+        group: 'Budget',
+        format: 'peso',
+    },
+    {
+        id: 'budget_variance',
+        label: 'Variance (spend \u2212 budget)',
+        head: 'Var',
+        group: 'Budget',
+        format: 'signed',
+        tone: varianceTone,
+    },
+    {
+        id: 'budget_pace',
+        label: 'Pace (spend \u00f7 budget)',
+        head: 'Pace',
+        group: 'Budget',
+        format: 'percent',
+        tone: paceTone,
+        defaultVisible: false,
     },
     {
         id: 'roas',
@@ -203,6 +317,91 @@ const COLUMNS: MetricColumn[] = [
     },
 
     {
+        id: 'est_rts',
+        label: 'Est. RTS applied (trailing 30d)',
+        head: 'Est. RTS',
+        group: 'Estimated margin',
+        format: 'percent',
+        tone: rtsTone,
+        defaultVisible: false,
+    },
+    {
+        id: 'est_delivered_amount',
+        label: 'Est. Delivered (sales less RTS)',
+        head: 'Est. Del.',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cod_fee',
+        label: 'Est. COD Fee (2.75%)',
+        head: 'COD',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cod_fee_vat',
+        label: 'Est. COD Fee VAT (12%)',
+        head: 'COD VAT',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cogs',
+        label: 'Est. COGS (less RTS)',
+        head: 'Est. COGS',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_shipping_fee',
+        label: 'Est. Shipping (\u20b167 an order)',
+        head: 'Ship',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_gross_profit',
+        label: 'Est. Gross Profit',
+        head: 'Est. GP',
+        group: 'Estimated margin',
+        format: 'signed',
+        tone: marginTone,
+    },
+    {
+        id: 'est_opex_share',
+        label: 'Est. Opex Share (\u20b138 a delivered order)',
+        head: 'Opex',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_net_profit',
+        label: 'Est. Net Profit (gross less opex)',
+        head: 'Est. NP',
+        group: 'Estimated margin',
+        format: 'signed',
+        tone: marginTone,
+    },
+    {
+        id: 'est_commission',
+        label: 'Est. Commission (5% of net)',
+        head: 'Comm.',
+        group: 'Estimated margin',
+        // Signed, because a losing row owes a negative cut rather than nothing —
+        // and toned off the net it tracks, whose sign it always shares.
+        format: 'signed',
+        tone: (_, m) => marginTone(m?.est_net_profit ?? null, m),
+        defaultVisible: false,
+    },
+
+    {
         id: 'delivered_amount',
         label: 'Delivered',
         head: 'Delivered',
@@ -251,12 +450,12 @@ function readCell(m: Metrics, col: MetricColumn) {
         title:
             raw === null
                 ? undefined
-                : col.format === 'peso'
+                : col.format === 'peso' || col.format === 'signed'
                   ? PESO + exact(raw)
                   : col.format === 'amount'
                     ? exact(raw)
                     : undefined,
-        tone: col.tone?.(raw),
+        tone: col.tone?.(raw, m),
         // A zero carries no signal in a grid this dense — keep it, but let the
         // eye slide over it so the real figures are what stand out.
         blank: raw === null || raw === 0,
@@ -342,6 +541,22 @@ export default function PageRoasTrackerIndex({
                             </span>
                             {pages.length} page{pages.length === 1 ? '' : 's'}
                         </p>
+                        {/* The estimate is only readable if its assumptions are
+                            stated. The RTS is per page — hover a page header for
+                            the one it used. */}
+                        <p className="mt-1 font-mono text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
+                            Est. margin: sales less each day&rsquo;s
+                            trailing-30d RTS, COD 2.75% + 12% VAT, COGS less
+                            RTS, {PESO}67 a parcel, less ad spend
+                            <span className="mx-2 text-gray-300 dark:text-gray-600">
+                                /
+                            </span>
+                            net: less {PESO}38 an order delivered
+                            <span className="mx-2 text-gray-300 dark:text-gray-600">
+                                /
+                            </span>
+                            commission: 5% of net
+                        </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <ColumnsDropdown
@@ -421,7 +636,7 @@ export default function PageRoasTrackerIndex({
                                                     groupStart,
                                                     'sticky top-0 z-30 max-w-[22rem] truncate bg-stone-100 text-left text-[12px] font-semibold text-gray-800 dark:bg-zinc-800 dark:text-gray-100',
                                                 )}
-                                                title={page.name}
+                                                title={`${page.name} — margin estimated at ${page.assumed_rts.toFixed(1)}% RTS across this range (each day uses its own trailing 30 days)`}
                                             >
                                                 <span className="flex items-center gap-2">
                                                     <span className="h-3 w-[3px] shrink-0 rounded-full bg-brand-500" />

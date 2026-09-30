@@ -711,6 +711,7 @@ export function RowTimelineModal({
     accountsTotal,
     groupLabel,
     metricFilters,
+    dateFilters,
     onClose,
 }: {
     slug: string;
@@ -719,6 +720,9 @@ export function RowTimelineModal({
     selectedAccounts: string[];
     accountsTotal: number;
     groupLabel: string;
+    /** The grid's row-level date filters, already serialised, so the chart
+     *  covers the same ads the row's totals came from. */
+    dateFilters?: string | null;
     /** Serialized grid filters, so the chart covers the row's surviving ads. */
     metricFilters?: string;
     onClose: () => void;
@@ -746,6 +750,7 @@ export function RowTimelineModal({
         if (selectedAccounts.length !== accountsTotal) {
             selectedAccounts.forEach((a) => qs.append('accounts[]', a));
         }
+        if (dateFilters) qs.set('date_filters', dateFilters);
         // Group charts follow the grid's filters so the line matches the row.
         // A single ad's chart doesn't: it is opened from the group's ad list,
         // which isn't filtered, so applying them would flatten it to zeroes.
@@ -776,6 +781,7 @@ export function RowTimelineModal({
         selectedAccounts,
         accountsTotal,
         metricFilters,
+        dateFilters,
         slug,
     ]);
 

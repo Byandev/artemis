@@ -23,6 +23,36 @@ class Creative extends Model
         'approved_at' => 'datetime',
     ];
 
+    /**
+     * Alphabet for the public creative code. Drops look-alike characters
+     * (0/O, 1/I/L) so codes survive being read aloud or retyped.
+     */
+    private const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+    private const CODE_LENGTH = 10;
+
+    protected static function booted(): void
+    {
+        static::creating(function (Creative $creative) {
+            $creative->code ??= static::generateCode();
+        });
+    }
+
+    /** A random 10-character code not yet used by any creative. */
+    public static function generateCode(): string
+    {
+        $max = strlen(self::CODE_ALPHABET) - 1;
+
+        do {
+            $code = '';
+            for ($i = 0; $i < self::CODE_LENGTH; $i++) {
+                $code .= self::CODE_ALPHABET[random_int(0, $max)];
+            }
+        } while (static::where('code', $code)->exists());
+
+        return $code;
+    }
+
     /** Calendar-date label for the planned creative date (timezone-safe). */
     public function getCreativeDateLabelAttribute(): ?string
     {

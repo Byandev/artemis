@@ -31,7 +31,7 @@ function record(array $attrs): void
 function trackerPage(string $start, string $end): array
 {
     $response = test()->get(route(
-        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        'workspaces.sales-marketing.page-roas-tracker',
         [test()->workspace, 'start' => $start, 'end' => $end],
     ));
 
@@ -200,7 +200,7 @@ it('rolls every visible page into one all-pages group', function () {
         'returning_amount' => 500, 'delivered_amount' => 500]);
 
     $response = test()->get(route(
-        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        'workspaces.sales-marketing.page-roas-tracker',
         [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
     ));
 
@@ -225,30 +225,292 @@ it('rolls every visible page into one all-pages group', function () {
 
 it('sends no all-pages group when nothing is in view', function () {
     $response = test()->get(route(
-        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        'workspaces.sales-marketing.page-roas-tracker',
         [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
     ));
 
     expect($response->viewData('page')['props']['overall'])->toBeNull();
 });
 
+it('reads the budget gap off the day it was measured against', function () {
+    // Under on the first day, over on the second.
+    record(['date' => '2026-08-01', 'ad_spent' => 800, 'ad_spend_budget' => 1000]);
+    record(['date' => '2026-08-02', 'ad_spent' => 1400, 'ad_spend_budget' => 1000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    expect($page['days']['2026-08-01']['ad_spend_budget'])->toBe(1000.0)
+        ->and($page['days']['2026-08-01']['budget_variance'])->toBe(-200.0)
+        ->and($page['days']['2026-08-01']['budget_pace'])->toBe(80.0);
+
+    expect($page['days']['2026-08-02']['budget_variance'])->toBe(400.0)
+        ->and($page['days']['2026-08-02']['budget_pace'])->toBe(140.0);
+});
+
+it('sums the budget over the range and compares it against the summed spend', function () {
+    record(['date' => '2026-08-01', 'ad_spent' => 800, 'ad_spend_budget' => 1000]);
+    record(['date' => '2026-08-02', 'ad_spent' => 1400, 'ad_spend_budget' => 1000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    // ₱2,200 spent against ₱2,000 planned — ₱200 over, at 110% of plan. The two
+    // days pull opposite ways, so a mean of the daily paces (110%) only agrees
+    // here by coincidence; the ₱200 is what the range actually says.
+    expect($page['total']['ad_spend_budget'])->toBe(2000.0)
+        ->and($page['total']['budget_variance'])->toBe(200.0)
+        ->and($page['total']['budget_pace'])->toBe(110.0);
+
+    // The variance is an amount, so the Average row divides it; the pace is a
+    // ratio, so it stays the range's.
+    expect($page['average']['ad_spend_budget'])->toBe(1000.0)
+        ->and($page['average']['budget_variance'])->toBe(100.0)
+        ->and($page['average']['budget_pace'])->toBe(110.0);
+});
+
+it('leaves a page with no budget on record blank rather than calling it overspent', function () {
+    // Spend, but nobody ever budgeted the page.
+    record(['date' => '2026-08-01', 'ad_spent' => 500]);
+
+    $page = trackerPage('2026-08-01', '2026-08-01');
+
+    expect($page['days']['2026-08-01']['ad_spend_budget'])->toBeNull()
+        ->and($page['days']['2026-08-01']['budget_variance'])->toBeNull()
+        ->and($page['days']['2026-08-01']['budget_pace'])->toBeNull()
+        ->and($page['total']['budget_variance'])->toBeNull()
+        ->and($page['total']['budget_pace'])->toBeNull();
+});
+
+it('blends the budget across pages in the all-pages group', function () {
+    $second = Page::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    record(['date' => '2026-08-01', 'ad_spent' => 800, 'ad_spend_budget' => 1000]);
+
+    PageDailyRecord::create([
+        'workspace_id' => $this->workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => $second->getMorphClass(),
+        'page_id' => $second->getKey(),
+        'date' => '2026-08-01',
+        'ad_spent' => 1400,
+        'ad_spend_budget' => 1000,
+    ]);
+
+    $response = test()->get(route(
+        'workspaces.sales-marketing.page-roas-tracker',
+        [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
+    ));
+
+    $overall = $response->viewData('page')['props']['overall'];
+
+    // One page under, one over — the group is ₱200 over ₱2,000 planned.
+    expect($overall['days']['2026-08-01']['ad_spend_budget'])->toBe(2000.0)
+        ->and($overall['days']['2026-08-01']['budget_variance'])->toBe(200.0)
+        ->and($overall['days']['2026-08-01']['budget_pace'])->toBe(110.0);
+});
+
 it('sends every metric so the column toggle needs no round trip', function () {
     record(['date' => '2026-08-01', 'orders' => 1, 'sales' => 10, 'ad_spent' => 5]);
 
     $response = $this->get(route(
-        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        'workspaces.sales-marketing.page-roas-tracker',
         [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
     ));
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->component('workspaces/page-roas-tracker/index')
+        ->component('workspaces/sales-marketing/page-roas-tracker/index')
         ->has('pages.0.days.2026-08-01', fn (Assert $day) => $day
             ->hasAll([
-                'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
+                'orders', 'item_quantity', 'order_cogs',
+                'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
                 'ad_cpp', 'cpp',
+                'ad_spend_budget', 'budget_variance', 'budget_pace', 'est_rts',
                 'delivered_amount', 'returning_amount',
                 'roas', 'ad_roas', 'rts_rate',
+                'est_delivered_amount', 'est_cod_fee', 'est_cod_fee_vat',
+                'est_cogs', 'est_shipping_fee', 'est_gross_profit',
+                'est_opex_share', 'est_net_profit', 'est_commission',
             ])
         )
     );
+});
+
+/*
+ * ── The estimated margin ────────────────────────────────────────────────────
+ *
+ * Revenue is discounted by the RTS the page ran at last month (18% when last
+ * month can't say), the courier's cut comes off that, cost of goods is
+ * discounted the same way, and freight is charged on every parcel.
+ */
+
+it('estimates the margin from the default RTS when last month says nothing', function () {
+    record([
+        'date' => '2026-08-01',
+        'orders' => 10, 'item_quantity' => 12, 'order_cogs' => 4000,
+        'sales' => 10000, 'ad_spent' => 2000,
+    ]);
+
+    $day = trackerPage('2026-08-01', '2026-08-01')['days']['2026-08-01'];
+
+    // 18% assumed, so 82% of ₱10,000 is collected.
+    expect($day['est_delivered_amount'])->toBe(8200.0)
+        // 2.75% of that, then 12% VAT on the fee.
+        ->and($day['est_cod_fee'])->toBe(225.5)
+        ->and($day['est_cod_fee_vat'])->toBe(27.06)
+        // Returned stock comes back, so the goods cost 82% too.
+        ->and($day['est_cogs'])->toBe(3280.0)
+        // ₱67 a parcel on all ten, including the ones that will come back.
+        ->and($day['est_shipping_fee'])->toBe(670.0);
+
+    // 8200 - 2000 ad spend - 225.50 - 27.06 - 3280 - 670.
+    expect($day['est_gross_profit'])->toBe(1997.44);
+
+    // Opex rides on the orders that land: 10 x 82% x ₱38.
+    expect($day['est_opex_share'])->toBe(311.6)
+        ->and($day['est_net_profit'])->toBe(1685.84)
+        // 5% of what is left.
+        ->and($day['est_commission'])->toBe(84.29);
+});
+
+it('shows the commission a losing day costs rather than hiding it at zero', function () {
+    // Same sales both days, but the second day's ad spend swallows the margin.
+    record(['date' => '2026-08-01', 'orders' => 10, 'sales' => 10000, 'ad_spent' => 2000]);
+    record(['date' => '2026-08-02', 'orders' => 10, 'sales' => 10000, 'ad_spent' => 9000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    $first = $page['days']['2026-08-01'];
+    $second = $page['days']['2026-08-02'];
+
+    expect($second['est_net_profit'])->toBeLessThan(0)
+        ->and($second['est_commission'])->toBeLessThan(0)
+        ->and($second['est_commission'])->toBe(round($second['est_net_profit'] * 0.05, 2));
+
+    // Taken straight, it adds up: the Total is the two days together.
+    expect($page['total']['est_commission'])->toBe(
+        round($first['est_commission'] + $second['est_commission'], 2)
+    );
+});
+
+it('carries a negative commission on a range that nets a loss', function () {
+    record(['date' => '2026-08-01', 'orders' => 5, 'sales' => 1000, 'ad_spent' => 9000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-01');
+
+    $net = $page['total']['est_net_profit'];
+
+    expect($net)->toBeLessThan(0)
+        ->and($page['total']['est_commission'])->toBe(round($net * 0.05, 2));
+});
+
+it('takes opex off the gross to reach the net', function () {
+    record(['date' => '2026-08-01', 'orders' => 20, 'sales' => 20000, 'ad_spent' => 1000]);
+
+    $day = trackerPage('2026-08-01', '2026-08-01')['days']['2026-08-01'];
+
+    expect($day['est_net_profit'])->toBe(
+        round($day['est_gross_profit'] - $day['est_opex_share'], 2)
+    );
+});
+
+it('discounts revenue by the stored trailing RTS of the day', function () {
+    // The builder blends the 30 days behind each day into rts_rate_30d; the
+    // tracker's job is to price the day off it.
+    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 30]);
+
+    $page = trackerPage('2026-09-01', '2026-09-01');
+
+    expect($page['assumed_rts'])->toBe(30.0)
+        ->and($page['days']['2026-09-01']['est_rts'])->toBe(30.0)
+        // 70% of ₱1,000, not the 82% the default would have given.
+        ->and($page['days']['2026-09-01']['est_delivered_amount'])->toBe(700.0);
+});
+
+it('lets two days in one view be priced off their own stored rates', function () {
+    record(['date' => '2026-09-10', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 10]);
+    record(['date' => '2026-09-26', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 100]);
+
+    $page = trackerPage('2026-09-10', '2026-09-26');
+
+    expect($page['days']['2026-09-10']['est_rts'])->toBe(10.0)
+        ->and($page['days']['2026-09-26']['est_rts'])->toBe(100.0)
+        ->and($page['days']['2026-09-26']['est_delivered_amount'])->toBe(0.0);
+
+    // The range's rate is the sales-weighted blend of the days, not either one.
+    expect($page['total']['est_rts'])->toBe(55.0);
+});
+
+it('falls back to 18% for a day the builder could not rate', function () {
+    // No rts_rate_30d — the day's window held nothing that moved.
+    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000]);
+
+    $page = trackerPage('2026-09-01', '2026-09-01');
+
+    expect($page['assumed_rts'])->toBe(18.0)
+        ->and($page['days']['2026-09-01']['est_rts'])->toBe(18.0)
+        ->and($page['days']['2026-09-01']['est_delivered_amount'])->toBe(820.0);
+});
+
+it('sums the estimate over the range and halves it on the Average row', function () {
+    record(['date' => '2026-08-01', 'orders' => 5, 'sales' => 10000, 'order_cogs' => 4000, 'ad_spent' => 1000]);
+    record(['date' => '2026-08-02', 'orders' => 5, 'sales' => 10000, 'order_cogs' => 4000, 'ad_spent' => 1000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    // Every estimate is linear in the stored columns, so the range is the sum of
+    // the days and the Average is that over the two of them.
+    expect($page['total']['est_delivered_amount'])->toBe(16400.0)
+        ->and($page['average']['est_delivered_amount'])->toBe(8200.0)
+        ->and($page['total']['est_shipping_fee'])->toBe(670.0)
+        ->and($page['total']['est_gross_profit'])->toBe(
+            round($page['days']['2026-08-01']['est_gross_profit'] * 2, 2)
+        );
+});
+
+it('rolls the estimate up across pages, each on its own rate', function () {
+    $second = Page::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $row = fn (array $attrs) => PageDailyRecord::create(array_merge([
+        'workspace_id' => $this->workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => $second->getMorphClass(),
+        'page_id' => $second->getKey(),
+    ], $attrs));
+
+    // The first page is rated at 30% RTS, the second at 10%.
+    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 30]);
+    $row(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 10]);
+
+    $response = test()->get(route(
+        'workspaces.sales-marketing.page-roas-tracker',
+        [$this->workspace, 'start' => '2026-09-01', 'end' => '2026-09-01'],
+    ));
+
+    $overall = $response->viewData('page')['props']['overall'];
+
+    // ₱700 + ₱900 — each page on its own rate. No single blended rate on the
+    // combined ₱2,000 would give this.
+    expect($overall['days']['2026-09-01']['est_delivered_amount'])->toBe(1600.0);
+});
+
+it('treats an uncosted day as no goods cost rather than refusing to estimate', function () {
+    record(['date' => '2026-08-01', 'orders' => 1, 'sales' => 1000]);
+
+    $day = trackerPage('2026-08-01', '2026-08-01')['days']['2026-08-01'];
+
+    // The column itself stays null — nothing was recorded — but the estimate has
+    // to produce a number, so it charges no goods rather than collapsing.
+    expect($day['order_cogs'])->toBeNull()
+        ->and($day['est_cogs'])->toBe(0.0)
+        ->and($day['est_delivered_amount'])->toBe(820.0);
+});
+
+it('carries the units the day sold', function () {
+    record(['date' => '2026-08-01', 'orders' => 3, 'item_quantity' => 7]);
+    record(['date' => '2026-08-02', 'orders' => 2, 'item_quantity' => 5]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    expect($page['days']['2026-08-01']['item_quantity'])->toBe(7)
+        ->and($page['total']['item_quantity'])->toBe(12)
+        ->and($page['average']['item_quantity'])->toBe(6);
 });

@@ -21,6 +21,8 @@ export interface Review {
 
 export interface Creative {
     id: number;
+    /** Short unique ID (10 chars) shown in the UI and usable in ad names. Null for creatives made before codes existed. */
+    code: string | null;
     name: string;
     description: string | null;
     format: 'video' | 'image';

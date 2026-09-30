@@ -50,7 +50,20 @@ export type DateFilter = {
     value2?: string; // upper bound for 'between'
 };
 
-export type ReportFilter = NameFilter | MetricFilter | DateFilter;
+export type MediaType = 'image' | 'video';
+
+/** Image / video — which creatives the report counts. */
+export type MediaTypeFilter = {
+    field: 'media_type';
+    op: 'is';
+    value: MediaType;
+};
+
+export type ReportFilter =
+    | NameFilter
+    | MetricFilter
+    | DateFilter
+    | MediaTypeFilter;
 
 export const isNameFilter = (f: ReportFilter): f is NameFilter =>
     f.field === 'name';
@@ -58,12 +71,20 @@ export const isNameFilter = (f: ReportFilter): f is NameFilter =>
 export const isDateFilter = (f: ReportFilter): f is DateFilter =>
     f.field === 'created_date' || f.field === 'started_date';
 
+export const isMediaTypeFilter = (f: ReportFilter): f is MediaTypeFilter =>
+    f.field === 'media_type';
+
 /**
  * Positive test rather than "not a name filter" — `MetricFilter.field` is a bare
  * string, so anything unrecognised would otherwise be swept in as a metric.
  */
 export const isMetricFilter = (f: ReportFilter): f is MetricFilter =>
-    !isNameFilter(f) && !isDateFilter(f);
+    !isNameFilter(f) && !isDateFilter(f) && !isMediaTypeFilter(f);
+
+export const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
+    image: 'Image',
+    video: 'Video',
+};
 
 export const DATE_OP_LABELS: Record<DateFilterOp, string> = {
     on: 'is on',
