@@ -33,6 +33,8 @@ class Workspace extends Model
         'owner_id',
         'monthly_order_volume',
         'max_shops',
+        'messenger_link',
+        'last_interaction_at',
         'inventory_module_enabled',
         'finance_module_enabled',
         'products_module_enabled',
@@ -96,6 +98,7 @@ class Workspace extends Model
         'welle_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
+        'last_interaction_at' => 'datetime',
         // Reversible encryption so the automation pipeline can read it back.
         'erp_password' => 'encrypted',
     ];
