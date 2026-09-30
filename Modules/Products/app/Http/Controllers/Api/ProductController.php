@@ -17,10 +17,7 @@ class ProductController extends Controller
 
         return QueryBuilder::for(
             Product::where('workspace_id', $workspace->id)
-                ->when(
-                    TeamVisibility::shouldScope(auth()->user(), $workspace),
-                    fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo(auth()->user(), $workspace)),
-                )
+                ->visibleTo(auth()->user(), $workspace)
         )
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),

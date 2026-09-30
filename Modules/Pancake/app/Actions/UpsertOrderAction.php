@@ -4,6 +4,7 @@ namespace Modules\Pancake\Actions;
 
 use App\Models\Workspace;
 use Modules\Pancake\Models\Order;
+use Modules\Pancake\Support\OrderCurrency;
 use Modules\Pancake\Support\OrderTimestampResolver;
 
 class UpsertOrderAction
@@ -12,7 +13,7 @@ class UpsertOrderAction
 
     public function execute(Workspace $workspace, array $order): Order
     {
-        $divisor = $this->amountDivisor($order['order_currency'] ?? null);
+        $divisor = OrderCurrency::divisor($order['order_currency'] ?? null);
 
         return Order::updateOrCreate(
             [
@@ -39,22 +40,5 @@ class UpsertOrderAction
                 ...$this->timestampResolver->resolve($order),
             ]
         );
-    }
-
-    /**
-     * Pancake sometimes reports amounts in a scaled currency where the trailing
-     * number is the scale factor (e.g. "PHP100" means values are multiplied by
-     * 100). Return the divisor needed to normalise them back to the base
-     * currency: "PHP" => 1, "PHP100" => 100.
-     */
-    private function amountDivisor(?string $currency): int
-    {
-        if ($currency === null) {
-            return 1;
-        }
-
-        preg_match('/(\d+)$/', $currency, $matches);
-
-        return isset($matches[1]) ? max((int) $matches[1], 1) : 1;
     }
 }

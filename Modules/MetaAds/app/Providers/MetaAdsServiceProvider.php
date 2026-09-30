@@ -3,6 +3,7 @@
 namespace Modules\MetaAds\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\MetaAds\Console\Commands\BackfillAdSetBudgetHistoryCommand;
 use Modules\MetaAds\Console\Commands\CaptureBudgetSnapshotsCommand;
 use Modules\MetaAds\Console\Commands\DiscoverSystemAccountsCommand;
 use Modules\MetaAds\Console\Commands\EvaluateOptimizationRulesCommand;
@@ -46,6 +47,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         SyncInsightsCommand::class,
         SyncAllCommand::class,
         CaptureBudgetSnapshotsCommand::class,
+        BackfillAdSetBudgetHistoryCommand::class,
         DiscoverSystemAccountsCommand::class,
         EvaluateOptimizationRulesCommand::class,
         ReportPageBudgetsToDiscordCommand::class,

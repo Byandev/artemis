@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Shop;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;

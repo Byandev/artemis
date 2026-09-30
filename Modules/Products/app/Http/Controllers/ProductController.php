@@ -60,6 +60,7 @@ class ProductController extends Controller
             ->withQueryString();
 
         $categories = Product::ofWorkspace($workspace)
+            ->visibleTo($user, $workspace)
             ->select('category')
             ->whereNotNull('category')
             ->where('category', '!=', '')

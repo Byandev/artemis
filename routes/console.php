@@ -64,14 +64,8 @@ Schedule::command('welle:fetch-daily-records')->dailyAt('06:00')->withoutOverlap
 Schedule::command('sync:csr-daily-records')->everyTwoHours();
 Schedule::command('sync:csr-daily-call-records')->everyTwoHours();
 
-// Roll each shop's previous-14-days RTS rate onto shops.rts_snapshot so the RMO
-// table can show and sort by it without aggregating pancake_orders per request.
-// The 04:30 run follows the CSR rollups, once the previous day's orders have
-// settled; the 13:00 one picks up statuses the courier reported during the
-// morning. Both cover the same window of completed days, so the second run only
-// ever corrects the first — it never shifts the window mid-day.
-Schedule::command('sync:shop-rts-snapshot')->dailyAt('04:30')->withoutOverlapping();
-Schedule::command('sync:shop-rts-snapshot')->dailyAt('13:00')->withoutOverlapping();
+Schedule::command('sync:shop-rts-snapshot')->dailyAt('02:30')->withoutOverlapping();
+
 
 // Pull RMO statuses in line with the courier's parcel status for workspaces
 // that opted in. Runs once at midnight, which lands on the default two-day
@@ -100,6 +94,7 @@ Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapp
 
 // Who has access to each ad account (Business Manager People list). Access
 // changes are rare and the call is one request per account — daily is plenty.
+Schedule::command('metaads:sync-ad-accounts')->hourly()->withoutOverlapping();
 Schedule::command('metaads:sync-ad-account-people')->dailyAt('02:00')->withoutOverlapping();
 
 // Entity tree (campaigns → ad sets → ads → creatives) changes when advertisers

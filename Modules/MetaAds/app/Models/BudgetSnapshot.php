@@ -12,6 +12,12 @@ class BudgetSnapshot extends Model
 
     public const ENTITY_PAGE = 'page';
 
+    /** Observed live by metaads:capture-budgets — ground truth. */
+    public const SOURCE_CAPTURE = 'capture';
+
+    /** Reconstructed from Meta's activity log by metaads:backfill-adset-budgets. */
+    public const SOURCE_BACKFILL = 'backfill';
+
     protected $table = 'meta_ads_budget_snapshots';
 
     protected $primaryKey = null;
