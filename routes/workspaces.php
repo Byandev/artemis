@@ -852,6 +852,8 @@ Route::middleware(['auth', 'admin'])
             ->name('workspaces.update-modules');
         Route::put('/workspaces/{workspace}/max-shops', [AdminWorkspaceController::class, 'updateMaxShops'])
             ->name('workspaces.update-max-shops');
+        Route::put('/workspaces/{workspace}/contact', [AdminWorkspaceController::class, 'updateContact'])
+            ->name('workspaces.update-contact');
 
         // User Management
         Route::get('/users', [AdminUserController::class, 'index'])
