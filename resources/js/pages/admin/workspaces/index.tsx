@@ -6,7 +6,7 @@ import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
 import {
@@ -17,6 +17,7 @@ import {
     Files,
     LayoutGrid,
     LucideIcon,
+    MessageCircle,
     MessagesSquare,
     Search,
     Settings2,
@@ -53,6 +54,8 @@ interface Workspace {
     sms_parcel_journey_pages_count: number;
     chat_parcel_journey_pages_count: number;
     max_shops: number | null;
+    messenger_link: string | null;
+    last_interaction_at: string | null;
     subscription?: Subscription | null;
     inventory_module_enabled: boolean;
     finance_module_enabled: boolean;
@@ -355,6 +358,9 @@ export default function Index({ workspaces, plans, filters }: Props) {
     const [editingMaxShops, setEditingMaxShops] = useState<Workspace | null>(
         null,
     );
+    const [editingContact, setEditingContact] = useState<Workspace | null>(
+        null,
+    );
 
     const initialSorting = useMemo(() => {
         const sort =
@@ -423,6 +429,61 @@ export default function Index({ workspaces, plans, filters }: Props) {
                     {row.original.owner?.name || 'Platform Admin'}
                 </div>
             ),
+        },
+        {
+            accessorKey: 'last_interaction_at',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Last Interaction" />
+            ),
+            cell: ({ row }) => {
+                const { messenger_link, last_interaction_at } = row.original;
+                return (
+                    <div className="flex items-center gap-2">
+                        {messenger_link ? (
+                            <a
+                                href={messenger_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-md p-1.5 text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                                title={messenger_link}
+                            >
+                                <MessageCircle className="h-4 w-4" />
+                            </a>
+                        ) : (
+                            <span
+                                className="p-1.5 text-zinc-300 dark:text-zinc-700"
+                                title="No Messenger link"
+                            >
+                                <MessageCircle className="h-4 w-4" />
+                            </span>
+                        )}
+                        {last_interaction_at ? (
+                            <div>
+                                <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100">
+                                    {new Date(
+                                        last_interaction_at,
+                                    ).toLocaleDateString(undefined, {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: 'numeric',
+                                    })}
+                                </div>
+                                <div className="text-[10px] text-zinc-500">
+                                    {formatDistanceToNow(
+                                        new Date(last_interaction_at),
+                                        { addSuffix: true },
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <span className="text-xs text-zinc-400 italic">
+                                Never
+                            </span>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'shops_count',
@@ -575,6 +636,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
                         </Link>
                     )}
                     <button
+                        onClick={() => setEditingContact(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                        title="Edit contact"
+                    >
+                        <MessageCircle className="h-4 w-4" />
+                    </button>
+                    <button
                         onClick={() => setEditingMaxShops(row.original)}
                         className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                         title="Set max shops"
@@ -678,6 +746,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 <MaxShopsModal
                     workspace={editingMaxShops}
                     onClose={() => setEditingMaxShops(null)}
+                />
+            )}
+
+            {editingContact && (
+                <ContactModal
+                    workspace={editingContact}
+                    onClose={() => setEditingContact(null)}
                 />
             )}
 
@@ -791,7 +866,30 @@ function SubscriptionModal({
                         </label>
                         <select
                             value={data.status}
-                            onChange={(e) => setData('status', e.target.value)}
+                            onChange={(e) => {
+                                const status = e.target.value;
+                                // Reactivating on the old, already-passed period
+                                // would save a subscription that is still lapsed —
+                                // drop the stale dates so they auto-calculate.
+                                const periodOver =
+                                    !!data.current_period_end &&
+                                    data.current_period_end <
+                                        format(new Date(), 'yyyy-MM-dd');
+                                const reactivating =
+                                    status === 'active' ||
+                                    status === 'trialing';
+
+                                setData((prev) => ({
+                                    ...prev,
+                                    status,
+                                    ...(reactivating && periodOver
+                                        ? {
+                                              current_period_start: '',
+                                              current_period_end: '',
+                                          }
+                                        : {}),
+                                }));
+                            }}
                             className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
                         >
                             <option value="active">Active</option>
@@ -957,6 +1055,138 @@ function MaxShopsModal({
                             instead. Currently using {workspace.shops_count}{' '}
                             shop(s).
                         </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function ContactModal({
+    workspace,
+    onClose,
+}: {
+    workspace: Workspace;
+    onClose: () => void;
+}) {
+    const { data, setData, put, processing, errors } = useForm({
+        messenger_link: workspace.messenger_link ?? '',
+        // Local date, not a slice of the UTC ISO string — a midnight +08:00
+        // timestamp would otherwise read as the day before.
+        last_interaction_at: workspace.last_interaction_at
+            ? format(new Date(workspace.last_interaction_at), 'yyyy-MM-dd')
+            : '',
+    });
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        put(`/admin/workspaces/${workspace.slug}/contact`, {
+            onSuccess: () => onClose(),
+            preserveScroll: true,
+        });
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={onClose}
+        >
+            <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="mb-5 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Client Contact
+                        </h3>
+                        <p className="text-sm text-zinc-500">
+                            {workspace.name}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Messenger link
+                        </label>
+                        <input
+                            type="url"
+                            placeholder="https://m.me/..."
+                            value={data.messenger_link}
+                            onChange={(e) =>
+                                setData('messenger_link', e.target.value)
+                            }
+                            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
+                        />
+                        {errors.messenger_link && (
+                            <p className="mt-1 text-xs text-red-600">
+                                {errors.messenger_link}
+                            </p>
+                        )}
+                    </div>
+
+                    <div>
+                        <div className="mb-1 flex items-center justify-between">
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                Last interaction
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setData('last_interaction_at', today)
+                                }
+                                className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+                            >
+                                Set to today
+                            </button>
+                        </div>
+                        <DatePicker
+                            id={`contact-${workspace.id}-last-interaction`}
+                            mode="single"
+                            fullWidth
+                            placeholder="Never"
+                            defaultDate={data.last_interaction_at || undefined}
+                            maxDate={today}
+                            onChange={(dates) =>
+                                setData(
+                                    'last_interaction_at',
+                                    dates.length
+                                        ? format(dates[0], 'yyyy-MM-dd')
+                                        : '',
+                                )
+                            }
+                        />
+                        {errors.last_interaction_at && (
+                            <p className="mt-1 text-xs text-red-600">
+                                {errors.last_interaction_at}
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">

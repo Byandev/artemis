@@ -706,6 +706,12 @@ export function AppSidebar() {
                               icon: Banknote,
                               permission: PERMISSIONS.ViewFinanceRequestFunds,
                           },
+                          {
+                              title: 'RF Requirements',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/management`,
+                              icon: SlidersHorizontal,
+                              permission: PERMISSIONS.ViewFinanceTransactions,
+                          },
                       ],
                   },
               ]

@@ -31,7 +31,8 @@ function productRequestPayload(array $attrs = []): array
         'requested_by' => test()->user->id,
         'charge_to' => [['user_id' => test()->user->id]],
         'purpose' => 'Stock replenishment',
-        'amount_requested' => 900,
+        'payment_method' => 'cash',
+        'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 900]],
     ], $attrs);
 }
 
@@ -59,7 +60,8 @@ test('blank shares split the amount evenly between the products', function () {
 
     $this->actingAs($this->user)
         ->post($this->url, productRequestPayload([
-            'amount_requested' => 100,
+            'payment_method' => 'cash',
+            'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 100]],
             'products' => [
                 ['product_id' => $this->widget->id],
                 ['product_id' => $this->gadget->id],

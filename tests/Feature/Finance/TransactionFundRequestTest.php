@@ -117,10 +117,10 @@ test('the form offers approved requests with the shares it fills in from', funct
         'sort_order' => 0,
     ]);
 
-    // A pending request is not something to settle yet, so it stays out.
+    // A request still for approval is not something to settle yet, so it stays out.
     approvedRequest($this->workspace, $this->user, [
         'reference_no' => 'RF-00002',
-        'status' => 'pending',
+        'status' => 'for_approval',
     ]);
 
     $this->actingAs($this->user)
@@ -131,6 +131,7 @@ test('the form offers approved requests with the shares it fills in from', funct
             ->has('fundRequests', 1)
             ->where('fundRequests.0.reference_no', 'RF-00001')
             ->where('fundRequests.0.amount_requested', fn ($v) => (float) $v === 900.0)
+            ->where('fundRequests.0.requested_by', $this->user->id)
             ->where('fundRequests.0.charge_to.0.user_id', $this->user->id)
             ->where('fundRequests.0.charge_to.0.amount', fn ($v) => (float) $v === 900.0)
             ->where('fundRequests.0.products.0.product_label', 'Widget')

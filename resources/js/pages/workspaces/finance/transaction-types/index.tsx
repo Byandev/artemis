@@ -5,6 +5,11 @@ import {
     inputCls,
 } from '@/components/finance/account-form-dialog';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
+import {
+    ManageRequirementsDialog,
+    NamedItem,
+    Requirements,
+} from '@/components/finance/fund-request-requirements';
 import { transactionTypeStyle } from '@/components/finance/transaction-type';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -21,6 +26,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -30,7 +36,13 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import {
+    ClipboardCheck,
+    MoreHorizontal,
+    Pencil,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 type Nature = 'debit' | 'credit';
@@ -46,6 +58,12 @@ interface TransactionType {
     // Which company metric an OPEX pool is split across products by; null =
     // the default. Only meaningful when the section is `opex`.
     opex_allocation_basis: string | null;
+    // Whether the fund request form offers this type.
+    fund_requestable: boolean;
+    fund_requestable_per_product: boolean;
+    // What a fund request of this type calls for.
+    attachments: NamedItem[];
+    checklists: NamedItem[];
 }
 
 interface AllocationBasis {
@@ -58,6 +76,7 @@ interface Props {
     types: PaginatedData<TransactionType>;
     allocationBases: AllocationBasis[];
     defaultAllocationBasis: string;
+    requirements: Requirements;
     query?: {
         sort?: string | null;
         per_page?: number | string | null;
@@ -70,6 +89,7 @@ export default function TransactionTypesIndex({
     types,
     allocationBases,
     defaultAllocationBasis,
+    requirements,
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -79,6 +99,7 @@ export default function TransactionTypesIndex({
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<TransactionType | null>(null);
     const [toDelete, setToDelete] = useState<TransactionType | null>(null);
+    const [managingId, setManagingId] = useState<number | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/transaction-types`;
@@ -86,6 +107,10 @@ export default function TransactionTypesIndex({
     const canEdit = usePermission(PERMISSIONS.EditFinanceTransactions);
     const canDelete = usePermission(PERMISSIONS.DeleteFinanceTransactions);
     const showActions = canEdit || canDelete;
+
+    // Read the type from props on every render so the dialog shows its
+    // requirements as the server returns them after each change.
+    const managing = types.data.find((t) => t.id === managingId) ?? null;
 
     const performQuery = useCallback(
         debounce((s: string) => {
@@ -182,6 +207,25 @@ export default function TransactionTypesIndex({
             },
         },
         {
+            accessorKey: 'fund_requestable',
+            enableSorting: false,
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                    Fund Request
+                </div>
+            ),
+            cell: ({ row }) =>
+                row.original.fund_requestable ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] text-emerald-700 uppercase dark:bg-emerald-950/40 dark:text-emerald-300">
+                        {row.original.fund_requestable_per_product
+                            ? 'Yes · Per product'
+                            : 'Yes'}
+                    </span>
+                ) : (
+                    <span className="text-gray-300 dark:text-gray-600">—</span>
+                ),
+        },
+        {
             accessorKey: 'opex_allocation_basis',
             enableSorting: false,
             header: () => (
@@ -231,7 +275,7 @@ export default function TransactionTypesIndex({
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent
                                       align="end"
-                                      className="w-36"
+                                      className="w-48"
                                   >
                                       {canEdit && (
                                           <DropdownMenuItem
@@ -241,6 +285,16 @@ export default function TransactionTypesIndex({
                                           >
                                               <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
                                               Edit
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEdit && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  setManagingId(row.original.id)
+                                              }
+                                          >
+                                              <ClipboardCheck className="mr-2 h-3.5 w-3.5" />{' '}
+                                              Manage Requirements
                                           </DropdownMenuItem>
                                       )}
                                       {canEdit && canDelete && (
@@ -337,6 +391,15 @@ export default function TransactionTypesIndex({
                         defaultAllocationBasis={defaultAllocationBasis}
                     />
                 )}
+                {canEdit && (
+                    <ManageRequirementsDialog
+                        type={managing}
+                        requirements={requirements}
+                        financeUrl={`/workspaces/${workspace.slug}/finance`}
+                        can={{ canCreate, canEdit, canDelete }}
+                        onClose={() => setManagingId(null)}
+                    />
+                )}
                 {canDelete && (
                     <FinanceDeleteDialog
                         open={!!toDelete}
@@ -374,11 +437,15 @@ function TypeFormDialog({
             nature: Nature;
             income_statement_section: IncomeStatementSection;
             opex_allocation_basis: string | null;
+            fund_requestable: boolean;
+            fund_requestable_per_product: boolean;
         }>({
             name: '',
             nature: 'debit',
             income_statement_section: 'opex',
             opex_allocation_basis: null,
+            fund_requestable: false,
+            fund_requestable_per_product: false,
         });
 
     useEffect(() => {
@@ -391,6 +458,11 @@ function TypeFormDialog({
                     type.income_statement_section,
                 );
                 setData('opex_allocation_basis', type.opex_allocation_basis);
+                setData('fund_requestable', type.fund_requestable);
+                setData(
+                    'fund_requestable_per_product',
+                    type.fund_requestable_per_product,
+                );
             } else {
                 reset();
                 clearErrors();
@@ -544,6 +616,50 @@ function TypeFormDialog({
                                 })}
                             </div>
                         </Field>
+
+                        <label className="flex cursor-pointer items-start justify-between gap-3 rounded-[10px] border border-black/6 bg-stone-50 p-3 dark:border-white/6 dark:bg-zinc-800/50">
+                            <span className="text-[12px] leading-snug text-gray-600 dark:text-gray-300">
+                                <span className="font-medium text-gray-800 dark:text-gray-100">
+                                    Fund requestable
+                                </span>
+                                <br />
+                                Offer this type on the fund request form.
+                            </span>
+                            <Switch
+                                checked={data.fund_requestable}
+                                onCheckedChange={(v) =>
+                                    setData('fund_requestable', v)
+                                }
+                            />
+                        </label>
+                        {errors.fund_requestable && (
+                            <p className="-mt-3 text-[11px] text-red-500">
+                                {errors.fund_requestable}
+                            </p>
+                        )}
+
+                        {data.fund_requestable && (
+                            <label className="flex cursor-pointer items-start justify-between gap-3 rounded-[10px] border border-black/6 bg-stone-50 p-3 dark:border-white/6 dark:bg-zinc-800/50">
+                                <span className="text-[12px] leading-snug text-gray-600 dark:text-gray-300">
+                                    <span className="font-medium text-gray-800 dark:text-gray-100">
+                                        Per product
+                                    </span>
+                                    <br />
+                                    Each particular picks a product, and the
+                                    request is split across products by their
+                                    totals instead of on the allocation.
+                                </span>
+                                <Switch
+                                    checked={data.fund_requestable_per_product}
+                                    onCheckedChange={(v) =>
+                                        setData(
+                                            'fund_requestable_per_product',
+                                            v,
+                                        )
+                                    }
+                                />
+                            </label>
+                        )}
 
                         {/* A shared OPEX pool is split across products by its
                             share of some company metric — and which metric fits
