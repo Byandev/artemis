@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Product;
 use App\Models\User;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\TransactionType;
@@ -11,6 +10,7 @@ use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\GencysDailySalesOrderItem;
 use Modules\GencysERP\Models\Intern;
 use Modules\Inventory\Models\InventoryUnitCode;
+use Modules\Products\Models\Product;
 
 /**
  * OPEX is a company pool with nothing in it booked against one user or product,

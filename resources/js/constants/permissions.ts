@@ -37,6 +37,12 @@ export const PERMISSIONS = {
     CreateProducts: 'Create Products',
     EditProducts: 'Edit Products',
     DeleteProducts: 'Delete Products',
+    ViewProductForms: 'View Product Forms',
+    ManageProductForms: 'Manage Product Forms',
+    ViewTargetMarkets: 'View Target Markets',
+    ManageTargetMarkets: 'Manage Target Markets',
+    ViewProductResearch: 'View RDP Builder',
+    ManageProductResearch: 'Manage RDP Builder',
 
     // Teams
     ViewTeams: 'View Teams',
@@ -162,13 +168,18 @@ export const PERMISSIONS = {
     ViewSalesMarketingDailyReport: 'View S&M Daily Report',
     ViewPageRoasTracker: 'View Page ROAS Tracker',
     ViewSalesTargets: 'View Sales Targets',
+    ManageSalesTargets: 'Manage Sales Targets',
     ViewVideoEditorDashboard: 'View Video Editor Dashboard',
     ViewCsrDashboard: 'View CSR Dashboard',
+
+    // Welle
+    ViewMyEsc: 'View My ESC',
 
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
     ManageDiscordNotifications: 'Manage Discord Notifications',
+    ManageErpCredentials: 'Manage ERP Credentials',
 
     // Billing
     ViewBillingSettings: 'View Billing Settings',

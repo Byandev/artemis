@@ -300,6 +300,24 @@ return [
             'timeout' => 120,
             'nice' => 0,
         ],
+        'welle' => [
+            'connection' => 'redis',
+            'queue' => ['welle'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            // Kept low on purpose: the jobs serialise per user anyway, and
+            // Welle is a third-party login, not an API we should hammer.
+            'maxProcesses' => 2,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 3,
+            // Comfortably over the job's own 120s timeout.
+            'timeout' => 180,
+            'nice' => 0,
+        ],
         'meta-ads' => [
             'connection' => 'redis',
             'queue' => ['meta-ads'],

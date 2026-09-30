@@ -58,6 +58,8 @@ export interface FundRequestOption {
     amount_requested: number;
     status: string;
     transaction_type_id: number | null;
+    requested_by: number | null;
+    approved_by: number | null;
     department: string | null;
     charge_to: { user_id: number; name: string; amount: number }[];
     products: { product_label: string; amount: number }[];
@@ -139,7 +141,7 @@ const money = (n: number) =>
  * grid on the right. Defined at module scope so the inputs it wraps keep focus
  * across re-renders.
  */
-function Section({
+export function Section({
     title,
     hint,
     children,
@@ -166,7 +168,7 @@ function Section({
 }
 
 /** Spans both columns of a Section's field grid. */
-function Wide({
+export function Wide({
     children,
     ref,
 }: {
@@ -402,8 +404,8 @@ export function TransactionForm({
     /**
      * Fill the form in from an approved fund request. Everything stays editable
      * afterwards — this saves retyping the request into the ledger, it does not
-     * bind the entry to it. The type/department fall back to whatever is already
-     * set when the request carries none.
+     * bind the entry to it. The type, department, requester and approver fall
+     * back to whatever is already set when the request carries none.
      */
     const pullFromFundRequest = (id: string) => {
         setData('fund_request_id', id ? Number(id) : '');
@@ -427,6 +429,8 @@ export function TransactionForm({
                 request.transaction_type_id != null
                     ? String(request.transaction_type_id)
                     : current.transaction_type_id,
+            requested_by: request.requested_by ?? current.requested_by,
+            approved_by: request.approved_by ?? current.approved_by,
             department: request.department ?? current.department,
             charge_to: request.charge_to.map((row) => ({
                 user_id: row.user_id,

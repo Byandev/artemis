@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Permission;
-use App\Models\Product;
 use App\Models\Role;
 use App\Models\Shop;
 use App\Models\Team;
@@ -10,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
+use Modules\Products\Models\Product;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);

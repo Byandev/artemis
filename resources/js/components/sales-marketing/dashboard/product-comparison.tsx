@@ -2,14 +2,12 @@ import { useMemo } from 'react';
 import ComparisonPanel, {
     changeFrom,
     METRICS,
-    sumComparisonRows,
     useComparisonMetric,
     useProductComparisonMetrics,
     type ComparisonBar,
 } from './comparison-panel';
 import {
     assignProductFills,
-    OTHERS_FILL,
     productName,
     VISIBLE_PRODUCTS,
     type ProductRow,
@@ -34,9 +32,12 @@ interface ProductComparison {
  * it is assigned once off the sales ranking and left alone while the metric
  * changes.
  *
- * Everything past the palette folds into a single "Others" bar. Folding is a sum
- * of the raw rows, not of the metric, so the bucket's ROAS and RTS are real
- * ratios of real totals rather than averages of averages.
+ * Every product is plotted — nothing is folded into an "Others" bucket and
+ * nothing is cut at a "top N". The chart comes to rest at VISIBLE_PRODUCTS rows
+ * and scrolls to the rest, which keeps the panel a readable height without
+ * deciding on your behalf which products are worth naming. The scale and the
+ * average rule are taken across all of them, so scrolling reads on the same
+ * footing as landing.
  */
 export default function ProductComparison({
     slug,
@@ -72,21 +73,20 @@ export default function ProductComparison({
         [current.data],
     );
 
-    const { bars, total } = useMemo(() => {
-        if (!current.data) return { bars: [] as ComparisonBar[], total: 0 };
+    const bars = useMemo<ComparisonBar[]>(() => {
+        if (!current.data) return [];
 
         const spec = METRICS[metric];
         const before = new Map(
             (prior.data?.rows ?? []).map((r) => [r.product.id, r]),
         );
 
-        const ranked = current.data.rows
+        // Nothing to plot for a product that did none of this metric in the
+        // window — a zero-length bar states less than its absence does.
+        return current.data.rows
             .map((row) => ({ row, value: spec.of(row) }))
             .filter((r) => r.value > 0)
-            .sort((a, b) => b.value - a.value);
-
-        const bars: ComparisonBar[] = ranked
-            .slice(0, VISIBLE_PRODUCTS)
+            .sort((a, b) => b.value - a.value)
             .map(({ row, value }) => {
                 const wasRow = before.get(row.product.id);
                 const was = wasRow ? spec.of(wasRow) : null;
@@ -97,39 +97,11 @@ export default function ProductComparison({
                     value,
                     was,
                     change: changeFrom(value, was),
-                    // A product with more peers than the palette has hues can
-                    // land outside it; grey is then the honest answer.
-                    fill: fills.get(row.product.id) ?? OTHERS_FILL,
+                    // Assigned off the sales ranking, which covers every row in
+                    // this same answer — so there is always one to find.
+                    fill: fills.get(row.product.id),
                 };
             });
-
-        // Everything else, added up as raw sums and only then turned into the
-        // metric — the bucket's ROAS is its sales over its spend, not a mean.
-        const rest = ranked.slice(VISIBLE_PRODUCTS).map((r) => r.row);
-
-        if (rest.length) {
-            const value = spec.of(sumComparisonRows(rest));
-            const priorRest = rest
-                .map((row) => before.get(row.product.id))
-                .filter((row): row is ProductRow => row !== undefined);
-            // Compared against the same products' figures last period, so the
-            // bucket's delta is about those products rather than about which
-            // products happened to fall into it.
-            const was = priorRest.length
-                ? spec.of(sumComparisonRows(priorRest))
-                : null;
-
-            bars.push({
-                key: 'others',
-                name: 'Others',
-                value,
-                was,
-                change: changeFrom(value, was),
-                fill: OTHERS_FILL,
-            });
-        }
-
-        return { bars, total: ranked.length };
     }, [current.data, prior.data, metric, fills]);
 
     const firstLoad = (current.loading || prior.loading) && !current.data;
@@ -141,6 +113,7 @@ export default function ProductComparison({
             metrics={metrics}
             onMetric={chooseMetric}
             bars={bars}
+            visibleRows={VISIBLE_PRODUCTS}
             previous={previous}
             loading={current.loading || prior.loading}
             error={current.error || prior.error}
@@ -153,11 +126,11 @@ export default function ProductComparison({
             }}
             refreshLabel="the product comparison"
             emptyHint="no product performance in this period"
-            // Says what the grey bar stands for, since it is the one bar whose
-            // name does not name a thing.
+            // Says how much is below the fold, since the cut edge of the next
+            // bar is the only other sign that the chart carries on.
             note={
-                total > VISIBLE_PRODUCTS
-                    ? `others = ${total - VISIBLE_PRODUCTS} more products`
+                bars.length > VISIBLE_PRODUCTS
+                    ? `${bars.length} products — scroll for the rest`
                     : undefined
             }
         />

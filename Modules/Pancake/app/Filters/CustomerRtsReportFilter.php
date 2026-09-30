@@ -23,20 +23,8 @@ use Spatie\QueryBuilder\Filters\Filter;
  */
 class CustomerRtsReportFilter implements Filter
 {
+    use ComparesNumeric;
     use JoinsArrayValues;
-
-    /**
-     * Single-number comparisons, mapped to SQL.
-     *
-     * An allowlist because the chosen key is interpolated into the comparison;
-     * the request names a key, never an operator. `between` is absent because it
-     * reads a second number and is built by hand below.
-     */
-    public const OPERATORS = [
-        'gt' => '>',
-        'lt' => '<',
-        'eq' => '=',
-    ];
 
     public function __construct(
         private readonly string $operator = '',
@@ -55,32 +43,12 @@ class CustomerRtsReportFilter implements Filter
         $query->whereRaw("{$rate} IS NOT NULL");
 
         // Half a comparison narrows nothing — the report filter still stands.
-        if (! is_numeric($this->value)) {
-            return $query;
-        }
-
-        $percent = "ROUND({$rate} * 100)";
-
-        if ($this->operator === 'between') {
-            if (! is_numeric($this->upper)) {
-                return $query;
-            }
-
-            // Ordered here rather than trusting the boxes: a range typed high
-            // then low is still the range the user meant, and BETWEEN would
-            // otherwise quietly match nothing.
-            return $query->whereRaw("{$percent} BETWEEN ? AND ?", [
-                min((float) $this->value, (float) $this->upper),
-                max((float) $this->value, (float) $this->upper),
-            ]);
-        }
-
-        $sql = self::OPERATORS[$this->operator] ?? null;
-
-        if ($sql === null) {
-            return $query;
-        }
-
-        return $query->whereRaw("{$percent} {$sql} ?", [(float) $this->value]);
+        return $this->compare(
+            $query,
+            "ROUND({$rate} * 100)",
+            $this->operator,
+            $this->value,
+            $this->upper,
+        );
     }
 }

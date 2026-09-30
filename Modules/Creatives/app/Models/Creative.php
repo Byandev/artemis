@@ -2,7 +2,6 @@
 
 namespace Modules\Creatives\Models;
 
-use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Modules\Products\Models\Product;
 
 class Creative extends Model
 {

@@ -19,7 +19,8 @@ beforeEach(function () {
 function fundRequestPayload(array $attrs = []): array
 {
     return array_merge([
-        'amount_requested' => 900,
+        'payment_method' => 'cash',
+        'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 900]],
     ], $attrs);
 }
 
@@ -75,7 +76,8 @@ test('an uneven split keeps every centavo, the odd ones going to the first user'
 
     $this->actingAs($this->user)
         ->post($this->url, fundRequestPayload([
-            'amount_requested' => 100,
+            'payment_method' => 'cash',
+            'particulars' => [['name' => 'Item', 'quantity' => 1, 'unit_price' => 100]],
             'charge_to' => [
                 ['user_id' => $this->user->id],
                 ['user_id' => $maria->id],
@@ -193,6 +195,7 @@ test('a request stores its transaction type and department', function () {
     $type = TransactionType::create([
         'workspace_id' => $this->workspace->id,
         'name' => 'expenses',
+        'fund_requestable' => true,
     ]);
     $department = Department::create([
         'workspace_id' => $this->workspace->id,
@@ -219,6 +222,7 @@ test('a type or department from another workspace is rejected', function () {
     $foreignType = TransactionType::create([
         'workspace_id' => $otherWorkspace->id,
         'name' => 'expenses',
+        'fund_requestable' => true,
     ]);
 
     $this->actingAs($this->user)
@@ -229,4 +233,46 @@ test('a type or department from another workspace is rejected', function () {
         ->assertSessionHasErrors('transaction_type_id');
 
     expect(FundRequest::count())->toBe(0);
+});
+
+test('only fund-requestable types are offered and accepted', function () {
+    $requestable = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Ad Spent', 'fund_requestable' => true]);
+    $other = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Sales']);
+
+    $this->actingAs($this->user)
+        ->get("{$this->url}/create")
+        ->assertInertia(fn ($p) => $p
+            ->has('transactionTypes', 1)
+            ->where('transactionTypes.0.id', $requestable->id));
+
+    $this->actingAs($this->user)
+        ->post($this->url, fundRequestPayload([
+            'transaction_type_id' => $other->id,
+            'charge_to' => [['user_id' => $this->user->id]],
+        ]))
+        ->assertSessionHasErrors('transaction_type_id');
+
+    expect(FundRequest::count())->toBe(0);
+});
+
+test('an edit keeps a type that has since stopped being fund-requestable', function () {
+    $type = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Ad Spent', 'fund_requestable' => true]);
+
+    $this->actingAs($this->user)->post($this->url, fundRequestPayload([
+        'transaction_type_id' => $type->id,
+        'charge_to' => [['user_id' => $this->user->id]],
+    ]));
+    $request = FundRequest::sole();
+    $type->update(['fund_requestable' => false]);
+
+    $this->actingAs($this->user)
+        ->get("{$this->url}/{$request->id}/edit")
+        ->assertInertia(fn ($p) => $p->where('transactionTypes.0.id', $type->id));
+
+    $this->actingAs($this->user)
+        ->put("{$this->url}/{$request->id}", fundRequestPayload([
+            'transaction_type_id' => $type->id,
+            'charge_to' => [['user_id' => $this->user->id]],
+        ]))
+        ->assertSessionHasNoErrors();
 });

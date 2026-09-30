@@ -8,7 +8,8 @@ class ErpCredentialUpdateRequest extends FormRequest
 {
     /**
      * The route's `auth` middleware already guarantees an authenticated user;
-     * workspace membership is enforced in the controller.
+     * workspace membership, the Gencys module toggle and the "Manage ERP
+     * Credentials" grant are enforced in the controller.
      */
     public function authorize(): bool
     {

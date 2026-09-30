@@ -18,10 +18,14 @@ use Modules\Pancake\Models\Order;
  * runs the same rule backwards and picks those calls up, rather than leaving
  * them unmatched.
  *
- * Today's confirmations only, so the dates here are all relative to now rather
- * than written out: a fixed date would stop being today tomorrow.
+ * Today's orders only, so the dates here are all relative to now rather than
+ * written out: a fixed date would stop being today tomorrow.
+ *
+ * $insertedAt is the day the order came in, which is the other stamp the rule
+ * reads and defaults to today; $confirmedAt may be null for an order nobody has
+ * confirmed yet.
  */
-function orderConfirmedOn(Workspace $workspace, mixed $confirmedAt, string $phone): Order
+function orderConfirmedOn(Workspace $workspace, mixed $confirmedAt, string $phone, mixed $insertedAt = null): Order
 {
     $page = Page::factory()->forWorkspace($workspace)->create();
 
@@ -29,7 +33,10 @@ function orderConfirmedOn(Workspace $workspace, mixed $confirmedAt, string $phon
     // Order. Both map to pancake_orders, so create with one and re-read as the
     // other.
     $order = Order::findOrFail(
-        AppOrder::factory()->forPage($page)->create(['confirmed_at' => $confirmedAt])->id
+        AppOrder::factory()->forPage($page)->create([
+            'confirmed_at' => $confirmedAt,
+            'inserted_at' => $insertedAt ?? now(),
+        ])->id
     );
 
     ShippingAddress::factory()->create([
@@ -96,16 +103,31 @@ it('leaves calls on another day, another number, another workspace and another o
         ->persona->toBe(CallLogPersona::CUSTOMER);
 });
 
-it('does nothing for an order that was never confirmed', function () {
+it('claims today\'s calls for an order that came in today and is not confirmed yet', function () {
     $workspace = Workspace::factory()->create();
 
-    $order = orderConfirmedOn($workspace, now()->setTime(14, 5), '09171234567');
-    $order->update(['confirmed_at' => null]);
+    // The CSR rang to verify it before anyone confirmed it, which is the usual
+    // way round. Read on confirmed_at alone this order has no day at all, and
+    // the call would sit unmatched for good.
+    $order = orderConfirmedOn($workspace, null, '09171234567');
 
     $call = unmatchedCall($workspace, '09171234567', today());
 
+    expect(app(LinkVerificationCallLogsAction::class)->execute($order))->toBe(1);
+    expect($call->refresh())
+        ->order_id->toBe($order->id)
+        ->persona->toBe(CallLogPersona::VERIFICATION);
+});
+
+it('ignores an order that came in on an earlier day and was never confirmed', function () {
+    $workspace = Workspace::factory()->create();
+
+    $order = orderConfirmedOn($workspace, null, '09171234567', today()->subDay()->setTime(9, 0));
+
+    $call = unmatchedCall($workspace, '09171234567', today()->subDay());
+
     expect(app(LinkVerificationCallLogsAction::class)->execute($order))->toBe(0);
-    expect($call->refresh())->order_id->toBeNull();
+    expect($call->refresh())->order_id->toBeNull()->persona->toBeNull();
 });
 
 it('does nothing when the shipping address has no number to match on', function () {
@@ -126,8 +148,14 @@ it('ignores an order confirmed on an earlier day', function () {
 
     // Same customer, same number, and a call sitting unmatched on the day it
     // was confirmed — but that day is behind us, so this is not the gap the
-    // action is here to close.
-    $order = orderConfirmedOn($workspace, today()->subDay()->setTime(14, 5), '09171234567');
+    // action is here to close. Taken in that day too: an order that came in
+    // today would qualify on that stamp alone.
+    $order = orderConfirmedOn(
+        $workspace,
+        today()->subDay()->setTime(14, 5),
+        '09171234567',
+        today()->subDay()->setTime(9, 0),
+    );
 
     $call = unmatchedCall($workspace, '09171234567', today()->subDay());
 

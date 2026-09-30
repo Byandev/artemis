@@ -1,13 +1,13 @@
 <?php
 
 use App\Models\Page;
-use App\Models\Product;
 use App\Models\User;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\LossCarryover;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Services\UserProductIncomeStatementService;
+use Modules\Products\Models\Product;
 
 /**
  * A month that ends in the red is carried into the next one.

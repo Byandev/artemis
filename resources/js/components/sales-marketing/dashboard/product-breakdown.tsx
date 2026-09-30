@@ -6,7 +6,6 @@ import { sumComparisonRows, useProductSpendShown } from './comparison-panel';
 import { formatKpi } from './kpi-card';
 import {
     assignProductFills,
-    OTHERS_FILL,
     productName,
     VISIBLE_PRODUCTS,
     type Fill,
@@ -26,9 +25,6 @@ interface Breakdown {
 const ROAS_TARGET = 3;
 const RTS_CEILING = 0.2;
 
-/** How many rows are visible before the table starts scrolling. */
-const VISIBLE_ROWS = 10;
-
 /**
  * Row height in rem, fixed so the scroll cap can be stated in rows rather than
  * guessed in pixels. Header and footer are the same height, hence the +2.
@@ -42,16 +38,20 @@ const STICKY_BG = 'bg-white dark:bg-zinc-900';
  * The per-product table beneath the comparison chart: the same rows, stated
  * rather than plotted, with a sub-total.
  *
- * It folds to "Others" on the same rule the chart does, and carries each
- * product's colour as a swatch, so the row you are reading here is visibly the
- * bar you were reading up there. Ranking is by sales — the ordering the colours
- * are assigned on — rather than a column of its own choosing, so the two panels
- * can never disagree about which products are named and which are the remainder.
+ * Every product is listed — nothing folds into an "Others" row. The table rests
+ * at VISIBLE_PRODUCTS rows, the same depth the chart rests at, and scrolls to
+ * the rest under a pinned header and a pinned sub-total, so the figure you are
+ * reading always has its column name above it and the total below it.
+ *
+ * Each row carries the product's colour as a swatch, so the row you are reading
+ * here is visibly the bar you were reading up there. Ranking is by sales — the
+ * ordering the colours are assigned on — rather than a column of its own
+ * choosing, so the two panels list the same products in the same order.
  *
  * Every derived figure — ROAS, RTS rate, and the whole sub-total row — is worked
  * out here from the raw sums. The sub-total's ROAS and RTS are blended (totals
- * divided), not means of the columns above: averaging seven products' ratios
- * would weight a product with 3,800 orders the same as one with 16,000.
+ * divided), not means of the columns above: averaging a catalogue's ratios would
+ * weight a product with 3,800 orders the same as one with 16,000.
  */
 export default function ProductBreakdown({
     slug,
@@ -75,37 +75,21 @@ export default function ProductBreakdown({
         const all = data?.rows ?? [];
         const fills = assignProductFills(all);
 
-        const ranked = [...all].sort((a, b) => b.sales - a.sales);
-
-        const stated = ranked.slice(0, VISIBLE_PRODUCTS).map((row) => ({
-            key: String(row.product.id),
-            name: productName(row),
-            fill: fills.get(row.product.id) ?? OTHERS_FILL,
-            ...derive(row),
-        }));
-
-        // The remainder as one row: summed as raw figures and only then turned
-        // into ratios, so its ROAS is its sales over its spend rather than a
-        // mean of the ratios folded into it.
-        const rest = ranked.slice(VISIBLE_PRODUCTS);
-
-        if (rest.length) {
-            stated.push({
-                key: 'others',
-                name: 'Others',
-                fill: OTHERS_FILL,
-                ...derive(sumComparisonRows(rest)),
-            });
-        }
-
-        return stated;
+        return [...all]
+            .sort((a, b) => b.sales - a.sales)
+            .map((row) => ({
+                key: String(row.product.id),
+                name: productName(row),
+                // Assigned off the same sales ranking these rows are in, so
+                // every product has one.
+                fill: fills.get(row.product.id),
+                ...derive(row),
+            }));
     }, [data]);
 
-    const folded = Math.max((data?.rows.length ?? 0) - VISIBLE_PRODUCTS, 0);
-
-    // Summed off every raw row, which is the same set the stated rows cover
-    // once Others has absorbed the remainder — and ratios derived after the
-    // sum, so the sub-total's ROAS is total sales over total spend.
+    // Summed off every raw row — the same set the table states, so the
+    // sub-total covers what is scrolled past as well as what is in view — and
+    // ratios derived after the sum, so its ROAS is total sales over total spend.
     const total = useMemo(
         () => derive(sumComparisonRows(data?.rows ?? [])),
         [data],
@@ -145,16 +129,18 @@ export default function ProductBreakdown({
                     </p>
                 ) : (
                     // Scrolls in its own container both ways: wider than the
-                    // card on small screens, and taller than VISIBLE_ROWS once
-                    // the catalogue grows. Rows are a fixed height so that cap
-                    // is exactly ten of them plus the pinned header and footer.
+                    // card on small screens, and taller than VISIBLE_PRODUCTS
+                    // once the catalogue grows. Rows are a fixed height, so the
+                    // cap is exactly that many of them plus the pinned header
+                    // and sub-total — and the next row is cut at the fold,
+                    // which is the table's own hint that it carries on.
                     <div
                         className={cn(
-                            'overflow-auto rounded-[14px] transition-opacity',
+                            'custom-scrollbar overflow-auto rounded-[14px] transition-opacity',
                             loading && 'opacity-50',
                         )}
                         style={{
-                            maxHeight: `${(VISIBLE_ROWS + 2) * ROW_H}rem`,
+                            maxHeight: `${(VISIBLE_PRODUCTS + 2) * ROW_H}rem`,
                         }}
                     >
                         {/* border-separate, not collapse: a collapsed table
@@ -307,11 +293,11 @@ export default function ProductBreakdown({
                 )}
             </div>
 
-            {/* Says what the grey row stands for, since it is the one row whose
-                name does not name a thing. */}
-            {folded > 0 && (
+            {/* Says how much is below the fold, since the cut edge of the next
+                row is the only other sign that the table carries on. */}
+            {rows.length > VISIBLE_PRODUCTS && (
                 <p className="mt-2 text-right text-[11px] text-gray-400 dark:text-gray-500">
-                    others = {folded} more product{folded === 1 ? '' : 's'}
+                    {rows.length} products — scroll for the rest
                 </p>
             )}
         </section>
@@ -346,7 +332,9 @@ function derive(row: {
  * The product's colour, as it appears on its bar in the chart above. Decorative
  * — the name sits right beside it — so it is hidden from assistive tech.
  */
-function Swatch({ fill }: { fill: Fill }) {
+function Swatch({ fill }: { fill?: Fill }) {
+    if (!fill) return null;
+
     return (
         <span
             aria-hidden

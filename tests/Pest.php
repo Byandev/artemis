@@ -1,13 +1,19 @@
 <?php
 
+use App\Enums\IntegrationService;
 use App\Jobs\SyncCsrDailyCallRecord;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Models\UserIntegration;
+use App\Models\WelleDailyRecord;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
 use Tests\TestCase;
@@ -69,6 +75,23 @@ function makeWorkspaceWithOwner(): array
     $workspace = Workspace::factory()->forOwner($user)->create();
 
     return ['user' => $user, 'workspace' => $workspace];
+}
+
+/**
+ * A workspace with the Products module switched on.
+ *
+ * The `products_module_enabled` column defaults to false, and every product
+ * route 404s without it, so anything exercising the pages has to turn it on
+ * first. See the toggle in the admin workspaces "Toggle Modules" modal.
+ *
+ * @return array{user: User, workspace: Workspace}
+ */
+function makeProductsWorkspace(): array
+{
+    $made = makeWorkspaceWithOwner();
+    $made['workspace']->update(['products_module_enabled' => true]);
+
+    return $made;
 }
 
 /**
@@ -181,6 +204,21 @@ function actingAsWorkspaceOwner(): array
 }
 
 /**
+ * Put a workspace on a subscription — active by default. Public pages such as
+ * RMO management refuse to open for a workspace whose subscription has lapsed.
+ */
+function subscribeWorkspace(Workspace $workspace, string $status = Subscription::STATUS_ACTIVE, ?Carbon $periodEnd = null): Subscription
+{
+    return Subscription::create([
+        'workspace_id' => $workspace->id,
+        'subscription_plan_id' => SubscriptionPlan::where('code', SubscriptionPlan::CODE_STARTER)->firstOrFail()->id,
+        'status' => $status,
+        'current_period_start' => now()->subMonth(),
+        'current_period_end' => $periodEnd ?? now()->addMonth(),
+    ]);
+}
+
+/**
  * Generate an API key for a workspace and return [model, raw_token].
  *
  * @return array{model: WorkspaceApiKey, raw: string}
@@ -197,4 +235,86 @@ function makeApiKey(Workspace $workspace, ?string $name = null): array
     ]);
 
     return ['model' => $model, 'raw' => $generated['raw']];
+}
+
+/**
+ * Give a user a stored Welle token — the only credential that is ever kept.
+ *
+ * Lives here rather than beside one Welle test because several of them need a
+ * connected account, and a helper declared inside a test file only exists for
+ * a run that happens to load that file.
+ */
+function connectWelleAccount(User $user, string $token = 'welle-token-abc'): UserIntegration
+{
+    return $user->integrations()->updateOrCreate(
+        ['service' => IntegrationService::Welle],
+        ['token' => $token],
+    );
+}
+
+/**
+ * Pin "today" for the My ESC tests.
+ *
+ * Every rate on that page divides by the days of the month that have elapsed,
+ * so a test that left the date alone would assert against a denominator that
+ * changed with the calendar. The 16th of September gives sixteen elapsed days
+ * this month and a full thirty-one for the month before — two different
+ * denominators, both fixed.
+ *
+ * Laravel clears the test clock in tearDown, so nothing has to unset it.
+ */
+function freezeWelleToday(string $today = '2026-09-16 09:00:00'): CarbonImmutable
+{
+    Carbon::setTestNow($today);
+
+    return CarbonImmutable::today();
+}
+
+/**
+ * One day of a user's Welle record, `$dayOfMonth` days into the current month.
+ *
+ * `$pillars` overrides individual pillars on top of `$isEsc`, which is what
+ * makes a day that had movement but was not an ESC day expressible — the case
+ * every pillar card and bar exists to count.
+ *
+ * At least one pillar has to be ticked: a day with none of the three is not
+ * stored at all, so a blank row is a state the fetch cannot produce and a test
+ * should not be able to fake.
+ *
+ * Lives here for the same reason connectWelleAccount does: more than one Welle
+ * test needs it, and a helper declared inside a test file only exists for a
+ * run that happens to load that file.
+ *
+ * @param  array<string, bool>  $pillars
+ */
+function welleDay(
+    int $workspaceId,
+    int $userId,
+    int $dayOfMonth,
+    bool $isEsc,
+    array $pillars = [],
+): WelleDailyRecord {
+    $ticked = [];
+
+    foreach (WelleDailyRecord::PILLARS as $pillar) {
+        $ticked[$pillar] = $pillars[$pillar] ?? $isEsc;
+    }
+
+    $completed = count(array_filter($ticked));
+
+    if ($completed === 0) {
+        throw new InvalidArgumentException(
+            'A Welle day with no pillars ticked is never stored — tick one, or leave the day out.',
+        );
+    }
+
+    return WelleDailyRecord::create([
+        'workspace_id' => $workspaceId,
+        'user_id' => $userId,
+        'date' => Carbon::today()->startOfMonth()->addDays($dayOfMonth - 1)->toDateString(),
+        ...$ticked,
+        'pillars_completed' => $completed,
+        'is_esc' => $completed === count(WelleDailyRecord::PILLARS),
+        'synced_at' => now(),
+    ]);
 }

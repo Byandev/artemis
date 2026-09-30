@@ -112,14 +112,19 @@ test('a redelivery on a later day stamps its own delivery row', function () {
 });
 
 /**
- * An order confirmed that day, reachable on the number given.
+ * An order on one or both of the day's stamps, reachable on the number given.
  *
  * The verification rule reads the shipping address rather than the delivery —
  * these orders have no delivery row yet, which is the whole point of the call.
+ * $insertedAt is the day it came in; left out, the factory stamps it now, which
+ * is a day of its own and not the one under test.
  */
-function confirmedOrderFor($workspace, string $phone, string $confirmedAt): Order
+function confirmedOrderFor($workspace, string $phone, ?string $confirmedAt, ?string $insertedAt = null): Order
 {
-    $order = Order::factory()->forWorkspace($workspace)->create(['confirmed_at' => $confirmedAt]);
+    $order = Order::factory()->forWorkspace($workspace)->create(array_filter([
+        'confirmed_at' => $confirmedAt,
+        'inserted_at' => $insertedAt,
+    ]));
 
     ShippingAddress::factory()->create(['order_id' => $order->id, 'phone_number' => $phone]);
 
@@ -151,11 +156,37 @@ test('a number on no delivery is stamped verification when the order was confirm
         ->and($call->order_for_delivery_id)->toBeNull();
 });
 
-test('an order confirmed on another day is not a verification match', function () {
+test('a number on no delivery is stamped verification when the order came in that day', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
 
-    confirmedOrderFor($workspace, '09170000003', '2026-07-19 08:00:00');
+    // Rung the day it landed and not confirmed at the time — commonly not
+    // confirmed at all, which on confirmed_at alone leaves the call matched to
+    // nothing and counted nowhere.
+    $order = confirmedOrderFor($workspace, '09170000005', null, '2026-07-20 07:30:00');
+
+    $this->postJson('/api/v1/public/call-logs/sync', [
+        'user_id' => fake()->unique()->numberBetween(1, 999999),
+        'call_logs' => [[
+            'phone_number' => '09170000005',
+            'type' => 'outgoing',
+            'duration' => 60,
+            'timestamp' => '2026-07-20T10:15:00+08:00',
+        ]],
+    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
+
+    $call = CallLog::where('phone_number', '09170000005')->firstOrFail();
+
+    expect($call->persona)->toBe(CallLogPersona::VERIFICATION)
+        ->and((int) $call->order_id)->toBe($order->id)
+        ->and($call->order_for_delivery_id)->toBeNull();
+});
+
+test('an order neither taken in nor confirmed that day is not a verification match', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+
+    confirmedOrderFor($workspace, '09170000003', '2026-07-19 08:00:00', '2026-07-18 08:00:00');
 
     $this->postJson('/api/v1/public/call-logs/sync', [
         'user_id' => fake()->unique()->numberBetween(1, 999999),

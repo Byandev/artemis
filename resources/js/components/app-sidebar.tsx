@@ -34,6 +34,7 @@ import {
     FileText,
     Goal,
     GraduationCap,
+    Headset,
     History,
     Landmark,
     Layers,
@@ -63,6 +64,7 @@ import {
     Trophy,
     Truck,
     User,
+    UserRound,
     Users,
     Wallet,
 } from 'lucide-react';
@@ -204,6 +206,20 @@ export function AppSidebar() {
                       icon: User,
                       permission: PERMISSIONS.ViewCsrDashboard,
                   },
+                  // The pancake logins the dashboard's figures are summed from.
+                  // Gated with it, since it is only the legend for that page.
+                  {
+                      title: 'My Pancake Users',
+                      href: `/workspaces/${slug}/csr/pancake-users`,
+                      icon: UserRound,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
+                  {
+                      title: 'My Calls',
+                      href: `/workspaces/${slug}/csr/call-logs`,
+                      icon: Headset,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
               ]
             : []),
         ...(currentWorkspace.video_editor_dashboard_module_enabled
@@ -213,6 +229,19 @@ export function AppSidebar() {
                       href: `/workspaces/${slug}/video-editor/dashboard`,
                       icon: Clapperboard,
                       permission: PERMISSIONS.ViewVideoEditorDashboard,
+                  },
+              ]
+            : []),
+        // The personal Welle record. Only the workspaces a super admin has
+        // switched Welle on for have the page at all, and the grant is hidden
+        // with the toggle — see Workspace::hiddenPermissionNames().
+        ...(currentWorkspace.welle_module_enabled
+            ? [
+                  {
+                      title: 'My ESC',
+                      href: `/workspaces/${slug}/welle/my-esc`,
+                      icon: Sparkles,
+                      permission: PERMISSIONS.ViewMyEsc,
                   },
               ]
             : []),
@@ -243,10 +272,40 @@ export function AppSidebar() {
         ...(currentWorkspace.products_module_enabled
             ? [
                   {
-                      title: 'Products',
-                      href: `/workspaces/${slug}/products/list`,
+                      title: 'Product',
                       icon: Package,
-                      permission: PERMISSIONS.ViewProducts,
+                      anyOf: [
+                          PERMISSIONS.ViewProducts,
+                          PERMISSIONS.ViewProductForms,
+                          PERMISSIONS.ViewTargetMarkets,
+                          PERMISSIONS.ViewProductResearch,
+                      ],
+                      items: [
+                          {
+                              title: 'Manage',
+                              href: `/workspaces/${slug}/products/list`,
+                              icon: Package,
+                              permission: PERMISSIONS.ViewProducts,
+                          },
+                          {
+                              title: 'Product Forms',
+                              href: `/workspaces/${slug}/products/forms`,
+                              icon: Tags,
+                              permission: PERMISSIONS.ViewProductForms,
+                          },
+                          {
+                              title: 'Target Market',
+                              href: `/workspaces/${slug}/products/target-markets`,
+                              icon: Target,
+                              permission: PERMISSIONS.ViewTargetMarkets,
+                          },
+                          {
+                              title: 'RDP Builder',
+                              href: `/workspaces/${slug}/products/product-research`,
+                              icon: Layers,
+                              permission: PERMISSIONS.ViewProductResearch,
+                          },
+                      ],
                   },
               ]
             : []),
@@ -646,6 +705,12 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
                               icon: Banknote,
                               permission: PERMISSIONS.ViewFinanceRequestFunds,
+                          },
+                          {
+                              title: 'RF Requirements',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/management`,
+                              icon: SlidersHorizontal,
+                              permission: PERMISSIONS.ViewFinanceTransactions,
                           },
                       ],
                   },

@@ -11,7 +11,7 @@ class SyncCsrDailyRecords extends Command
 {
     protected $signature = 'sync:csr-daily-records
                             {--date= : Single target date in Y-m-d format. If omitted, the last --days days are dispatched (one job per day).}
-                            {--days=7 : Number of trailing days to backfill when --date is not provided. Defaults to 7.}
+                            {--days=3 : Number of trailing days to backfill when --date is not provided. Defaults to 7.}
                             {--workspace= : Limit to one workspace, by id or slug. Defaults to every workspace.}
                             {--type=POS : Record type label}';
 
@@ -31,7 +31,7 @@ class SyncCsrDailyRecords extends Command
 
         if ($this->option('date')) {
             $date = CarbonImmutable::parse($this->option('date'))->toDateString();
-            SyncCsrDailyRecord::dispatch($date, $type, $workspaceId);
+            SyncCsrDailyRecord::dispatch($date, $type, $workspaceId)->onQueue('analytics');
             $this->info("Dispatched SyncCsrDailyRecord for {$date} (type={$type}){$scope}.");
 
             return self::SUCCESS;
@@ -42,7 +42,7 @@ class SyncCsrDailyRecords extends Command
 
         for ($i = 0; $i < $days; $i++) {
             $date = $start->subDays($i)->toDateString();
-            SyncCsrDailyRecord::dispatch($date, $type, $workspaceId);
+            SyncCsrDailyRecord::dispatch($date, $type, $workspaceId)->onQueue('analytics');
         }
 
         $this->info("Dispatched {$days} SyncCsrDailyRecord job(s) (type={$type}){$scope} covering {$start->subDays($days - 1)->toDateString()} → {$start->toDateString()}.");

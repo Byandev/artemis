@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,6 +8,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Modules\Inventory\Exports\InventoryItemReportExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
+use Modules\Products\Models\Product;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);

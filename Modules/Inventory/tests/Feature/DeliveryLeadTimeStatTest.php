@@ -1,10 +1,10 @@
 <?php
 
-use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
+use Modules\Products\Models\Product;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);

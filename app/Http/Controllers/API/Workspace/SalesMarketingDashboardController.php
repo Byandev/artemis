@@ -304,9 +304,11 @@ class SalesMarketingDashboardController extends Controller
      *
      * The same shape and the same deal as `teamComparison`: raw sums only, so
      * the panel can switch between Sales, Ad spend, ROAS and RTS without
-     * refetching, and can fold whatever falls outside the top few into an
-     * "Others" bucket by adding the rows up itself. Which is only possible
-     * because these are sums — a server-side ROAS could not be re-bucketed.
+     * refetching, and can rank and total the rows itself. Which is only
+     * possible because these are sums — a server-side ROAS could not be
+     * re-ranked or re-totalled. Every product the window has is returned;
+     * the panel scrolls rather than cutting the list, so a cap here would be
+     * a cap on what can be read.
      */
     public function productComparison(Request $request, Workspace $workspace): JsonResponse
     {

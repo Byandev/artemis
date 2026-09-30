@@ -18,11 +18,13 @@ import {
 } from 'lucide-react';
 
 /**
- * The customer return rate at or above which an order is flagged for a
- * verification call. Mirrors CSRController::VERIFICATION_RTS_THRESHOLD — shown
- * in the footnote so the card says what "needs verification" means.
+ * The customer return rate at or above which an order counts as risky, and the
+ * number of past orders the rate has to be drawn from before it is believed.
+ * Mirror CSRController::RISKY_RTS_THRESHOLD and RISKY_MIN_ORDERS — both are
+ * shown in the footnote so the card says what "risky" means.
  */
-const RTS_THRESHOLD = 55;
+const RTS_THRESHOLD = 40;
+const RTS_MIN_ORDERS = 6;
 
 /** Fields every analytics stat endpoint answers with. */
 interface StatPayload {
@@ -83,6 +85,12 @@ export interface RmoTimeStat extends StatPayload {
 
 export interface CallsPlacedStat extends StatPayload {
     value: number;
+    /**
+     * The same calls counted by order — an order rung three times is three
+     * calls and one order — so the two read together say how much of the
+     * ringing was repeat ringing.
+     */
+    orders: number;
 }
 
 export interface RealConversationsStat extends StatPayload {
@@ -91,11 +99,14 @@ export interface RealConversationsStat extends StatPayload {
     average_seconds: number | null;
 }
 
-export interface ReachRateStat extends StatPayload {
+export interface ConfirmedRiskyOrdersStat extends StatPayload {
     value: number;
     /** Orders whose customer number has no report behind it at all. */
     no_report: number;
-    /** Orders whose customer is returning parcels at or above the threshold. */
+    /**
+     * Orders whose customer is returning parcels at or above the threshold,
+     * counted only where there are enough past orders to read a rate from.
+     */
     high_rts: number;
     orders: number;
 }
@@ -107,8 +118,8 @@ export interface VerifiedOrdersStat extends StatPayload {
     orders: number;
     /** Calls it took to get through them — an order rung three times is three. */
     calls: number;
-    /** The backlog it is read against — the Reach Rate card's figure. */
-    needs_verification: number;
+    /** The figure it is read against — the Confirmed Risky Orders card's own. */
+    risky_orders: number;
 }
 
 /** Seconds as `502h 32m` / `12m 05s` / `45s`, dropping units that read as zero. */
@@ -558,10 +569,12 @@ export function CallsPlacedStatCard({
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
             // The time behind these is the card beside this one, so the
-            // footnote names the unit rather than restating that figure.
+            // footnote spends itself on the figure nothing else carries: the
+            // distinct orders those calls reached, which is what says whether
+            // the count is breadth or repeat ringing.
             footnote={
                 stat
-                    ? `verification call${stat.value === 1 ? '' : 's'} in the range`
+                    ? `across ${stat.orders.toLocaleString()} unique order${stat.orders === 1 ? '' : 's'}`
                     : ''
             }
             trend={
@@ -610,16 +623,16 @@ export function RealConversationsStatCard({
     );
 }
 
-export function ReachRateStatCard({
+export function ConfirmedRiskyOrdersStatCard({
     stat,
     loading,
 }: {
-    stat: ReachRateStat | null;
+    stat: ConfirmedRiskyOrdersStat | null;
     loading: boolean;
 }) {
     return (
         <StatCard
-            title="Total Order needs Verification"
+            title="Confirmed Risky Orders"
             icon={ShieldAlert}
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
@@ -628,7 +641,7 @@ export function ReachRateStatCard({
             // bad ones, which are different problems.
             footnote={
                 stat
-                    ? `${stat.no_report.toLocaleString()} no report · ${stat.high_rts.toLocaleString()} at ${RTS_THRESHOLD}%+ RTS`
+                    ? `${stat.no_report.toLocaleString()} no report · ${stat.high_rts.toLocaleString()} at ${RTS_THRESHOLD}%+ RTS over ${RTS_MIN_ORDERS}+ orders`
                     : ''
             }
             trend={
@@ -648,7 +661,7 @@ export function ReachRateStatCard({
 /**
  * How much of the range's verification backlog got verified.
  *
- * Orders verified over the "Total Order needs Verification" card beside it,
+ * Orders verified over the "Confirmed Risky Orders" card beside it,
  * with both counts and the calls behind them in the footnote. Orders on both
  * sides of the division, not calls: three calls at one order cover one order,
  * and counting the calls read a two-order backlog rung three times as 150%.
@@ -679,8 +692,8 @@ export function VerifiedOrdersStatCard({
             // counting the calls put a two-order backlog at 150%.
             footnote={
                 !stat || stat.value === null
-                    ? 'Nothing needed verifying in this period'
-                    : `${stat.orders.toLocaleString()} of ${stat.needs_verification.toLocaleString()} needing verification · ${stat.calls.toLocaleString()} calls`
+                    ? 'No risky orders in this period'
+                    : `${stat.orders.toLocaleString()} of ${stat.risky_orders.toLocaleString()} risky · ${stat.calls.toLocaleString()} calls`
             }
             trend={
                 <Trend

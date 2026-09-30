@@ -18,7 +18,7 @@ class CallLogController extends Controller
         $request->validate([
             'user_id' => ['required'],
             'call_logs' => ['required', 'array', 'min:1'],
-            'call_logs.*.phone_number' => ['required', 'string'],
+            'call_logs.*.phone_number' => ['nullable', 'string'],
             'call_logs.*.type' => ['required', 'string'],
             'call_logs.*.duration' => ['required', 'integer', 'min:0'],
             'call_logs.*.timestamp' => ['required', 'date'],
@@ -26,6 +26,16 @@ class CallLogController extends Controller
 
         $workspace = $request->attributes->get('workspace');
         $now = now();
+
+        // A call the handset reported no number for is dropped rather than
+        // stored: there is nothing to match it to a delivery or an order on,
+        // and phone_number is part of the upsert key, so every re-sync of the
+        // same numberless call would land as another row. The rest of the
+        // batch still syncs — one such entry no longer rejects the payload.
+        $logs = array_values(array_filter(
+            $request->input('call_logs'),
+            fn ($log) => filled($log['phone_number'] ?? null),
+        ));
 
         $rows = array_map(function ($log) use ($workspace, $request, $now) {
             // Normalize to the app timezone (Asia/Singapore) so call_date/call_time
@@ -39,14 +49,15 @@ class CallLogController extends Controller
                 'user_id' => $request->input('user_id'),
                 'phone_number' => $log['phone_number'],
                 'type' => $log['type'],
-                'duration' => $log['duration'],
+                // Zeroed for a rejected call — see CallLog::durationFor().
+                'duration' => CallLog::durationFor($log['type'], (int) $log['duration']),
                 'call_date' => $timestamp->toDateString(),
                 'call_time' => $timestamp->toTimeString(),
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
 
-        }, $request->input('call_logs'));
+        }, $logs);
 
         // Match each number against that day's deliveries to work out whether
         // it was the customer or the rider, and which order. The payload is

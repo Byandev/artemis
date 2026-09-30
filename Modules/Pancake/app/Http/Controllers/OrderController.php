@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Modules\Pancake\Filters\CustomerOrdersFilter;
 use Modules\Pancake\Filters\CustomerRtsReportFilter;
 use Modules\Pancake\Filters\IgnoredFilter;
 use Modules\Pancake\Filters\OrderDateFilter;
@@ -19,6 +20,7 @@ use Modules\Pancake\Filters\OrderSearchFilter;
 use Modules\Pancake\Filters\OrderStatusFilter;
 use Modules\Pancake\Jobs\ImportOrderShippingFees;
 use Modules\Pancake\Models\Order;
+use Modules\Pancake\Support\CustomerOrderHistory;
 use Modules\Pancake\Support\CustomerRtsRisk;
 use Modules\Pancake\Support\ShippingFeeImportStatus;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -67,9 +69,10 @@ class OrderController extends Controller
     }
 
     /**
-     * Every comparison the page may offer, in the order it lists them. The SQL
-     * behind each one lives on CustomerRtsReportFilter::OPERATORS; `between`
-     * takes a second number and is built by hand there.
+     * Every comparison the page may offer, in the order it lists them. Shared by
+     * the Customer RTS and Customer orders chips, both of which compare a number
+     * the same way; the SQL behind each key lives on the ComparesNumeric trait,
+     * and `between` takes a second number and is built by hand there.
      */
     public const RTS_COMPARISONS = ['gt', 'lt', 'eq', 'between'];
 
@@ -79,9 +82,10 @@ class OrderController extends Controller
      *
      * Each entry is a Spatie filter class from Modules\Pancake\Filters, so the
      * rule itself is testable on its own and this method stays a list of what
-     * the page may be narrowed by. The three that read another parameter —
-     * `date_type` picks the column, `rts_*` carry the comparison — are declared
-     * as IgnoredFilter so Spatie accepts them without applying them twice.
+     * the page may be narrowed by. The ones that only feed another filter —
+     * `date_type` picks the column, `rts_*` and `customer_orders_*` carry the
+     * comparisons — are declared as IgnoredFilter so Spatie accepts them without
+     * applying them twice.
      *
      * The counts pass `withStatus: false`, which swaps the status rule for the
      * same no-op, so each tab shows its own total instead of the count of the
@@ -107,6 +111,12 @@ class OrderController extends Controller
             AllowedFilter::custom('rts_op', new IgnoredFilter),
             AllowedFilter::custom('rts_value', new IgnoredFilter),
             AllowedFilter::custom('rts_value2', new IgnoredFilter),
+            AllowedFilter::custom('customer_orders', new CustomerOrdersFilter(
+                (string) $request->input('filter.customer_orders_op'),
+                $request->input('filter.customer_orders_to'),
+            )),
+            AllowedFilter::custom('customer_orders_op', new IgnoredFilter),
+            AllowedFilter::custom('customer_orders_to', new IgnoredFilter),
         ];
     }
 
@@ -134,8 +144,9 @@ class OrderController extends Controller
             // would otherwise drop the table's own columns from the select.
             ->select('pancake_orders.*')
             ->selectRaw(CustomerRtsRisk::rateSql().' as cx_rts_rate')
+            ->selectRaw(CustomerOrderHistory::totalSql().' as cx_orders_total')
             ->allowedFilters($this->allowedFilters($request, $dateColumn))
-            ->allowedSorts(['order_number', 'total_amount', 'inserted_at', 'updated_at', 'confirmed_at', 'status_name', 'cx_rts_rate'])
+            ->allowedSorts(['order_number', 'total_amount', 'inserted_at', 'updated_at', 'confirmed_at', 'status_name', 'cx_rts_rate', 'cx_orders_total'])
             ->defaultSort('-inserted_at')
             ->paginate((int) $request->input('per_page', 50))
             ->withQueryString();

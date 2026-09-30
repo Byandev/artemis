@@ -8,6 +8,7 @@ use App\Models\CallLog;
 use App\Models\Workspace;
 use App\Support\CallLogCallers;
 use App\Support\CallLogPersona;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -37,7 +38,26 @@ class CallLogController extends Controller
     {
         $this->authorize(Permission::ViewCallLogs->value, $workspace);
 
-        $logs = QueryBuilder::for(CallLog::where('call_logs.workspace_id', $workspace->id))
+        $user = $request->user();
+
+        // Resolved once: shouldScope() reads the "viewing as team" choice, which
+        // also writes it back to the session, and the persona list below asks
+        // the same question again.
+        $scoped = TeamVisibility::shouldScope($user, $workspace);
+
+        $calls = CallLog::where('call_logs.workspace_id', $workspace->id)
+            // A call reaches a team only through the order it matched, so team
+            // scoping rides on the order relation the way the parcel-update list
+            // does. An unmatched call belongs to no order and so to no team:
+            // whereHas() drops it for a scoped viewer along with the calls on
+            // other teams' orders, which is the fail-closed reading the rest of
+            // the app takes. Unrestricted viewers still see the whole register.
+            ->when(
+                $scoped,
+                fn ($query) => $query->whereHas('order', fn ($order) => $order->visibleTo($user, $workspace)),
+            );
+
+        $logs = QueryBuilder::for($calls)
             ->allowedFilters([
                 // Phone number or order id — the two things someone arrives at
                 // this page holding, and the two the table itself shows. The id
@@ -87,12 +107,16 @@ class CallLogController extends Controller
         return Inertia::render('workspaces/rts/call-logs', [
             'workspace' => $workspace,
             'logs' => $logs,
-            'personas' => [
+            // "Unmatched" is dropped for a scoped viewer rather than left as a
+            // filter that can only ever come back empty: persona and order id
+            // are stamped together, so the rows it selects are exactly the ones
+            // the team scope above has already removed.
+            'personas' => array_values(array_filter([
                 CallLogPersona::CUSTOMER,
                 CallLogPersona::RIDER,
                 CallLogPersona::VERIFICATION,
-                self::UNMATCHED,
-            ],
+                $scoped ? null : self::UNMATCHED,
+            ])),
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),

@@ -20,7 +20,7 @@ interface TeamComparison {
     rows: TeamRow[];
 }
 
-/** How many members the chart plots before folding the rest into a note. */
+/** How many members stand at rest before the chart scrolls. */
 const VISIBLE_ROWS = 8;
 
 /**
@@ -30,7 +30,13 @@ const VISIBLE_ROWS = 8;
  * One series, so one colour — the names are already labelled down the side, and
  * a hue per member would encode nothing the bar length doesn't. The tick on each
  * bar is that member's previous-period figure, and the dashed rule is the
- * average across everyone shown.
+ * average across everyone.
+ *
+ * Every member is plotted — nothing is cut at a "top N". The chart comes to rest
+ * at VISIBLE_ROWS rows and scrolls to the rest, which keeps the panel a readable
+ * height without deciding on your behalf whose figures are worth naming. The
+ * scale and the average rule are taken across all of them, so scrolling reads on
+ * the same footing as landing.
  */
 export default function TeamComparison({
     slug,
@@ -57,15 +63,17 @@ export default function TeamComparison({
         { start: previous[0], end: previous[1] },
     );
 
-    const { bars, total } = useMemo(() => {
-        if (!current.data) return { bars: [] as ComparisonBar[], total: 0 };
+    const bars = useMemo<ComparisonBar[]>(() => {
+        if (!current.data) return [];
 
         const spec = METRICS[metric];
         const before = new Map(
             (prior.data?.rows ?? []).map((r) => [r.advertiser.id, spec.of(r)]),
         );
 
-        const ranked = current.data.rows
+        // Nothing to plot for a member who did none of this metric in the
+        // window — a zero-length bar states less than its absence does.
+        return current.data.rows
             .map((row) => {
                 const value = spec.of(row);
                 const was = before.get(row.advertiser.id) ?? null;
@@ -80,8 +88,6 @@ export default function TeamComparison({
             })
             .filter((r) => r.value > 0)
             .sort((a, b) => b.value - a.value);
-
-        return { bars: ranked.slice(0, VISIBLE_ROWS), total: ranked.length };
     }, [current.data, prior.data, metric]);
 
     const firstLoad = (current.loading || prior.loading) && !current.data;
@@ -92,6 +98,7 @@ export default function TeamComparison({
             metric={metric}
             onMetric={chooseMetric}
             bars={bars}
+            visibleRows={VISIBLE_ROWS}
             previous={previous}
             loading={current.loading || prior.loading}
             error={current.error || prior.error}
@@ -104,9 +111,11 @@ export default function TeamComparison({
             }}
             refreshLabel="the team comparison"
             emptyHint="nothing to compare in this period"
+            // Says how much is below the fold, since the cut edge of the next
+            // bar is the only other sign that the chart carries on.
             note={
-                total > VISIBLE_ROWS
-                    ? `top ${VISIBLE_ROWS} of ${total}`
+                bars.length > VISIBLE_ROWS
+                    ? `${bars.length} members — scroll for the rest`
                     : undefined
             }
         />
