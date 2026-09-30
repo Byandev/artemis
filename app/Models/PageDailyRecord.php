@@ -25,6 +25,10 @@ class PageDailyRecord extends Model
     protected $casts = [
         'date' => 'date',
         'orders' => 'integer',
+        // The day's orders opened up to their lines: units sold, and what those
+        // goods cost. Null cost means none was recorded, not a cost of zero.
+        'item_quantity' => 'integer',
+        'order_cogs' => 'decimal:2',
         'sales' => 'decimal:2',
         'delivered' => 'integer',
         'delivered_amount' => 'decimal:2',
@@ -32,7 +36,13 @@ class PageDailyRecord extends Model
         'returned_amount' => 'decimal:2',
         'returning_amount' => 'decimal:2',
         'rts_rate' => 'decimal:2',
+        // The same blend over the 30 days ending on this one. Null when nothing
+        // moved in that window — no rate, as opposed to a rate of zero.
+        'rts_rate_30d' => 'decimal:2',
         'ad_spent' => 'decimal:2',
+        // The planned daily spend for the page, snapshotted from
+        // page_daily_budget_records — null when the page had none on record.
+        'ad_spend_budget' => 'decimal:2',
         'ad_sales' => 'decimal:2',
         'ad_purchases' => 'integer',
         'roas' => 'decimal:2',

@@ -1,11 +1,13 @@
 <?php
 
 use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use App\Models\PageDailyRecord;
 use App\Models\Shop;
 use App\Models\Workspace;
 use Illuminate\Support\Str;
-use Modules\Pancake\Models\Order;
+use Modules\Pancake\Models\Order as PancakeOrder;
+use Modules\Pancake\Models\OrderItem;
 
 /**
  * The per-page half of the nightly performance build. It is what the Sales &
@@ -23,7 +25,7 @@ function buildPagePerfPage(Workspace $workspace): Page
 /** A confirmed order on a page, at the amount the day should sum to. */
 function buildPagePerfOrder(Workspace $workspace, Page $page, string $date, float $amount): void
 {
-    Order::create([
+    PancakeOrder::create([
         'workspace_id' => $workspace->id,
         'shop_id' => $page->shop_id,
         'page_id' => $page->id,
@@ -87,4 +89,174 @@ test('re-running a date updates the row rather than stacking duplicates', functi
 
     expect(PageDailyRecord::where('page_id', $page->id)->count())->toBe(1)
         ->and((float) PageDailyRecord::where('page_id', $page->id)->value('sales'))->toBe(500.0);
+});
+
+test('it snapshots the budget the page was on that day', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+
+    // A budget set once, then raised a week later. A budget carries forward
+    // until it is changed, so the day in between is measured against the first.
+    PageDailyBudgetRecord::create([
+        'workspace_id' => $workspace->id,
+        'page_id' => $page->id,
+        'date' => '2026-03-01',
+        'budget' => 1000,
+    ]);
+    PageDailyBudgetRecord::create([
+        'workspace_id' => $workspace->id,
+        'page_id' => $page->id,
+        'date' => '2026-03-08',
+        'budget' => 2500,
+    ]);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-05'])->assertSuccessful();
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $budgetOn = fn (string $date) => PageDailyRecord::where('page_id', $page->id)
+        ->where('date', $date)
+        ->value('ad_spend_budget');
+
+    expect((float) $budgetOn('2026-03-05'))->toBe(1000.0)
+        ->and((float) $budgetOn('2026-03-10'))->toBe(2500.0);
+});
+
+test('it leaves the budget null for a day before the page had one', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+    buildPagePerfOrder($workspace, $page, '2026-03-10', 900);
+
+    PageDailyBudgetRecord::create([
+        'workspace_id' => $workspace->id,
+        'page_id' => $page->id,
+        'date' => '2026-03-20',
+        'budget' => 1000,
+    ]);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    // Nothing was planned yet, so the day has nothing to be under or over —
+    // which is not the same as having been planned at zero.
+    expect(PageDailyRecord::where('page_id', $page->id)->value('ad_spend_budget'))->toBeNull();
+});
+
+test('it opens the day up to units sold and what the goods cost', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+    buildPagePerfOrder($workspace, $page, '2026-03-10', 900);
+
+    $order = PancakeOrder::where('page_id', $page->id)->firstOrFail();
+
+    $line = fn (int $quantity, ?float $cogs) => OrderItem::create([
+        'order_id' => $order->id,
+        'pancake_id' => (string) Str::uuid(),
+        'pancake_order_id' => $order->order_number,
+        'quantity' => $quantity,
+        'cogs' => $cogs,
+    ]);
+
+    $line(2, 300);
+    // An un-costed line still sold units, and adds nothing to the cost.
+    $line(3, null);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $row = PageDailyRecord::where('page_id', $page->id)->where('date', '2026-03-10')->first();
+
+    expect((int) $row->item_quantity)->toBe(5)
+        ->and((float) $row->order_cogs)->toBe(300.0);
+});
+
+test('it leaves the cost null on a day whose lines carry none', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+    buildPagePerfOrder($workspace, $page, '2026-03-10', 900);
+
+    $order = PancakeOrder::where('page_id', $page->id)->firstOrFail();
+
+    OrderItem::create([
+        'order_id' => $order->id,
+        'pancake_id' => (string) Str::uuid(),
+        'pancake_order_id' => $order->order_number,
+        'quantity' => 4,
+        'cogs' => null,
+    ]);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $row = PageDailyRecord::where('page_id', $page->id)->where('date', '2026-03-10')->first();
+
+    // Units are a count and read as 4; the cost is "nothing recorded", not zero.
+    expect((int) $row->item_quantity)->toBe(4)
+        ->and($row->order_cogs)->toBeNull();
+});
+
+test('it rates a day by the RTS of the 30 days ending on it', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+
+    $history = fn (string $date, float $returning, float $delivered) => PageDailyRecord::create([
+        'workspace_id' => $workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => $page->getMorphClass(),
+        'page_id' => $page->id,
+        'date' => $date,
+        'returning_amount' => $returning,
+        'delivered_amount' => $delivered,
+    ]);
+
+    // Inside the window: ₱300 back against ₱700 out.
+    $history('2026-03-05', 300, 700);
+    // 30 days before the build date — one day too old to count, and a rate so
+    // extreme that letting it in would be obvious.
+    $history('2026-02-08', 9000, 0);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $row = PageDailyRecord::where('page_id', $page->id)->where('date', '2026-03-10')->first();
+
+    expect((float) $row->rts_rate_30d)->toBe(30.0);
+});
+
+test('it leaves the trailing rate null when nothing moved in the window', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+    buildPagePerfOrder($workspace, $page, '2026-03-10', 900);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $row = PageDailyRecord::where('page_id', $page->id)->where('date', '2026-03-10')->first();
+
+    // No deliveries and no returns is no rate — the tracker falls back to its
+    // default rather than pricing the page as one that never gets returns.
+    expect($row->rts_rate_30d)->toBeNull();
+});
+
+test('it counts the day it is building in that day own window', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+
+    // A parcel that came back on the build date itself, and one that landed.
+    // The row does not exist yet, so these have to be folded in as they are
+    // computed rather than read back from a row written by an earlier run.
+    buildPagePerfOrder($workspace, $page, '2026-03-10', 400);
+    PancakeOrder::where('page_id', $page->id)->update([
+        'returning_at' => '2026-03-10 09:00:00',
+        // The shared helper fills total_amount; the build reads final_amount.
+        'final_amount' => 400,
+    ]);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $row = PageDailyRecord::where('page_id', $page->id)->where('date', '2026-03-10')->first();
+
+    // Everything that moved that day went back.
+    expect((float) $row->rts_rate_30d)->toBe(100.0);
 });
