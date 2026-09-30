@@ -196,7 +196,7 @@ export default function WorkspaceMembers({
         e.preventDefault();
         if (!memberToUpdateRole) return;
 
-        if (!isAdmin) {
+        if (!canEditMembers) {
             showNoPermissionToast();
             setMemberToUpdateRole(null);
             updateRoleForm.reset();
