@@ -179,6 +179,7 @@ enum Permission: string
     case ViewSalesMarketingDailyReport = 'View S&M Daily Report';
     case ViewPageRoasTracker = 'View Page ROAS Tracker';
     case ViewSalesTargets = 'View Sales Targets';
+    case ManageSalesTargets = 'Manage Sales Targets';
 
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
@@ -356,7 +357,8 @@ enum Permission: string
             self::ViewSalesMarketingDashboard,
             self::ViewSalesMarketingDailyReport,
             self::ViewPageRoasTracker,
-            self::ViewSalesTargets => 'Sales & Marketing',
+            self::ViewSalesTargets,
+            self::ManageSalesTargets => 'Sales & Marketing',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys,
