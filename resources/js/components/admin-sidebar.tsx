@@ -13,6 +13,7 @@ import {
     CreditCard,
     FileText,
     Layers,
+    LayoutDashboard,
     ScrollText,
     Smartphone,
     TicketCheck,
@@ -22,6 +23,11 @@ import AppLogo from './app-logo';
 
 export function AdminSidebar() {
     const adminNavItems: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: '/admin/dashboard',
+            icon: LayoutDashboard,
+        },
         {
             title: 'Workspaces',
             href: '/admin/workspaces',
