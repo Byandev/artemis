@@ -34,6 +34,7 @@ import {
     ReviewStatus,
 } from '../types';
 import { AdsBadge, FinalBadge, InitialAvatar, ReviewBadge } from './atoms';
+import { CreativeCode } from './creative-code';
 
 // ─── Shared primitives ──────────────────────────────────────────────────────────
 
@@ -510,6 +511,9 @@ export function CreativeDetailSheet({
                                     {creative.name}
                                 </SheetTitle>
                                 <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-600">
+                                    {creative.code && (
+                                        <CreativeCode code={creative.code} />
+                                    )}
                                     {creative.creator && (
                                         <>
                                             <InitialAvatar
