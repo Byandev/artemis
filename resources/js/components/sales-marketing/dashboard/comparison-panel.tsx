@@ -247,8 +247,8 @@ export default function ComparisonPanel({
     // Only cap once there is something to scroll to, so a short chart keeps its
     // natural height and no scrollbar steals width from the bars.
     const scrolls = visibleRows !== undefined && bars.length > visibleRows;
-    // Exactly `visibleRows` rows and the gaps between them, which leaves the
-    // next row cut off at the fold — the chart's own hint that it carries on.
+    // Exactly `visibleRows` rows and the gaps between them — the scrollbar is
+    // then the sign that the chart carries on.
     const scrollHeight = scrolls
         ? `${visibleRows * ROW_H + (visibleRows - 1) * ROW_GAP_Y}rem`
         : undefined;
@@ -426,9 +426,9 @@ const VALUE_COL = 'w-32 shrink-0 sm:w-44';
 const ROW_GAP = 'gap-3 sm:gap-4';
 
 /**
- * A row's height and the gap under it, in rem — `h-6` and `space-y-2.5` stated
- * as numbers. The row is pinned to that height rather than left to its tallest
- * child, so a scroll cap of eight rows is eight rows and not an estimate.
+ * A row's height and the gap under it, in rem — the bar's `h-6` and the rows'
+ * `space-y-2.5` stated as numbers so the scroll cap can be worked out in rows
+ * rather than guessed in pixels. Changing either class means changing these.
  */
 const ROW_H = 1.5;
 const ROW_GAP_Y = 0.625;

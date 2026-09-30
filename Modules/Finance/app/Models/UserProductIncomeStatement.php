@@ -2,10 +2,10 @@
 
 namespace Modules\Finance\Models;
 
-use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Products\Models\Product;
 
 /**
  * A saved per-user-per-product slice of an {@see IncomeStatement} — one row for

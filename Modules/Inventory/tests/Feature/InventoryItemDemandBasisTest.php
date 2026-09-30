@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -8,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
+use Modules\Products\Models\Product;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);

@@ -48,6 +48,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fund Request Attachment Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where the files uploaded against a fund request's attachments (the ones
+    | its transaction type calls for) are stored. Private like the proof
+    | buckets above: served through a signed URL, never a public one.
+    |
+    */
+
+    'fund_request_attachment_disk' => env('FUND_REQUEST_ATTACHMENT_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Course Media Disk
     |--------------------------------------------------------------------------
     |
@@ -63,6 +76,37 @@ return [
     */
 
     'course_media_disk' => env('COURSE_MEDIA_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Product Form Media Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where the picture attached to each product-form size/variant is stored.
+    | S3 in every deployed environment; override to "local" on machines with
+    | no AWS credentials. Served through the app via a short-lived signed URL
+    | like the other buckets here, never publicly.
+    |
+    | Named separately rather than relying on media-library's `disk_name`, for
+    | the same reason as the disks above: that env var repoints every other
+    | collection too.
+    |
+    */
+
+    'product_form_media_disk' => env('PRODUCT_FORM_MEDIA_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | RDP Media Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where an RDP's packshot lives — both the render someone uploads and the
+    | options the generator produces. Same reasoning as the disks above: pinned
+    | explicitly, private, and served through the app with a signed URL.
+    |
+    */
+
+    'product_research_media_disk' => env('PRODUCT_RESEARCH_MEDIA_DISK', 's3'),
 
     /*
     |--------------------------------------------------------------------------

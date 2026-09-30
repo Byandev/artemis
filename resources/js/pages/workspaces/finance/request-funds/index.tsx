@@ -1,16 +1,11 @@
 import PageHeader from '@/components/common/PageHeader';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
 import {
-    DepartmentOption,
-    ProductOption,
+    fundRequestStatusLabel,
     RequestFund,
-    RequestFundFormDialog,
-} from '@/components/finance/request-fund-form-dialog';
+} from '@/components/finance/fund-request-form';
 import { StatusFilter } from '@/components/finance/status-filter';
-import {
-    TransactionTypeItem,
-    transactionTypeLabel,
-} from '@/components/finance/transaction-type';
+import { transactionTypeLabel } from '@/components/finance/transaction-type';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -39,19 +34,10 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-interface UserOption {
-    id: number;
-    name: string;
-}
-
 interface Props {
     workspace: Workspace;
     requestFunds: PaginatedData<RequestFund>;
-    users: UserOption[];
     statuses: string[];
-    products: ProductOption[];
-    transactionTypes: TransactionTypeItem[];
-    departments: DepartmentOption[];
     canApproveStatus: boolean;
     query?: {
         sort?: string | null;
@@ -61,19 +47,19 @@ interface Props {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-    pending:
+    for_approval:
         'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
     approved: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
-    released:
+    for_liquidation:
         'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
-    cancelled: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
+    hold: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
 };
 
 const STATUS_TEXT: Record<string, string> = {
-    pending: 'text-amber-600 dark:text-amber-400',
+    for_approval: 'text-amber-600 dark:text-amber-400',
     approved: 'text-blue-600 dark:text-blue-400',
-    released: 'text-emerald-600 dark:text-emerald-400',
-    cancelled: 'text-gray-500 dark:text-gray-400',
+    for_liquidation: 'text-emerald-600 dark:text-emerald-400',
+    hold: 'text-gray-500 dark:text-gray-400',
 };
 
 const fmt = (v: number | string) =>
@@ -88,11 +74,7 @@ const fmtDate = (v: string | null) =>
 export default function RequestFundsIndex({
     workspace,
     requestFunds,
-    users,
     statuses,
-    products,
-    transactionTypes,
-    departments,
     canApproveStatus,
     query,
 }: Props) {
@@ -100,8 +82,6 @@ export default function RequestFundsIndex({
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
     );
-    const [createOpen, setCreateOpen] = useState(false);
-    const [editing, setEditing] = useState<RequestFund | null>(null);
     const [toDelete, setToDelete] = useState<RequestFund | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
     const [statusFilter, setStatusFilter] = useState<string[]>(() => {
@@ -114,7 +94,7 @@ export default function RequestFundsIndex({
         () =>
             statuses.map((s) => ({
                 value: s,
-                label: s.charAt(0).toUpperCase() + s.slice(1),
+                label: fundRequestStatusLabel(s),
             })),
         [statuses],
     );
@@ -204,8 +184,9 @@ export default function RequestFundsIndex({
             header: 'Type',
             cell: ({ row }) => (
                 <span className="text-[12px] text-gray-700 dark:text-gray-200">
-                    {transactionTypeLabel(row.original.transactionType?.name) ||
-                        '—'}
+                    {transactionTypeLabel(
+                        row.original.transaction_type?.name,
+                    ) || '—'}
                 </span>
             ),
         },
@@ -246,14 +227,16 @@ export default function RequestFundsIndex({
             ),
             cell: ({ row }) => {
                 const rf = row.original;
-                const badgeCls = `inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium capitalize ${
-                    STATUS_STYLES[rf.status] ?? STATUS_STYLES.cancelled
+                const badgeCls = `inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${
+                    STATUS_STYLES[rf.status] ?? STATUS_STYLES.hold
                 }`;
 
                 if (!canApproveStatus) {
                     return (
                         <div className="text-center">
-                            <span className={badgeCls}>{rf.status}</span>
+                            <span className={badgeCls}>
+                                {fundRequestStatusLabel(rf.status)}
+                            </span>
                         </div>
                     );
                 }
@@ -265,7 +248,7 @@ export default function RequestFundsIndex({
                                 <button
                                     className={`${badgeCls} transition-all hover:opacity-80`}
                                 >
-                                    {rf.status}
+                                    {fundRequestStatusLabel(rf.status)}
                                     <ChevronDown className="h-3 w-3 opacity-60" />
                                 </button>
                             </DropdownMenuTrigger>
@@ -277,12 +260,11 @@ export default function RequestFundsIndex({
                                     <DropdownMenuItem
                                         key={s}
                                         onClick={() => changeStatus(rf, s)}
-                                        className={`font-mono text-[11px] font-medium capitalize ${
-                                            STATUS_TEXT[s] ??
-                                            STATUS_TEXT.cancelled
+                                        className={`font-mono text-[11px] font-medium ${
+                                            STATUS_TEXT[s] ?? STATUS_TEXT.hold
                                         }`}
                                     >
-                                        {s}
+                                        {fundRequestStatusLabel(s)}
                                         {s === rf.status && (
                                             <Check className="ml-auto h-3.5 w-3.5" />
                                         )}
@@ -332,7 +314,9 @@ export default function RequestFundsIndex({
                                       {canEdit && (
                                           <DropdownMenuItem
                                               onClick={() =>
-                                                  setEditing(row.original)
+                                                  router.get(
+                                                      `${baseUrl}/${row.original.id}/edit`,
+                                                  )
                                               }
                                           >
                                               <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
@@ -372,7 +356,7 @@ export default function RequestFundsIndex({
                 >
                     {canCreate && (
                         <button
-                            onClick={() => setCreateOpen(true)}
+                            onClick={() => router.get(`${baseUrl}/create`)}
                             className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                         >
                             <Plus className="h-3.5 w-3.5" />
@@ -429,23 +413,6 @@ export default function RequestFundsIndex({
                     />
                 </div>
 
-                {(canCreate || canEdit) && (
-                    <RequestFundFormDialog
-                        open={createOpen || editing !== null}
-                        onOpenChange={(o) => {
-                            if (!o) {
-                                setCreateOpen(false);
-                                setEditing(null);
-                            }
-                        }}
-                        requestFund={editing}
-                        workspaceSlug={workspace.slug}
-                        users={users}
-                        products={products}
-                        transactionTypes={transactionTypes}
-                        departments={departments}
-                    />
-                )}
                 {canDelete && (
                     <FinanceDeleteDialog
                         open={!!toDelete}

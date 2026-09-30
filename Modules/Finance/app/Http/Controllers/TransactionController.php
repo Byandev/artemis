@@ -7,7 +7,6 @@ use App\Enums\Permission;
 use App\Facades\Activity;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -20,6 +19,7 @@ use Modules\Finance\Models\Account;
 use Modules\Finance\Models\FundRequest;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
+use Modules\Products\Models\Product;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -224,6 +224,8 @@ class TransactionController extends Controller
                 'status' => $fundRequest->status,
                 // Copied onto the transaction when one is filled in from here.
                 'transaction_type_id' => $fundRequest->transaction_type_id,
+                'requested_by' => $fundRequest->requested_by,
+                'approved_by' => $fundRequest->approved_by,
                 'department' => $fundRequest->department?->name,
                 'charge_to' => $fundRequest->chargeToUsers->map(fn ($user) => [
                     'user_id' => $user->id,

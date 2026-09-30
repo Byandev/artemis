@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Product;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\Transaction;
@@ -10,6 +9,7 @@ use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\GencysDailySalesOrderItem;
 use Modules\Inventory\Models\InventoryUnitCode;
+use Modules\Products\Models\Product;
 
 /** A delivered order, optionally with a single unit-code item on it. */
 function pis_order(int $id, $workspace, string $cell, array $attrs, ?string $unitCode): GencysDailySalesOrder

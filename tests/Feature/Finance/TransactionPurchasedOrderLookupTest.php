@@ -1,10 +1,10 @@
 <?php
 
-use App\Models\Product;
 use Modules\Finance\Models\TransactionType;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
+use Modules\Products\Models\Product;
 
 function polUrl($workspace, array $query = []): string
 {

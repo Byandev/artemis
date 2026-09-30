@@ -2,11 +2,11 @@
 
 namespace Modules\Finance\Models;
 
-use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Products\Models\Product;
 
 /**
  * A deficit carried into a month, entered against one seller and one product.

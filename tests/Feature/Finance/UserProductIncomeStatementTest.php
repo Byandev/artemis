@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Page;
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Support\Str;
@@ -17,6 +16,7 @@ use Modules\GencysERP\Models\GencysDailySalesOrderItem;
 use Modules\GencysERP\Models\Intern;
 use Modules\Inventory\Models\InventoryUnitCode;
 use Modules\Pancake\Models\Order as PancakeOrder;
+use Modules\Products\Models\Product;
 
 /** A delivered order written to an intern cell, carrying one unit code. */
 function ups_order(int $id, $workspace, string $cell, string $unitCode, array $attrs = []): GencysDailySalesOrder

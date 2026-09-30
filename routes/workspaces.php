@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminClientReportController;
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminInvoiceController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
@@ -18,8 +19,6 @@ use App\Http\Controllers\Workspaces\DepartmentController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
-use App\Http\Controllers\Workspaces\Product\AnalyticsController;
-use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
 use App\Http\Controllers\Workspaces\RolePermissionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
@@ -62,6 +61,7 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
 use Modules\Finance\Http\Controllers\IncomeStatementController as FinanceIncomeStatementController;
+use Modules\Finance\Http\Controllers\ManagementController as FinanceManagementController;
 use Modules\Finance\Http\Controllers\PurchasedOrderLookupController as FinancePurchasedOrderLookupController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
@@ -95,6 +95,11 @@ use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use Modules\Pancake\Http\Controllers\OrderController;
+use Modules\Products\Http\Controllers\AnalyticsController;
+use Modules\Products\Http\Controllers\FormController as ProductFormController;
+use Modules\Products\Http\Controllers\ProductController;
+use Modules\Products\Http\Controllers\ProductResearchController;
+use Modules\Products\Http\Controllers\TargetMarketController;
 use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
 use Modules\SimGateway\Http\Controllers\SmsController;
 
@@ -120,19 +125,22 @@ Route::get('/public/workspaces/{workspace}/sales-targets/{salesTarget}', [Public
     ->whereNumber('salesTarget')
     ->name('public-page.sales-targets.show');
 
-Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/stats', [ForDeliveryController::class, 'publicStats'])->name('public-page.rmo-management.stats');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-status', [ForDeliveryController::class, 'publicBulkUpdateStatus'])->name('public-page.rmo-management.bulkUpdateStatus');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('public-page.rmo-management.callLogs');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('public-page.rmo-management.callLogs.export');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('public-page.rmo-management.callLogs.breakdown');
+// Public RMO management is shut off entirely once the workspace's subscription lapses.
+Route::middleware('public.subscription')->group(function () {
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/stats', [ForDeliveryController::class, 'publicStats'])->name('public-page.rmo-management.stats');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-status', [ForDeliveryController::class, 'publicBulkUpdateStatus'])->name('public-page.rmo-management.bulkUpdateStatus');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('public-page.rmo-management.callLogs');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('public-page.rmo-management.callLogs.export');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('public-page.rmo-management.callLogs.breakdown');
+});
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
@@ -284,6 +292,36 @@ Route::middleware(['auth'])->group(function () {
     })->name('workspaces.products');
     Route::get('/workspaces/{workspace}/products/list', [ProductController::class, 'index'])->name('workspaces.products.index');
     Route::get('/workspaces/{workspace}/products/analytics', [AnalyticsController::class, 'index'])->name('workspaces.products.analytics');
+    Route::get('/workspaces/{workspace}/products/forms', [ProductFormController::class, 'index'])->name('workspaces.products.forms.index');
+    Route::post('/workspaces/{workspace}/products/forms', [ProductFormController::class, 'store'])->name('workspaces.products.forms.store');
+    // Declared before the {productForm} routes so "variants" is never taken as
+    // a form id.
+    Route::get('/workspaces/{workspace}/products/forms/variants/{variant}/image/{media}', [ProductFormController::class, 'showVariantImage'])->name('workspaces.products.forms.variant-image');
+    Route::put('/workspaces/{workspace}/products/forms/{productForm}', [ProductFormController::class, 'update'])->name('workspaces.products.forms.update');
+    Route::delete('/workspaces/{workspace}/products/forms/{productForm}', [ProductFormController::class, 'destroy'])->name('workspaces.products.forms.destroy');
+    Route::get('/workspaces/{workspace}/products/target-markets', [TargetMarketController::class, 'index'])->name('workspaces.products.target-markets.index');
+    Route::post('/workspaces/{workspace}/products/target-markets', [TargetMarketController::class, 'store'])->name('workspaces.products.target-markets.store');
+    Route::put('/workspaces/{workspace}/products/target-markets/{targetMarket}', [TargetMarketController::class, 'update'])->name('workspaces.products.target-markets.update');
+    Route::delete('/workspaces/{workspace}/products/target-markets/{targetMarket}', [TargetMarketController::class, 'destroy'])->name('workspaces.products.target-markets.destroy');
+    Route::get('/workspaces/{workspace}/products/product-research', [ProductResearchController::class, 'index'])->name('workspaces.products.product-research.index');
+    Route::get('/workspaces/{workspace}/products/product-research/create', [ProductResearchController::class, 'create'])->name('workspaces.products.product-research.create');
+    // Declared before the {productResearch} routes so "suggest-names" is never read as an
+    // id. Throttled because each call is a paid one — see the product-research-suggestions
+    // limiter in AppServiceProvider.
+    Route::post('/workspaces/{workspace}/products/product-research/suggest-names', [ProductResearchController::class, 'suggestNames'])
+        ->middleware('throttle:product-research-suggestions')
+        ->name('workspaces.products.product-research.suggest-names');
+    Route::post('/workspaces/{workspace}/products/product-research', [ProductResearchController::class, 'store'])->name('workspaces.products.product-research.store');
+    Route::get('/workspaces/{workspace}/products/product-research/{productResearch}/edit', [ProductResearchController::class, 'edit'])->name('workspaces.products.product-research.edit');
+    // No {productResearch}: a draft that has not been filed yet is saved on the way
+    // through, so Step 3 does not have to wait on Save to RDPs.
+    Route::post('/workspaces/{workspace}/products/product-research/packshots', [ProductResearchController::class, 'generatePackshots'])
+        ->middleware('throttle:product-research-suggestions')
+        ->name('workspaces.products.product-research.packshots');
+    Route::post('/workspaces/{workspace}/products/product-research/packshot', [ProductResearchController::class, 'uploadPackshot'])->name('workspaces.products.product-research.packshot-upload');
+    Route::post('/workspaces/{workspace}/products/product-research/{productResearch}/packshot/select', [ProductResearchController::class, 'selectPackshot'])->name('workspaces.products.product-research.packshot-select');
+    Route::get('/workspaces/{workspace}/products/product-research/{productResearch}/packshot/{media}', [ProductResearchController::class, 'showPackshotImage'])->name('workspaces.products.product-research.packshot-image');
+    Route::put('/workspaces/{workspace}/products/product-research/{productResearch}', [ProductResearchController::class, 'update'])->name('workspaces.products.product-research.update');
     Route::get('/workspaces/{workspace}/products/analytics/metrics', [AnalyticsController::class, 'metrics'])->name('workspaces-workspace.products.analytics.metrics');
     Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
     Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
@@ -685,10 +723,21 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
 
         Route::get('/request-funds', [FinanceFundRequestController::class, 'index'])->name('request-funds.index');
+        Route::get('/request-funds/create', [FinanceFundRequestController::class, 'create'])->name('request-funds.create');
+        Route::get('/request-funds/{requestFund}/edit', [FinanceFundRequestController::class, 'edit'])->name('request-funds.edit');
+        Route::get('/request-funds/{requestFund}/attachments/{attachment}', [FinanceFundRequestController::class, 'downloadAttachment'])->name('request-funds.attachments.show');
         Route::post('/request-funds', [FinanceFundRequestController::class, 'store'])->name('request-funds.store');
         Route::put('/request-funds/{requestFund}/status', [FinanceFundRequestController::class, 'updateStatus'])->name('request-funds.status');
         Route::put('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'update'])->name('request-funds.update');
         Route::delete('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'destroy'])->name('request-funds.destroy');
+
+        Route::get('/management', [FinanceManagementController::class, 'index'])->name('management.index');
+        Route::post('/management/{kind}', [FinanceManagementController::class, 'store'])->whereIn('kind', ['attachments', 'checklists'])->name('management.requirements.store');
+        Route::put('/management/{kind}/{id}', [FinanceManagementController::class, 'update'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.update');
+        Route::delete('/management/{kind}/{id}', [FinanceManagementController::class, 'destroy'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.destroy');
+        Route::put('/management/transaction-types/{transactionType}', [FinanceManagementController::class, 'sync'])->name('management.requirements.sync');
+        Route::put('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'link'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.link');
+        Route::delete('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'unlink'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.unlink');
     });
 
     Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {
@@ -792,6 +841,9 @@ Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])
+            ->name('dashboard');
+
         // Workspace Management
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
@@ -806,6 +858,8 @@ Route::middleware(['auth', 'admin'])
             ->name('workspaces.update-modules');
         Route::put('/workspaces/{workspace}/max-shops', [AdminWorkspaceController::class, 'updateMaxShops'])
             ->name('workspaces.update-max-shops');
+        Route::put('/workspaces/{workspace}/contact', [AdminWorkspaceController::class, 'updateContact'])
+            ->name('workspaces.update-contact');
 
         // User Management
         Route::get('/users', [AdminUserController::class, 'index'])

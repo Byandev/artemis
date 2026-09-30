@@ -272,10 +272,40 @@ export function AppSidebar() {
         ...(currentWorkspace.products_module_enabled
             ? [
                   {
-                      title: 'Products',
-                      href: `/workspaces/${slug}/products/list`,
+                      title: 'Product',
                       icon: Package,
-                      permission: PERMISSIONS.ViewProducts,
+                      anyOf: [
+                          PERMISSIONS.ViewProducts,
+                          PERMISSIONS.ViewProductForms,
+                          PERMISSIONS.ViewTargetMarkets,
+                          PERMISSIONS.ViewProductResearch,
+                      ],
+                      items: [
+                          {
+                              title: 'Manage',
+                              href: `/workspaces/${slug}/products/list`,
+                              icon: Package,
+                              permission: PERMISSIONS.ViewProducts,
+                          },
+                          {
+                              title: 'Product Forms',
+                              href: `/workspaces/${slug}/products/forms`,
+                              icon: Tags,
+                              permission: PERMISSIONS.ViewProductForms,
+                          },
+                          {
+                              title: 'Target Market',
+                              href: `/workspaces/${slug}/products/target-markets`,
+                              icon: Target,
+                              permission: PERMISSIONS.ViewTargetMarkets,
+                          },
+                          {
+                              title: 'RDP Builder',
+                              href: `/workspaces/${slug}/products/product-research`,
+                              icon: Layers,
+                              permission: PERMISSIONS.ViewProductResearch,
+                          },
+                      ],
                   },
               ]
             : []),
@@ -675,6 +705,12 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
                               icon: Banknote,
                               permission: PERMISSIONS.ViewFinanceRequestFunds,
+                          },
+                          {
+                              title: 'RF Requirements',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/management`,
+                              icon: SlidersHorizontal,
+                              permission: PERMISSIONS.ViewFinanceTransactions,
                           },
                       ],
                   },

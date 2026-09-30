@@ -3,12 +3,12 @@
 namespace Modules\Inventory\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Modules\Products\Models\Product;
 
 class InventoryItem extends Model
 {
