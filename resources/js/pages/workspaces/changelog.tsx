@@ -12,6 +12,62 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.39.0',
+        date: '2026-09-30',
+        sections: [
+            {
+                title: 'Finance — Fund Requests',
+                items: [
+                    'Raising or editing a fund request now opens a full page instead of a pop-up. What the money is for goes under Particulars, one line each with a quantity and unit price, and the amount requested is their total, so it can’t drift from the breakdown. A request saved before this release opens with a single line carrying its old amount, ready for you to name',
+                    'Payment Method asks how the funds are released — Online Banking, E-Wallet, Cheque or Cash — and bank transfers and e-wallets also ask for the bank, account name and account number, so the person releasing the money has everything on the request. Tick Liquidation required and set a deadline when the requester has to account for what they spend',
+                    'Each transaction type can ask for its own attachments and checklist, and a request can’t be saved until every attachment that type needs has a file. Scans, photos (iPhone photos included), PDFs and Word or Excel files up to 10 MB are accepted, and they’re kept private, opened through a download link that expires',
+                    'A transaction type now has to be switched to Fund requestable on the Transaction Types page before the fund request form offers it — new types start switched off, so an admin needs to switch on the ones you raise requests against. Switch on Per product as well and each particular picks a product, with the request split across products by their lines instead of by hand',
+                    'The statuses are now For Approval, Approved, For Liquidation and Hold, replacing Pending, Released and Cancelled. A transaction filled in from a request now also carries over who requested it and who approved it',
+                ],
+            },
+            {
+                title: 'Finance — RF Requirements (New)',
+                items: [
+                    'RF Requirements, under Finance in the menu, keeps one list of the attachments and checklist items your fund requests can ask for, on separate tabs, with a count of how many transaction types use each',
+                    'Manage Requirements on a transaction type’s menu is where you tick which of those the type asks for. You can also add, rename or delete a requirement from there, and a rename or delete applies to every type that uses it, which is why the dialog shows the other types first',
+                ],
+            },
+            {
+                title: 'Meta Ads — Ads Manager, Reports and Optimization History',
+                items: [
+                    'Ads Manager has a start time filter that narrows the rows to ads that started running on, before, after or between dates you pick. This is separate from the date range, which still picks which days’ results get added up. The filter stays when you refresh or share the link, and a row’s timeline chart follows it so its totals match the row',
+                    'Two new ways to group Ads Manager: Campaign Objective (Sales, Engagement and so on) and Optimization Goal. You can also filter any grouping by objective, and a row’s spend then counts only the campaigns the filter keeps. Campaigns or ad sets that Meta reports no objective or goal for are grouped together in one row instead of showing as blank rows',
+                    'Reports can be filtered to image ads or video ads, and every figure on the report then counts only ads of that type. Videos posted from an existing page post were often counted as images before; they’re now picked up as videos',
+                    'Optimization History can be filtered by ad account and by page. Each dropdown lists only accounts and pages that have logged history, so a filter never comes back empty',
+                ],
+            },
+            {
+                title: 'Sales & Marketing — Page ROAS Tracker',
+                items: [
+                    'New Ad Spend Budget, Variance and Pace columns set each day’s spend against what the page was budgeted for that day. The budget is recorded day by day, so raising it next week doesn’t change how last week is judged, and a page with no budget shows blank rather than looking like it overspent',
+                    'Item Quantities and Order COGS show how many units the page’s orders sold and what those goods cost. The cost comes from each product variation’s latest import price in Pancake, and a day where no item had a cost shows blank rather than looking like the goods were free',
+                    'An estimated margin runs from delivered sales down to net profit and commission, taking off COD fees, VAT, cost of goods, shipping and a share of operating costs. Returns are estimated from the page’s own RTS rate over the last 30 days, and hovering over a page shows the rate used. It’s a quick estimate using flat rates, not the income statement',
+                ],
+            },
+            {
+                title: 'Shops — Order Tags (New)',
+                items: [
+                    'Order Tags on the shops page shows the tags a shop has in Pancake right now, with their colours',
+                    'Create preset tags adds the standard set to the shop in one click — High RTS, Cancel by Customer, Has Returned Orders, Troll, Reserved, Incomplete Details and With Issue — each limited to the order status it belongs to, so you don’t have to type them into Pancake shop by shop. Tags the shop already has are skipped, so pressing it again is safe',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Creating, editing or deleting sales targets now needs its own Manage Sales Targets permission instead of Edit Teams. No role has it yet, so an admin needs to grant it on the roles screen to anyone who manages targets',
+                    'The public RMO Management link stops working once the workspace’s subscription has expired, been cancelled or is past due. Anyone opening it sees a subscription-expired page, and exports and updates from that link stop too',
+                    'New creatives get a 10-character Code you can copy with one click. Letters and numbers that look alike are left out, so the code is easy to read out or retype. Creatives made before this release don’t have one',
+                    'Team members now see the products of shops linked to their teams even if those products aren’t tied to one of their pages. Before, those products were hidden from them',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.38.0',
         date: '2026-09-25',
         sections: [

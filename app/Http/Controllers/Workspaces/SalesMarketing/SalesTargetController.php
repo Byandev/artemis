@@ -56,7 +56,7 @@ class SalesTargetController extends Controller
             'workspace' => $workspace,
             'targets' => $targets,
             'teams' => $teams,
-            'canManage' => $request->user()->hasPermission(Permission::EditTeams->value, $workspace),
+            'canManage' => $request->user()->hasPermission(Permission::ManageSalesTargets->value, $workspace),
         ]);
     }
 
@@ -76,7 +76,7 @@ class SalesTargetController extends Controller
             'teams' => TeamVisibility::selectableTeams($request->user(), $workspace)
                 ->map(fn ($team) => $team->only(['id', 'name']))
                 ->values(),
-            'canManage' => $request->user()->hasPermission(Permission::EditTeams->value, $workspace),
+            'canManage' => $request->user()->hasPermission(Permission::ManageSalesTargets->value, $workspace),
         ]);
     }
 
@@ -84,7 +84,7 @@ class SalesTargetController extends Controller
     {
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
-        $this->authorize(Permission::EditTeams->value, $workspace);
+        $this->authorize(Permission::ManageSalesTargets->value, $workspace);
 
         $validated = $this->validatePayload($request, $workspace);
 
@@ -106,7 +106,7 @@ class SalesTargetController extends Controller
     {
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
-        $this->authorize(Permission::EditTeams->value, $workspace);
+        $this->authorize(Permission::ManageSalesTargets->value, $workspace);
 
         $this->guardOwnership($workspace, $salesTarget);
 
@@ -133,7 +133,7 @@ class SalesTargetController extends Controller
     {
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
-        $this->authorize(Permission::EditTeams->value, $workspace);
+        $this->authorize(Permission::ManageSalesTargets->value, $workspace);
 
         $this->guardOwnership($workspace, $salesTarget);
 
