@@ -52,7 +52,7 @@ class FundRequest extends Model
             'GoTyme Bank', 'Maya Bank', 'SeaBank', 'CIMB Bank', 'Tonik',
         ],
         'e_wallet' => [
-            'GCash', 'Maya', 'GrabPay', 'ShopeePay', 'Coins.ph', 'PalawanPay', 'GoTyme',
+            'GCash', 'Maya', 'Coins.ph', 'GoTyme',
         ],
     ];
 
