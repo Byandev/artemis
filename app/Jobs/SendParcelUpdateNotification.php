@@ -85,7 +85,7 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
                         // off to CheckParcelUpdateNotification for the final status.
                         $this->parcelJourneyNotification->update(['sms_id' => $result->messageId, 'status' => 'sent']);
 
-//                        dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('sms');
+                        //                        dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('sms');
                     } else {
                         // Provider doesn't expose delivery tracking (SendGate) — treat
                         // a successful send as sent.
