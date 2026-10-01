@@ -12,6 +12,48 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.40.0',
+        date: '2026-10-01',
+        sections: [
+            {
+                title: 'Sales & Marketing — New Creatives Tracker (New)',
+                items: [
+                    'New Creatives Tracker, under Sales & Marketing in the menu, follows the campaigns and ad sets you’re testing through a 7-day test. Each row shows Sales, Spend and ROAS for Day 1 to Day 7 and a Total, with Day 1 being the day that campaign or ad set started, so tests launched on different dates line up side by side',
+                    'Add Testing Item lists your active campaigns and ad sets that aren’t in the tracker yet. A new item is filled in straight away from the results already synced, with its ad account and product, and its numbers then refresh every hour just after Meta’s figures come in. Total ROAS is worked out over the whole test, not as an average of the daily ROAS',
+                    'Manual adds a campaign or ad set Meta doesn’t sync, with its name, ad account, page, product and start date typed in. You type its Sales and Spend for each day and ROAS works itself out. Changing a manual item’s start date moves its recorded days with it, so Day 1 stays on the new start date',
+                    'Intern’s Final Decision (Scale, 50% Intern / 50% Company or Killed) and Finance Status (For Collection, Pending or Collected) are set on each row. Pausing an item keeps the days it has and stops adding new ones until you resume it',
+                    'Search, filter by ad account, type, start date, or switch on Manual only, and the filters stay when you refresh or share the link. Viewing, adding, editing and removing are four separate permissions and nobody has them yet, so an admin needs to grant them on the roles screen',
+                ],
+            },
+            {
+                title: 'Meta Ads — Launch Comparison (New)',
+                items: [
+                    'Launch Comparison, next to Ads Calendar in the Meta Ads menu, lines up campaigns, ad sets or ads by how long they’ve been running instead of by calendar date. Day 1 is each one’s own start date, so you can see whether this week’s launch is doing better or worse than last month’s at the same point',
+                    'Compare the first 3, 7, 14 or 30 days, or pick your own number up to 90. Daily shows each day on its own; Running total adds up everything since Day 1, and ROAS, CPA, CTR and the other rates are worked out again from those totals rather than added up',
+                    'Days that haven’t happened yet, and today before it has synced, stay blank instead of showing 0, so a young launch doesn’t look like it stopped spending. Reach and frequency are left out because they can’t be added up across days',
+                    'Narrow the list by start date, ad account, search, creator, objective, or results across the days you’re comparing, the same way you filter Ads Manager. The chart button on a row opens its Ads Manager timeline. Nobody can see the page yet, so an admin needs to grant View Launch Comparison on the roles screen',
+                ],
+            },
+            {
+                title: 'RTS — External RMO Team Sync (New)',
+                items: [
+                    'If an outside team handles some of your RMOs, switch on External team sync in Settings → RMO management and paste the link to their Google Sheet. Every 10 minutes, today’s tab is read and the orders it lists are tagged to match: Confirmed becomes RIDER OTW, Delivered becomes DELIVERED and Returned becomes RETURNING',
+                    'Any other status on the sheet, like Ringing or Cannot Be Reached, is the outside team’s call notes rather than an outcome, so it leaves the RMO status as it is. Orders are matched by tracking number',
+                    'While it’s on, the RMO management page gets an External Team filter that shows only the orders the outside team handles, or only the ones your own team handles',
+                    'The sheet needs one tab per day, named like “OCTOBER 1,2026”, with TRACKING NUMBER and STATUS columns, and it has to be shared with the n8n Google account',
+                ],
+            },
+            {
+                title: 'Finance — Fund Requests',
+                items: [
+                    'Payment Method and Charge To can now be left blank and filled in later, so a request can be raised before you know how the money will be released or who it’s charged to',
+                    'Attachments are optional for now. A request can be saved even if the transaction type asks for a file that hasn’t been uploaded yet',
+                    'The bank or e-wallet is picked from a list of popular Philippine banks and e-wallets, like BDO, BPI, GCash and Maya, and the most common one is picked for you when you choose a method. If yours isn’t listed, choose Other and type it in',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.39.0',
         date: '2026-09-30',
         sections: [
