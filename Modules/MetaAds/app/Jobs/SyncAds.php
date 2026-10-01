@@ -53,7 +53,7 @@ class SyncAds implements ShouldQueue
         try {
             $client = $this->adAccount->graphClient();
 
-            $fields = 'id,name,adset_id,campaign_id,creative{id,thumbnail_url,image_url},status,effective_status,created_time,updated_time,created_by';
+            $fields = 'id,name,adset_id,campaign_id,creative{id,thumbnail_url,image_url,object_type,video_id},status,effective_status,created_time,updated_time,created_by';
 
             $query = ['fields' => $fields];
             if ($this->afterCursor !== null) {
@@ -91,16 +91,19 @@ class SyncAds implements ShouldQueue
                     ],
                 );
 
-                // Capture the creative's thumbnail straight from the ad so the
-                // Ads Manager always has an image to show, even when the
-                // account-level /adcreatives listing doesn't return this
-                // creative. Only the media fields are written, so a fuller row
-                // synced by SyncCreatives is never clobbered.
+                // Capture the creative's thumbnail and media type straight from
+                // the ad so the Ads Manager always has an image to show — and
+                // can tell a video from an image — even when the account-level
+                // /adcreatives listing doesn't return this creative. Only these
+                // fields are written, so a fuller row synced by SyncCreatives is
+                // never clobbered.
                 $creative = $row['creative'] ?? null;
                 if (is_array($creative) && ($creative['id'] ?? null)) {
                     $media = array_filter([
                         'thumbnail_url' => $creative['thumbnail_url'] ?? null,
                         'image_url' => $creative['image_url'] ?? null,
+                        'object_type' => $creative['object_type'] ?? null,
+                        'video_id' => $creative['video_id'] ?? null,
                     ], fn ($v) => $v !== null);
 
                     Creative::updateOrCreate(

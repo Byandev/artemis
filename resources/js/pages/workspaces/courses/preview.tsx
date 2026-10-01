@@ -123,16 +123,20 @@ export default function CoursePreview({
                 <div className="mb-5 flex items-start justify-between gap-4">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
+                            {/* Back to the course that was opened, not the
+                                whole catalogue — the player is one level in. */}
                             <Link
-                                href={baseUrl}
-                                className="flex items-center gap-1 font-mono text-[10px] font-medium tracking-wider text-emerald-600 uppercase transition-colors hover:text-emerald-700 dark:text-emerald-400"
+                                href={courseUrl}
+                                className="flex min-w-0 items-center gap-1 font-mono text-[10px] font-medium tracking-wider text-emerald-600 uppercase transition-colors hover:text-emerald-700 dark:text-emerald-400"
                             >
-                                <ArrowLeft className="h-3 w-3" />
-                                All Courses
+                                <ArrowLeft className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{course.name}</span>
                             </Link>
-                            <span className={`${LABEL} truncate`}>
-                                {course.name}
-                            </span>
+                            {active && (
+                                <span className={`${LABEL} truncate`}>
+                                    {active.moduleName}
+                                </span>
+                            )}
                         </div>
 
                         <h1 className={`mt-1 truncate ${TITLE}`}>

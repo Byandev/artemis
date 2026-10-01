@@ -34,16 +34,19 @@ import {
     FileText,
     Goal,
     GraduationCap,
+    Headset,
     History,
     Landmark,
     Layers,
     LayoutDashboard,
     LifeBuoy,
     ListChecks,
+    Map,
     MapPin,
     Megaphone,
     MessageSquare,
     Package,
+    PhoneCall,
     PieChart,
     ReceiptText,
     RotateCcw,
@@ -61,6 +64,7 @@ import {
     Trophy,
     Truck,
     User,
+    UserRound,
     Users,
     Wallet,
 } from 'lucide-react';
@@ -108,10 +112,21 @@ export function AppSidebar() {
                       anyOf: [
                           PERMISSIONS.ViewSalesMarketingDashboard,
                           PERMISSIONS.ViewSalesMarketingDailyReport,
-                          PERMISSIONS.ViewPageRoasTracker,
+                          // The tracker is hidden for Gencys partners below,
+                          // so its grant must not be what opens the group for
+                          // them — otherwise they get an empty group.
+                          ...(currentWorkspace.is_gencys_partner
+                              ? []
+                              : [PERMISSIONS.ViewPageRoasTracker]),
                           PERMISSIONS.ViewAdSpendGoals,
                           PERMISSIONS.ViewAdSpentSummary,
                           PERMISSIONS.ViewSalesTargets,
+                          // The Budget Tracker below rides on the Meta Ads
+                          // grant, so that grant has to be able to open the
+                          // group on its own.
+                          ...(currentWorkspace.meta_ads_module_enabled
+                              ? [PERMISSIONS.ViewMetaAds]
+                              : []),
                       ],
                       items: [
                           {
@@ -128,12 +143,19 @@ export function AppSidebar() {
                               permission:
                                   PERMISSIONS.ViewSalesMarketingDailyReport,
                           },
-                          {
-                              title: 'Page ROAS Tracker',
-                              href: `/workspaces/${slug}/sales-marketing/page-roas-tracker`,
-                              icon: TrendingUp,
-                              permission: PERMISSIONS.ViewPageRoasTracker,
-                          },
+                          // Gencys partners track page ROAS in Gencys itself,
+                          // so the tracker is hidden for them.
+                          ...(currentWorkspace.is_gencys_partner
+                              ? []
+                              : [
+                                    {
+                                        title: 'Page ROAS Tracker',
+                                        href: `/workspaces/${slug}/sales-marketing/page-roas-tracker`,
+                                        icon: TrendingUp,
+                                        permission:
+                                            PERMISSIONS.ViewPageRoasTracker,
+                                    },
+                                ]),
                           // Ad Spend Goals is its own module switch — the rest
                           // of the group rides on the S&M one.
                           ...(currentWorkspace.ad_spend_goals_module_enabled
@@ -153,6 +175,19 @@ export function AppSidebar() {
                               icon: ReceiptText,
                               permission: PERMISSIONS.ViewAdSpentSummary,
                           },
+                          // Reads Meta Ads data and keeps its Meta Ads URL and
+                          // grant — it sits in this group in the sidebar only,
+                          // so it stays behind the Meta Ads switch.
+                          ...(currentWorkspace.meta_ads_module_enabled
+                              ? [
+                                    {
+                                        title: 'Ad Spent Budget Tracker',
+                                        href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
+                                        icon: Wallet,
+                                        permission: PERMISSIONS.ViewMetaAds,
+                                    },
+                                ]
+                              : []),
                           {
                               title: 'Sales Targets',
                               href: `/workspaces/${slug}/sales-marketing/sales-targets`,
@@ -171,6 +206,20 @@ export function AppSidebar() {
                       icon: User,
                       permission: PERMISSIONS.ViewCsrDashboard,
                   },
+                  // The pancake logins the dashboard's figures are summed from.
+                  // Gated with it, since it is only the legend for that page.
+                  {
+                      title: 'My Pancake Users',
+                      href: `/workspaces/${slug}/csr/pancake-users`,
+                      icon: UserRound,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
+                  {
+                      title: 'My Calls',
+                      href: `/workspaces/${slug}/csr/call-logs`,
+                      icon: Headset,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
               ]
             : []),
         ...(currentWorkspace.video_editor_dashboard_module_enabled
@@ -180,6 +229,19 @@ export function AppSidebar() {
                       href: `/workspaces/${slug}/video-editor/dashboard`,
                       icon: Clapperboard,
                       permission: PERMISSIONS.ViewVideoEditorDashboard,
+                  },
+              ]
+            : []),
+        // The personal Welle record. Only the workspaces a super admin has
+        // switched Welle on for have the page at all, and the grant is hidden
+        // with the toggle — see Workspace::hiddenPermissionNames().
+        ...(currentWorkspace.welle_module_enabled
+            ? [
+                  {
+                      title: 'My ESC',
+                      href: `/workspaces/${slug}/welle/my-esc`,
+                      icon: Sparkles,
+                      permission: PERMISSIONS.ViewMyEsc,
                   },
               ]
             : []),
@@ -201,13 +263,49 @@ export function AppSidebar() {
             icon: ShoppingCart,
             permission: PERMISSIONS.ViewOrders,
         },
+        {
+            title: 'Call Logs',
+            href: `/workspaces/${slug}/rts/call-logs`,
+            icon: PhoneCall,
+            permission: PERMISSIONS.ViewCallLogs,
+        },
         ...(currentWorkspace.products_module_enabled
             ? [
                   {
-                      title: 'Products',
-                      href: `/workspaces/${slug}/products/list`,
+                      title: 'Product',
                       icon: Package,
-                      permission: PERMISSIONS.ViewProducts,
+                      anyOf: [
+                          PERMISSIONS.ViewProducts,
+                          PERMISSIONS.ViewProductForms,
+                          PERMISSIONS.ViewTargetMarkets,
+                          PERMISSIONS.ViewProductResearch,
+                      ],
+                      items: [
+                          {
+                              title: 'Manage',
+                              href: `/workspaces/${slug}/products/list`,
+                              icon: Package,
+                              permission: PERMISSIONS.ViewProducts,
+                          },
+                          {
+                              title: 'Product Forms',
+                              href: `/workspaces/${slug}/products/forms`,
+                              icon: Tags,
+                              permission: PERMISSIONS.ViewProductForms,
+                          },
+                          {
+                              title: 'Target Market',
+                              href: `/workspaces/${slug}/products/target-markets`,
+                              icon: Target,
+                              permission: PERMISSIONS.ViewTargetMarkets,
+                          },
+                          {
+                              title: 'RDP Builder',
+                              href: `/workspaces/${slug}/products/product-research`,
+                              icon: Layers,
+                              permission: PERMISSIONS.ViewProductResearch,
+                          },
+                      ],
                   },
               ]
             : []),
@@ -354,12 +452,6 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
-                              title: 'Ad Spent Tracker',
-                              href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
-                              icon: Wallet,
-                              permission: PERMISSIONS.ViewMetaAds,
-                          },
-                          {
                               title: 'Optimization Rules',
                               href: `/workspaces/${slug}/integrations/meta/optimization-rules`,
                               icon: SlidersHorizontal,
@@ -390,7 +482,7 @@ export function AppSidebar() {
         ...(currentWorkspace.csr_module_enabled
             ? [
                   {
-                      title: 'CSR',
+                      title: 'Operations',
                       icon: User,
                       anyOf: [
                           PERMISSIONS.ViewCsrManagement,
@@ -398,13 +490,13 @@ export function AppSidebar() {
                       ],
                       items: [
                           {
-                              title: 'Management',
+                              title: 'CSR Management',
                               href: `/workspaces/${slug}/csr/management`,
                               icon: User,
                               permission: PERMISSIONS.ViewCsrManagement,
                           },
                           {
-                              title: 'Analytics',
+                              title: 'CSR Analytics',
                               href: `/workspaces/${slug}/csr/analytics`,
                               icon: BarChart2,
                               permission: PERMISSIONS.ViewCsrAnalytics,
@@ -426,6 +518,12 @@ export function AppSidebar() {
                     title: 'Analytics',
                     href: `/workspaces/${slug}/rts/analytics`,
                     icon: BarChart2,
+                    permission: PERMISSIONS.ViewRtsAnalytics,
+                },
+                {
+                    title: 'Heat Map',
+                    href: `/workspaces/${slug}/rts/heat-map`,
+                    icon: Map,
                     permission: PERMISSIONS.ViewRtsAnalytics,
                 },
                 {
@@ -607,6 +705,12 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
                               icon: Banknote,
                               permission: PERMISSIONS.ViewFinanceRequestFunds,
+                          },
+                          {
+                              title: 'RF Requirements',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/management`,
+                              icon: SlidersHorizontal,
+                              permission: PERMISSIONS.ViewFinanceTransactions,
                           },
                       ],
                   },

@@ -51,7 +51,7 @@ function frozenCount($workspace): int
 }
 
 test('an unfinished sales-tracker run in the last three days holds the snapshot back', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     readyItem($workspace);
 
     // Sales orders are the demand behind every average, and they arrive across
@@ -67,7 +67,7 @@ test('an unfinished sales-tracker run in the last three days holds the snapshot 
 ]);
 
 test('an unfinished transaction or purchase-order run today holds the snapshot back', function (string $type) {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     readyItem($workspace);
 
     syncRun($workspace, $type, GencysSyncRun::STATUS_FAILED);
@@ -81,7 +81,7 @@ test('an unfinished transaction or purchase-order run today holds the snapshot b
 ]);
 
 test('yesterday failure of a today-only feed does not hold anything back', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     readyItem($workspace);
 
     // Yesterday's transactions are already in; only today's are still landing.
@@ -95,7 +95,7 @@ test('yesterday failure of a today-only feed does not hold anything back', funct
 });
 
 test('runs that finished cleanly, and feeds nobody depends on, do not hold anything back', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     readyItem($workspace);
 
     syncRun($workspace, GencysSyncRun::TYPE_DAILY_SALES_TRACKER, GencysSyncRun::STATUS_SUCCESS);
@@ -111,8 +111,8 @@ test('runs that finished cleanly, and feeds nobody depends on, do not hold anyth
 });
 
 test('one workspace waiting on a sync does not stop another being frozen', function () {
-    ['workspace' => $blocked] = makeWorkspaceWithOwner();
-    ['workspace' => $clear] = makeWorkspaceWithOwner();
+    ['workspace' => $blocked] = makeGencysWorkspaceWithOwner();
+    ['workspace' => $clear] = makeGencysWorkspaceWithOwner();
     readyItem($blocked);
     readyItem($clear);
 
@@ -126,7 +126,7 @@ test('one workspace waiting on a sync does not stop another being frozen', funct
 });
 
 test('--ignore-sync freezes anyway, for when the gap is understood', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     readyItem($workspace);
 
     syncRun($workspace, GencysSyncRun::TYPE_PURCHASE_ORDER, GencysSyncRun::STATUS_FAILED);

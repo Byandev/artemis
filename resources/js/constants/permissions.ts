@@ -23,6 +23,7 @@ export const PERMISSIONS = {
 
     // Orders (Pancake)
     ViewOrders: 'View Orders',
+    ImportOrderShippingFees: 'Import Order Shipping Fees',
 
     // Shops
     ViewShops: 'View Shops',
@@ -36,6 +37,12 @@ export const PERMISSIONS = {
     CreateProducts: 'Create Products',
     EditProducts: 'Edit Products',
     DeleteProducts: 'Delete Products',
+    ViewProductForms: 'View Product Forms',
+    ManageProductForms: 'Manage Product Forms',
+    ViewTargetMarkets: 'View Target Markets',
+    ManageTargetMarkets: 'Manage Target Markets',
+    ViewProductResearch: 'View RDP Builder',
+    ManageProductResearch: 'Manage RDP Builder',
 
     // Teams
     ViewTeams: 'View Teams',
@@ -56,6 +63,7 @@ export const PERMISSIONS = {
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
+    ViewCallLogs: 'View Call Logs',
     ViewRtsAiChat: 'View RTS AI Chat',
     ViewRmoManagement: 'View RMO Management',
     ManageRmoSettings: 'Manage RMO Settings',
@@ -160,13 +168,18 @@ export const PERMISSIONS = {
     ViewSalesMarketingDailyReport: 'View S&M Daily Report',
     ViewPageRoasTracker: 'View Page ROAS Tracker',
     ViewSalesTargets: 'View Sales Targets',
+    ManageSalesTargets: 'Manage Sales Targets',
     ViewVideoEditorDashboard: 'View Video Editor Dashboard',
     ViewCsrDashboard: 'View CSR Dashboard',
+
+    // Welle
+    ViewMyEsc: 'View My ESC',
 
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
     ManageDiscordNotifications: 'Manage Discord Notifications',
+    ManageErpCredentials: 'Manage ERP Credentials',
 
     // Billing
     ViewBillingSettings: 'View Billing Settings',

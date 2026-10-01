@@ -31,6 +31,7 @@ class AdAccount extends Model
         'last_synced_at' => 'datetime',
         'uses_system_user' => 'boolean',
         'active_sync' => 'boolean',
+        'budgets_backfilled_at' => 'datetime',
     ];
 
     public function graphAccountId(): string
@@ -38,7 +39,7 @@ class AdAccount extends Model
         return 'act_'.$this->id;
     }
 
-    public function graphClient(): MetaGraphClient
+    public function graphClient(bool $manage = false): MetaGraphClient
     {
         if ($this->uses_system_user) {
             $token = config('metaads.system_user_token');
@@ -49,12 +50,46 @@ class AdAccount extends Model
             return new MetaGraphClient($token);
         }
 
-        $metaUser = $this->metaUsers()->first();
+        $metaUser = $this->metaUsers()
+            ->when($manage, function (Builder $query) {
+                $query->whereNot('meta_ads_users.id', '1715720859559320');
+            })
+            ->first();
+
         if (! $metaUser) {
             throw new RuntimeException("No MetaUser linked to AdAccount {$this->id}");
         }
 
         return $metaUser->graphClient();
+    }
+
+    /**
+     * Every token that can speak for this account, in preference order: the
+     * system user (when the account is flagged for it), then each linked Meta
+     * user. Keyed by a stable ref so callers can remember which one worked.
+     *
+     * graphClient() deliberately returns one token, which is what the sync jobs
+     * want. Ad previews don't: Meta renders them with the permissions of
+     * whoever signs the request, so a user with ads access but no role on the
+     * page that owns the post gets "Story Unavailable" where a colleague with
+     * that role gets the real ad. Callers that render need to try more than the
+     * first token. See Services\AdPreviewResolver.
+     *
+     * @return array<string, MetaGraphClient>
+     */
+    public function graphClients(): array
+    {
+        $clients = [];
+
+        if ($this->uses_system_user && ($token = config('metaads.system_user_token'))) {
+            $clients['system'] = new MetaGraphClient($token);
+        }
+
+        foreach ($this->metaUsers as $metaUser) {
+            $clients[(string) $metaUser->id] = $metaUser->graphClient();
+        }
+
+        return $clients;
     }
 
     /**
@@ -81,6 +116,16 @@ class AdAccount extends Model
         return $this->belongsToMany(Team::class, 'team_ad_account', 'meta_ads_account_id', 'team_id')
             ->withPivot('access_level')
             ->withTimestamps();
+    }
+
+    /**
+     * People Meta reports as having access to this account (Business Manager's
+     * People list). Synced by SyncAdAccountPeople — unlike metaUsers(), this is
+     * everyone with access, not just those who connected Artemis.
+     */
+    public function people(): HasMany
+    {
+        return $this->hasMany(AdAccountPerson::class, 'meta_ads_account_id');
     }
 
     public function campaigns(): HasMany

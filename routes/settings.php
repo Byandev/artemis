@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\ErpCredentialController;
+use App\Http\Controllers\Settings\IntegrationSettingsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\RmoSettingController;
@@ -48,6 +49,14 @@ Route::middleware('auth')->group(function () {
         ->name('erp-credentials.update');
     Route::delete('/workspaces/{workspace}/settings/erp-credentials', [ErpCredentialController::class, 'destroy'])
         ->name('erp-credentials.destroy');
+
+    // Third-party integrations the workspace connects itself (Welle).
+    Route::get('/workspaces/{workspace}/settings/integrations', [IntegrationSettingsController::class, 'edit'])
+        ->name('integrations.edit');
+    Route::put('/workspaces/{workspace}/settings/integrations/welle', [IntegrationSettingsController::class, 'updateWelle'])
+        ->name('integrations.welle.update');
+    Route::delete('/workspaces/{workspace}/settings/integrations/welle', [IntegrationSettingsController::class, 'destroyWelle'])
+        ->name('integrations.welle.destroy');
 
     Route::get('/workspaces/{workspace}/settings/notifications', [NotificationSettingsController::class, 'edit'])
         ->name('notifications.edit');

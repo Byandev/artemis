@@ -105,7 +105,7 @@ it('the apply job is a no-op outside production', function () {
         ->and($proposal->fresh()->status)->toBe('approved');
 });
 
-it('bulk approve marks all approved and queues an apply job for each', function () {
+it('bulk approve marks all approved and queues an apply job for each, staggered 30s apart', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     $metaUser = MetaUser::create(['id' => 8002, 'name' => 'T', 'access_token' => 'fake']);
     $account = AdAccount::create(['id' => 330, 'name' => 'A']);
@@ -135,6 +135,18 @@ it('bulk approve marks all approved and queues an apply job for each', function 
     expect($p1->fresh()->status)->toBe('approved')
         ->and($p2->fresh()->status)->toBe('approved');
     Queue::assertPushed(ApplyOptimizationAction::class, 2);
+
+    // First applies straight away, the rest are held back 30s each so a large
+    // batch doesn't fire every write at the Meta API at once.
+    Queue::assertPushed(
+        ApplyOptimizationAction::class,
+        fn ($job) => $job->proposalId === $p1->id && $job->delay === null,
+    );
+    Queue::assertPushed(
+        ApplyOptimizationAction::class,
+        fn ($job) => $job->proposalId === $p2->id
+            && $job->delay?->diffInSeconds(now(), true) === 30.0,
+    );
 });
 
 it('bulk reject marks all rejected without queuing apply jobs', function () {

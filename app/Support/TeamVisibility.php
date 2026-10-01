@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Modules\MetaAds\Models\AdAccount;
 
 /**
@@ -135,6 +136,36 @@ class TeamVisibility
         }
 
         return self::teamIdsFor($user, $workspace);
+    }
+
+    /**
+     * The shop ids a shop-keyed query should be limited to, or null for "no
+     * restriction".
+     *
+     * The CSR rollups are keyed by shop rather than by a model with a teams()
+     * relation, so they cannot use scopeVisibleTo — this resolves the same
+     * team ids down to the shops they cover. An empty array is the fail-closed
+     * case: a scoped viewer in no team sees nothing.
+     *
+     * @return array<int, int>|null
+     */
+    public static function scopeShopIds(User $user, Workspace $workspace): ?array
+    {
+        $teamIds = self::scopeTeamIds($user, $workspace);
+
+        if ($teamIds === null) {
+            return null;
+        }
+
+        if ($teamIds === []) {
+            return [];
+        }
+
+        return DB::table('team_shop')
+            ->whereIn('team_id', $teamIds)
+            ->distinct()
+            ->pluck('shop_id')
+            ->all();
     }
 
     /**

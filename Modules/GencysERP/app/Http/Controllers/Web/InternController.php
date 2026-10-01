@@ -148,7 +148,13 @@ class InternController extends Controller
         return back();
     }
 
-    /** Fire the n8n webhook that scrapes interns and posts them back to the callback. */
+    /**
+     * Ask the ERP for a fresh intern roster.
+     *
+     * Posted straight at n8n from here. The roster is not one of the batch
+     * queue's sync types, so there is no flow to raise it through — this is the
+     * page's own button and it reports back on the page it was pressed on.
+     */
     public function sync(Workspace $workspace): RedirectResponse
     {
         $this->authorize(Permission::ViewGencysInterns->value, $workspace);

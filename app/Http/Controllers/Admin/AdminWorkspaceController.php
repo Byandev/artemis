@@ -52,6 +52,7 @@ class AdminWorkspaceController extends Controller
                 'shops_count',
                 'sms_parcel_journey_pages_count',
                 'chat_parcel_journey_pages_count',
+                'last_interaction_at',
 
                 AllowedSort::callback('owner', function ($query, bool $descending) {
                     $direction = $descending ? 'desc' : 'asc';
@@ -184,6 +185,7 @@ class AdminWorkspaceController extends Controller
             'ad_spend_goals_module_enabled' => 'required|boolean',
             'billing_module_enabled' => 'required|boolean',
             'courses_module_enabled' => 'required|boolean',
+            'welle_module_enabled' => 'required|boolean',
         ]);
 
         $workspace->update($validated);
@@ -200,5 +202,17 @@ class AdminWorkspaceController extends Controller
         $workspace->update($validated);
 
         return back()->with('success', "Max shops updated for {$workspace->name}.");
+    }
+
+    public function updateContact(Request $request, Workspace $workspace)
+    {
+        $validated = $request->validate([
+            'messenger_link' => ['nullable', 'url', 'max:255'],
+            'last_interaction_at' => ['nullable', 'date', 'before_or_equal:now'],
+        ]);
+
+        $workspace->update($validated);
+
+        return back()->with('success', "Contact details updated for {$workspace->name}.");
     }
 }

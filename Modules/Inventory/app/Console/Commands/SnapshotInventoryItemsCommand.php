@@ -9,13 +9,15 @@ use Modules\Inventory\Support\InventoryItemSnapshotter;
 use Modules\Inventory\Support\SnapshotReadiness;
 
 /**
- * Freeze every inventory item — stored columns, computed metrics and the
- * report's group figures — against a date.
+ * Freeze every inventory item of every Gencys-partner workspace — stored columns,
+ * computed metrics and the report's group figures — against a date.
  *
- * This is what the items list reads, so these runs are the page rather than a
- * history sidecar; see routes/console.php for the schedule. Re-running today is
- * safe: rows are upserted on (inventory_item_id, snapshot_date), so a re-run
- * overwrites rather than duplicates.
+ * This is what a partner's items list reads, so these runs are the page rather
+ * than a history sidecar; see routes/console.php for the schedule. Non-partners
+ * are skipped outright: their list computes live, so a frozen row would be a copy
+ * nobody reads. Re-running today is safe: rows are upserted on
+ * (inventory_item_id, snapshot_date), so a re-run overwrites rather than
+ * duplicates.
  *
  * There is no backfill. Every figure is computed from the present — the current
  * ledger, the purchase orders as they stand, the latest order feed — so a past
@@ -58,9 +60,22 @@ class SnapshotInventoryItemsCommand extends Command
             return self::FAILURE;
         }
 
+        // Gencys partners only. Their figures arrive by batch sync, so a frozen
+        // day is as current as the data gets. Every other workspace keeps its
+        // inventory in Artemis directly and its list computes live — freezing
+        // those rows wrote a copy nothing read, and one that a receipt saved a
+        // minute later already contradicted. --workspace does not override this;
+        // the flag is what makes a snapshot mean anything.
         $workspaces = Workspace::query()
+            ->where('is_gencys_partner', true)
             ->when($this->option('workspace'), fn ($q, $id) => $q->whereKey($id))
             ->get();
+
+        if ($workspaces->isEmpty()) {
+            $this->info('No Gencys-partner workspaces to snapshot.');
+
+            return self::SUCCESS;
+        }
 
         $written = 0;
         $synced = 0;

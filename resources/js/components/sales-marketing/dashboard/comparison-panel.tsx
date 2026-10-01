@@ -1,8 +1,10 @@
 import RefreshButton from '@/components/inventory/dashboard/refresh-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Workspace } from '@/types/models/Workspace';
+import { usePage } from '@inertiajs/react';
 import moment from 'moment';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { formatKpi, type KpiFormat } from './kpi-card';
 
 /**
@@ -59,6 +61,47 @@ export const METRICS: Record<MetricKey, MetricSpec> = {
     },
 };
 
+/** Every metric, in the order the switcher lays them out. */
+const ALL_METRICS = Object.keys(METRICS) as MetricKey[];
+
+/** The metrics derived from ad spend, hidden together or not at all. */
+const SPEND_METRICS: MetricKey[] = ['ad_spend', 'roas'];
+
+/**
+ * Whether the per-product panels state ad spend. A Gencys partner's spend is not
+ * attributed per product on our side, so those panels drop the spend column and
+ * the two metrics derived from it rather than stating sums they only half know.
+ * The team panels keep all four — spend there is per advertiser, which we do
+ * have.
+ *
+ * Read from the shared workspace rather than passed down, so the chart and the
+ * table under it can't disagree about what this workspace shows.
+ */
+export function useProductSpendShown(): boolean {
+    const { currentWorkspace } = usePage().props as unknown as {
+        currentWorkspace?: Workspace;
+    };
+
+    return !currentWorkspace?.is_gencys_partner;
+}
+
+/**
+ * Which metrics the product comparison may offer here — the switcher and the
+ * remembered selection both read it, so neither can name a metric the other
+ * doesn't have.
+ */
+export function useProductComparisonMetrics(): MetricKey[] {
+    const spendShown = useProductSpendShown();
+
+    return useMemo(
+        () =>
+            spendShown
+                ? ALL_METRICS
+                : ALL_METRICS.filter((key) => !SPEND_METRICS.includes(key)),
+        [spendShown],
+    );
+}
+
 /**
  * Raw sums added together — how a set of rows folded into one bar ("Others")
  * gets its figures. Summing first and deriving after is the only order that
@@ -93,17 +136,20 @@ export const changeFrom = (value: number, was: number | null): number | null =>
  */
 export function useComparisonMetric(
     storageKey: string,
+    available: MetricKey[] = ALL_METRICS,
 ): [MetricKey, (key: MetricKey) => void] {
     const [metric, setMetric] = useState<MetricKey>(() => {
         try {
             const saved = localStorage.getItem(storageKey);
-            // Guarded: a stored value from an older build might name a metric
-            // that no longer exists.
-            if (saved && saved in METRICS) return saved as MetricKey;
+            // Guarded: a stored value can name a metric that no longer exists,
+            // or one this workspace is no longer offered.
+            if (saved && available.includes(saved as MetricKey)) {
+                return saved as MetricKey;
+            }
         } catch {
             // Unreadable storage — fall through to the default.
         }
-        return 'sales';
+        return available[0] ?? 'sales';
     });
 
     const choose = (key: MetricKey) => {
@@ -144,12 +190,19 @@ const DEFAULT_FILL = { light: '#059669', dark: '#059669' };
  * The tick on each bar is that row's previous-period figure, and the dashed rule
  * is the average across everything shown. The caller owns the fetching, the
  * ranking and any folding into an "Others" bar; this owns how the result reads.
+ *
+ * A caller that hands over more rows than fit comfortably passes `visibleRows`
+ * and the rest go behind a scroll rather than behind a "top N" cap — the panel
+ * still plots, averages and scales across all of them, so what you scroll to is
+ * on the same footing as what you land on.
  */
 export default function ComparisonPanel({
     title,
     metric,
+    metrics = ALL_METRICS,
     onMetric,
     bars,
+    visibleRows,
     previous,
     loading,
     error,
@@ -161,8 +214,15 @@ export default function ComparisonPanel({
 }: {
     title: string;
     metric: MetricKey;
+    /** The metrics the switcher offers — see `useComparisonMetrics`. */
+    metrics?: MetricKey[];
     onMetric: (key: MetricKey) => void;
     bars: ComparisonBar[];
+    /**
+     * How many bars stand at rest before the chart scrolls. Left off, every bar
+     * handed over is laid out and the panel never scrolls.
+     */
+    visibleRows?: number;
     /** `[start, end]` of the window the ticks compare against. */
     previous: string[];
     loading: boolean;
@@ -184,6 +244,15 @@ export default function ComparisonPanel({
         ? bars.reduce((sum, b) => sum + b.value, 0) / bars.length
         : 0;
 
+    // Only cap once there is something to scroll to, so a short chart keeps its
+    // natural height and no scrollbar steals width from the bars.
+    const scrolls = visibleRows !== undefined && bars.length > visibleRows;
+    // Exactly `visibleRows` rows and the gaps between them — the scrollbar is
+    // then the sign that the chart carries on.
+    const scrollHeight = scrolls
+        ? `${visibleRows * ROW_H + (visibleRows - 1) * ROW_GAP_Y}rem`
+        : undefined;
+
     // A refetch holds the previous render at reduced opacity rather than
     // flashing back to bones.
     const refetching = loading && !firstLoad;
@@ -199,7 +268,7 @@ export default function ComparisonPanel({
                     {/* Controls above the chart they scope. Switching metric is
                         a client-side re-read — no refetch, no skeleton. */}
                     <div className="flex items-center gap-0.5 rounded-lg border border-black/6 bg-white p-0.5 dark:border-white/8 dark:bg-zinc-900">
-                        {(Object.keys(METRICS) as MetricKey[]).map((key) => (
+                        {metrics.map((key) => (
                             <button
                                 key={key}
                                 type="button"
@@ -257,45 +326,59 @@ export default function ComparisonPanel({
                         {/* The rows, with the average rule laid over them as a
                             single mark. The overlay is a sibling row using the
                             same column widths, so it tracks the bars without
-                            competing with them for space. */}
-                        <div className="relative space-y-2.5">
-                            {bars.map((bar) => (
-                                <Row
-                                    key={bar.key}
-                                    bar={bar}
-                                    max={max}
-                                    as={spec.as}
-                                    reverse={spec.reverse}
-                                />
-                            ))}
-
-                            {average > 0 && (
-                                <div
-                                    className={cn(
-                                        'pointer-events-none absolute inset-0 flex items-stretch',
-                                        ROW_GAP,
-                                    )}
-                                    aria-hidden
-                                >
-                                    <div className={NAME_COL} />
-                                    <div className="relative flex-1">
-                                        <span
-                                            className="absolute -top-1 -bottom-1 border-l-2 border-dashed border-gray-500 dark:border-gray-300"
-                                            style={{
-                                                left: `${pct(average, max)}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <div className={VALUE_COL} />
-                                </div>
+                            competing with them for space — which is also why it
+                            lives inside the scroll container rather than over
+                            it: same width, same offset, whatever is scrolled. */}
+                        <div
+                            className={cn(
+                                scrolls && 'custom-scrollbar overflow-y-auto',
                             )}
+                            style={{ maxHeight: scrollHeight }}
+                        >
+                            <div className="relative space-y-2.5">
+                                {bars.map((bar) => (
+                                    <Row
+                                        key={bar.key}
+                                        bar={bar}
+                                        max={max}
+                                        as={spec.as}
+                                        reverse={spec.reverse}
+                                    />
+                                ))}
+
+                                {average > 0 && (
+                                    <div
+                                        className={cn(
+                                            'pointer-events-none absolute inset-0 flex items-stretch',
+                                            ROW_GAP,
+                                        )}
+                                        aria-hidden
+                                    >
+                                        <div className={NAME_COL} />
+                                        <div className="relative flex-1">
+                                            <span
+                                                className="absolute -top-1 -bottom-1 border-l-2 border-dashed border-gray-500 dark:border-gray-300"
+                                                style={{
+                                                    left: `${pct(average, max)}%`,
+                                                }}
+                                            />
+                                        </div>
+                                        <div className={VALUE_COL} />
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* The rule's label, on the same column geometry so it
-                            sits directly under the line it names. */}
+                            sits directly under the line it names — including the
+                            width the scrollbar takes off the rows above it. */}
                         {average > 0 && (
                             <div
-                                className={cn('mt-2 flex items-start', ROW_GAP)}
+                                className={cn(
+                                    'mt-2 flex items-start',
+                                    ROW_GAP,
+                                    scrolls && 'pr-1',
+                                )}
                             >
                                 <div className={NAME_COL} />
                                 <div className="relative h-4 flex-1">
@@ -342,6 +425,14 @@ const NAME_COL = 'w-[5.5rem] shrink-0 sm:w-52';
 const VALUE_COL = 'w-32 shrink-0 sm:w-44';
 const ROW_GAP = 'gap-3 sm:gap-4';
 
+/**
+ * A row's height and the gap under it, in rem — the bar's `h-6` and the rows'
+ * `space-y-2.5` stated as numbers so the scroll cap can be worked out in rows
+ * rather than guessed in pixels. Changing either class means changing these.
+ */
+const ROW_H = 1.5;
+const ROW_GAP_Y = 0.625;
+
 /** One row: name, bar, value. */
 function Row({
     bar,
@@ -361,7 +452,7 @@ function Row({
     const fill = bar.fill ?? DEFAULT_FILL;
 
     return (
-        <div className={cn('flex items-center', ROW_GAP)}>
+        <div className={cn('flex h-6 items-center', ROW_GAP)}>
             <p
                 className={cn(
                     'truncate font-mono text-[11px] text-gray-600 uppercase dark:text-gray-300',

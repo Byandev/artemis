@@ -3,12 +3,12 @@
 use App\Enums\Permission as PermissionEnum;
 use App\Models\Page;
 use App\Models\PageDailyRecord;
-use App\Models\Product;
 use App\Models\Role;
 use App\Models\Shop;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
+use Modules\Products\Models\Product;
 
 /**
  * Product breakdown on the S&M dashboard — the table beneath the comparison

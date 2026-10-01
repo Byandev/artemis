@@ -1,11 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
 import { ImportTransactionsDialog } from '@/components/finance/import-transactions-dialog';
-import {
-    SUB_CATEGORIES,
-    SUB_CATEGORY_LABEL,
-    SubCategory,
-} from '@/components/finance/sub-category';
+import { SUB_CATEGORY_LABEL } from '@/components/finance/sub-category';
 import { FinanceTransaction } from '@/components/finance/transaction-form';
 import {
     buildTransactionTypeOptions,
@@ -30,7 +26,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
@@ -168,12 +164,16 @@ export default function TransactionsIndex({
     };
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkType, setBulkType] = useState<string>('');
-    const [bulkSubCategory, setBulkSubCategory] = useState<SubCategory | ''>(
-        '',
-    );
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/transactions`;
+    // The list URL as it stands (filters, sort, page) so a save on the edit
+    // screen lands back on the same view instead of an unfiltered first page.
+    const currentUrl = usePage().url;
+    const returnTo = useMemo(
+        () => encodeURIComponent(currentUrl),
+        [currentUrl],
+    );
     const canCreateTransactions = usePermission(
         PERMISSIONS.CreateFinanceTransactions,
     );
@@ -229,27 +229,6 @@ export default function TransactionsIndex({
                 onSuccess: () => {
                     setRowSelection({});
                     setBulkType('');
-                },
-            },
-        );
-    };
-
-    const applyBulkSubCategory = () => {
-        if (!canEditTransactions || !selectedCount) return;
-        setBulkProcessing(true);
-        router.put(
-            `${baseUrl}/bulk-update-sub-category`,
-            {
-                ids: selectedIds.map(Number),
-                sub_category: bulkSubCategory === '' ? null : bulkSubCategory,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onFinish: () => setBulkProcessing(false),
-                onSuccess: () => {
-                    setRowSelection({});
-                    setBulkSubCategory('');
                 },
             },
         );
@@ -677,7 +656,7 @@ export default function TransactionsIndex({
                                       {canEditTransactions && (
                                           <DropdownMenuItem asChild>
                                               <Link
-                                                  href={`${baseUrl}/${row.original.id}/edit`}
+                                                  href={`${baseUrl}/${row.original.id}/edit?return_to=${returnTo}`}
                                               >
                                                   <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
                                                   Edit
@@ -843,33 +822,6 @@ export default function TransactionsIndex({
                         >
                             {bulkProcessing ? 'Applying…' : 'Apply'}
                         </button>
-                        <span className="h-4 w-px bg-emerald-200 dark:bg-emerald-500/30" />
-                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                            Sub category:
-                        </span>
-                        <select
-                            value={bulkSubCategory}
-                            onChange={(e) =>
-                                setBulkSubCategory(
-                                    e.target.value as SubCategory | '',
-                                )
-                            }
-                            className="h-8 rounded-lg border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
-                        >
-                            <option value="">— clear —</option>
-                            {SUB_CATEGORIES.map((s) => (
-                                <option key={s.value} value={s.value}>
-                                    {s.label}
-                                </option>
-                            ))}
-                        </select>
-                        <button
-                            onClick={applyBulkSubCategory}
-                            disabled={bulkProcessing}
-                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3 font-mono! text-[11px]! font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                            {bulkProcessing ? 'Applying…' : 'Apply'}
-                        </button>
                         <button
                             onClick={() => setRowSelection({})}
                             className="ml-auto flex h-8 items-center gap-1 rounded-lg border border-black/8 bg-white px-2.5 font-mono! text-[11px]! text-gray-600 hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
@@ -914,6 +866,11 @@ export default function TransactionsIndex({
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
+                                    // Paging and sorting only move the ledger.
+                                    // Without this the form's option lists
+                                    // (accounts, users, products, fund
+                                    // requests) are rebuilt on every click.
+                                    only: ['transactions', 'totals'],
                                 },
                             );
                         }}

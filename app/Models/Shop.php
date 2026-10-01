@@ -22,6 +22,8 @@ class Shop extends Model
 
     protected $casts = [
         'orders_last_synced_at' => 'datetime',
+        'rts_snapshot' => 'float',
+        'rts_snapshot_updated_at' => 'datetime',
     ];
 
     public function workspace(): BelongsTo

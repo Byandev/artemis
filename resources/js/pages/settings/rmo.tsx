@@ -10,7 +10,14 @@ import { type BreadcrumbItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Transition } from '@headlessui/react';
 import { Head, useForm } from '@inertiajs/react';
-import { BellRing, CalendarClock, Clock, ListChecks, Tags } from 'lucide-react';
+import {
+    BellRing,
+    CalendarClock,
+    Clock,
+    ListChecks,
+    Sheet,
+    Tags,
+} from 'lucide-react';
 import { type FormEventHandler } from 'react';
 
 // Whole-hour options (00:00 – 23:00); the scheduler checks hourly, so a send
@@ -26,6 +33,8 @@ interface Props {
         enable_edit_previous_day: boolean;
         enable_bulk_status_update: boolean;
         enable_auto_tag_status: boolean;
+        enable_external_team_sync: boolean;
+        external_team_sheet_url: string | null;
         discord_daily_stats_enabled: boolean;
         discord_webhook_url: string | null;
         discord_send_at: string;
@@ -50,6 +59,8 @@ export default function RmoSettings({
             enable_edit_previous_day: settings.enable_edit_previous_day,
             enable_bulk_status_update: settings.enable_bulk_status_update,
             enable_auto_tag_status: settings.enable_auto_tag_status,
+            enable_external_team_sync: settings.enable_external_team_sync,
+            external_team_sheet_url: settings.external_team_sheet_url ?? '',
             discord_daily_stats_enabled: settings.discord_daily_stats_enabled,
             discord_webhook_url: settings.discord_webhook_url ?? '',
             discord_send_at: settings.discord_send_at,
@@ -186,6 +197,81 @@ export default function RmoSettings({
                                         waiting for the nightly run.
                                     </p>
                                 )}
+                            </div>
+
+                            <div className="rounded-[12px] border border-black/8 bg-white p-4 dark:border-white/8 dark:bg-zinc-900">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-stone-100 dark:bg-zinc-800">
+                                            <Sheet className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[13px] font-medium text-gray-900 dark:text-gray-100">
+                                                External team sync
+                                            </p>
+                                            <p className="mt-0.5 text-[12px] text-gray-500 dark:text-gray-400">
+                                                Every 10 minutes, read the
+                                                external RMO team&apos;s Google
+                                                Sheet for today and auto-tag the
+                                                orders it lists:{' '}
+                                                <strong>Confirmed</strong> to{' '}
+                                                <strong>RIDER OTW</strong>,{' '}
+                                                <strong>Delivered</strong> to{' '}
+                                                <strong>DELIVERED</strong> and{' '}
+                                                <strong>Returned</strong> to{' '}
+                                                <strong>RETURNING</strong>. Also
+                                                adds an &quot;External
+                                                Team&quot; filter to the RMO
+                                                management page.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        checked={data.enable_external_team_sync}
+                                        onCheckedChange={(v) =>
+                                            setData(
+                                                'enable_external_team_sync',
+                                                v,
+                                            )
+                                        }
+                                        aria-label="Enable external team sync"
+                                    />
+                                </div>
+
+                                <div className="mt-3 grid gap-1.5 border-t border-black/6 pt-3 dark:border-white/6">
+                                    <Label
+                                        htmlFor="external_team_sheet_url"
+                                        className="text-[12px] text-gray-500 dark:text-gray-400"
+                                    >
+                                        Google Sheet link
+                                    </Label>
+                                    <Input
+                                        id="external_team_sheet_url"
+                                        type="url"
+                                        value={data.external_team_sheet_url}
+                                        onChange={(e) =>
+                                            setData(
+                                                'external_team_sheet_url',
+                                                e.target.value,
+                                            )
+                                        }
+                                        disabled={
+                                            !data.enable_external_team_sync
+                                        }
+                                        placeholder="https://docs.google.com/spreadsheets/d/…"
+                                        autoComplete="off"
+                                        className="h-8"
+                                    />
+                                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                        One tab per day, named like
+                                        &quot;OCTOBER 1,2026&quot;, with
+                                        TRACKING NUMBER and STATUS columns.
+                                        Share it with the n8n Google account.
+                                    </p>
+                                    <InputError
+                                        message={errors.external_team_sheet_url}
+                                    />
+                                </div>
                             </div>
                         </div>
 

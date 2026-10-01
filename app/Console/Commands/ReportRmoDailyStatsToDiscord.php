@@ -124,9 +124,9 @@ class ReportRmoDailyStatsToDiscord extends Command
         ]);
 
         $calls = $this->rows([
-            'Call logs synced' => number_format($stats['total_call_logs']),
+            'RMO calls' => number_format($stats['total_call_logs']),
             'Total duration' => RmoDailyStats::formatDuration($stats['total_call_duration']),
-            'Connected (5s+)' => number_format($stats['connected_call_logs']),
+            'Connected (3s+)' => number_format($stats['connected_call_logs']),
             'Avg duration' => $avg,
             'Hit rate' => $hitRate,
         ]);

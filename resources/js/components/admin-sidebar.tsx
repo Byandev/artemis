@@ -13,6 +13,7 @@ import {
     CreditCard,
     FileText,
     Layers,
+    LayoutDashboard,
     ScrollText,
     Smartphone,
     TicketCheck,
@@ -22,6 +23,11 @@ import AppLogo from './app-logo';
 
 export function AdminSidebar() {
     const adminNavItems: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: '/admin/dashboard',
+            icon: LayoutDashboard,
+        },
         {
             title: 'Workspaces',
             href: '/admin/workspaces',
@@ -71,7 +77,7 @@ export function AdminSidebar() {
                     <SidebarMenuItem>
                         <div className="flex flex-col p-2">
                             <SidebarMenuButton size="lg" asChild>
-                                <Link href="/admin/workspaces">
+                                <Link href="/admin/dashboard">
                                     <AppLogo />
                                 </Link>
                             </SidebarMenuButton>

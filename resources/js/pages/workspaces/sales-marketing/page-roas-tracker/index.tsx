@@ -1,3 +1,8 @@
+import {
+    ColumnOption,
+    ColumnsDropdown,
+    useColumnVisibility,
+} from '@/components/ui/columns-dropdown';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
@@ -5,7 +10,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import flatpickr from 'flatpickr';
 import moment from 'moment';
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import PageRoasFilters, {
     FilterOption,
     PageRoasFilterValue,
@@ -14,23 +19,64 @@ import DateOption = flatpickr.Options.DateOption;
 
 interface Metrics {
     orders: number;
+    /** Units on the day's orders — a count, like orders. */
+    item_quantity: number;
+    /** What the day's goods cost. Null when none of its lines were costed. */
+    order_cogs: number | null;
     sales: number;
     ad_spent: number;
+    /** Planned daily spend. Null when the page has no budget on record. */
+    ad_spend_budget: number | null;
+    /** Spend minus budget: positive is overspend, negative is underspend. */
+    budget_variance: number | null;
+    /** Spend as a percentage of budget — 100 is exactly on plan. */
+    budget_pace: number | null;
+    ad_sales: number;
+    ad_purchases: number;
+    delivered_amount: number;
+    returning_amount: number;
     roas: number | null;
+    ad_roas: number | null;
+    rts_rate: number | null;
+    ad_cpp: number | null;
+    cpp: number | null;
+
+    /* The estimated margin and the costs it takes off. Amounts, so they sum
+       across pages and divide on the Average row like any other. */
+    /** The RTS the estimate discounted this cell's revenue by. */
+    est_rts: number | null;
+    est_delivered_amount: number;
+    est_cod_fee: number;
+    est_cod_fee_vat: number;
+    est_cogs: number;
+    est_shipping_fee: number;
+    est_gross_profit: number;
+    est_opex_share: number;
+    est_net_profit: number;
+    /** 5% of what the row nets, sign and all — a losing row owes a cut back. */
+    est_commission: number;
 }
+
+type MetricKey = keyof Metrics;
 
 interface PageSeries {
     page_id: number | string;
     name: string;
+    /** The RTS the estimate applied across the range, sales-weighted. */
+    assumed_rts: number;
     days: Record<string, Metrics>;
     total: Metrics;
     average: Metrics;
 }
 
+/** The all-pages roll-up: same shape as a page series, minus the identity. */
+type OverallSeries = Pick<PageSeries, 'days' | 'total' | 'average'>;
+
 interface Props {
     workspace: Workspace;
     dates: string[];
     pages: PageSeries[];
+    overall: OverallSeries | null;
     filterOptions: {
         pages: FilterOption[];
         shops: FilterOption[];
@@ -45,35 +91,384 @@ interface Props {
     };
 }
 
-const int = (n: number) => n.toLocaleString();
-const dec = (n: number) =>
+/* ── Formatting ──────────────────────────────────────────────────────────── */
+
+const EMPTY = '—';
+
+/**
+ * Amounts show whole units. At a page-per-day grain the centavos are noise —
+ * repeated across ten columns and a month of rows they cost far more legibility
+ * than they carry information — so the exact figure moves to the cell's title.
+ */
+const whole = (n: number) => Math.round(n).toLocaleString();
+const exact = (n: number) =>
     n.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
-const roasText = (n: number | null) => (n && n > 0 ? n.toFixed(2) : '0');
+
+const PESO = '\u20b1';
+
+const format: Record<string, (n: number | null) => string> = {
+    int: (n) => (n === null ? EMPTY : n.toLocaleString()),
+    amount: (n) => (n === null ? EMPTY : whole(n)),
+    peso: (n) => (n === null ? EMPTY : PESO + whole(n)),
+    // A gap against plan reads as a direction first: the sign says over or under
+    // before the eye gets to the digits.
+    signed: (n) =>
+        n === null
+            ? EMPTY
+            : (n > 0 ? '+' : n < 0 ? '\u2212' : '') + PESO + whole(Math.abs(n)),
+    ratio: (n) => (n === null ? EMPTY : n.toFixed(2)),
+    percent: (n) => (n === null ? EMPTY : `${n.toFixed(1)}%`),
+};
+
+/* ── Tone ────────────────────────────────────────────────────────────────── */
+
+type Tone = 'good' | 'warn' | 'bad' | 'muted';
 
 /**
- * Colour ROAS so winners and losers read at a glance. 3.00 is the bar: at or
- * above it is green, between 2 and 3 is short of it, and below 2 is the problem
- * — the red deepens as it gets worse so a bad day stands out across a room.
- *
- * The deep band pairs white text with the dark fill; red-600 on dark text would
- * not clear contrast.
+ * Tone is carried by the digits alone — no cell fills. With three toned columns
+ * repeated across every page group, a wash on each one turned the grid into a
+ * quilt and buried the numbers it was meant to rank.
  */
-const roasCell = (n: number | null) =>
-    n === null || n === 0
-        ? 'text-gray-400'
-        : n >= 3
-          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
-          : n >= 2
-            ? 'bg-red-200 text-red-900 dark:bg-red-400/25 dark:text-red-100'
-            : 'bg-red-600 text-white dark:bg-red-600 dark:text-white';
+const TONE: Record<Tone, string> = {
+    good: 'text-emerald-600 dark:text-emerald-400',
+    warn: 'text-amber-600 dark:text-amber-400',
+    bad: 'text-rose-600 dark:text-rose-400',
+    muted: 'text-gray-300 dark:text-gray-600',
+};
+
+/** 3.00 is the bar: at or above it is a winner, 2–3 is short of it, under 2 is the problem. */
+const roasTone = (n: number | null): Tone =>
+    n === null || n === 0 ? 'muted' : n >= 3 ? 'good' : n >= 2 ? 'warn' : 'bad';
+
+/** RTS is inverted — less of it is better. Pitched at the 25–35% band COD runs at. */
+const rtsTone = (n: number | null): Tone =>
+    n === null ? 'muted' : n <= 25 ? 'good' : n <= 35 ? 'warn' : 'bad';
+
+/**
+ * Budget pace, as a percentage of plan. Off-plan in either direction is what
+ * matters: a page 40% under budget has left the plan as far behind as one 40%
+ * over it, and both want explaining. Within 10% is on plan, within 25% drifting.
+ */
+const paceTone = (n: number | null): Tone =>
+    n === null
+        ? 'muted'
+        : Math.abs(n - 100) <= 10
+          ? 'good'
+          : Math.abs(n - 100) <= 25
+            ? 'warn'
+            : 'bad';
+
+/**
+ * The variance says the same thing in pesos, so it takes the same tone — but
+ * only the pace knows how far off the plan ₱2,000 actually is, so it reads that
+ * off the row rather than off its own figure.
+ */
+const varianceTone = (_: number | null, m: Metrics): Tone =>
+    paceTone(m?.budget_pace ?? null);
+
+/**
+ * An estimated profit, gross or net, judged against the revenue it came out of
+ * rather than on its own: ₱500 is a good day on ₱3,000 of sales and a bad one on
+ * ₱50,000. A loss is a loss at any size.
+ */
+const marginTone = (n: number | null, m: Metrics): Tone => {
+    const sales = m?.sales ?? 0;
+
+    if (n === null || sales <= 0) return 'muted';
+    if (n < 0) return 'bad';
+
+    const margin = (n / sales) * 100;
+
+    return margin >= 20 ? 'good' : margin >= 10 ? 'warn' : 'bad';
+};
+
+/* ── Columns ─────────────────────────────────────────────────────────────── */
+
+interface MetricColumn extends ColumnOption {
+    id: MetricKey;
+    /** Header text — shorter than the label the dropdown uses. */
+    head: string;
+    format: keyof typeof format;
+    /** Gets the whole row too, for a figure judged against a sibling metric. */
+    tone?: (n: number | null, m: Metrics) => Tone;
+}
+
+/**
+ * The core four the tracker has always shown stay on, joined by the budget and
+ * the gap against it — spend is only readable next to what it was meant to be.
+ * Everything else the daily builder gained is opt-in, so the table does not get
+ * wider for people who never asked for it.
+ *
+ * Declaration order is column order, so the budget pair sits between Ad Spent
+ * and ROAS rather than trailing the group it belongs to.
+ */
+const COLUMNS: MetricColumn[] = [
+    {
+        id: 'orders',
+        label: 'Orders',
+        head: 'Orders',
+        group: 'Core',
+        format: 'int',
+    },
+    {
+        id: 'item_quantity',
+        label: 'Item Quantities',
+        head: 'Units',
+        group: 'Core',
+        format: 'int',
+    },
+    {
+        id: 'sales',
+        label: 'Sales',
+        head: 'Sales',
+        group: 'Core',
+        format: 'peso',
+    },
+    {
+        id: 'order_cogs',
+        label: 'Order COGS',
+        head: 'COGS',
+        group: 'Core',
+        format: 'peso',
+    },
+    {
+        id: 'ad_spent',
+        label: 'Ad Spent',
+        head: 'Ad Spent',
+        group: 'Core',
+        format: 'peso',
+    },
+    {
+        id: 'ad_spend_budget',
+        label: 'Ad Spend Budget',
+        head: 'Budget',
+        group: 'Budget',
+        format: 'peso',
+    },
+    {
+        id: 'budget_variance',
+        label: 'Variance (spend \u2212 budget)',
+        head: 'Var',
+        group: 'Budget',
+        format: 'signed',
+        tone: varianceTone,
+    },
+    {
+        id: 'budget_pace',
+        label: 'Pace (spend \u00f7 budget)',
+        head: 'Pace',
+        group: 'Budget',
+        format: 'percent',
+        tone: paceTone,
+        defaultVisible: false,
+    },
+    {
+        id: 'roas',
+        label: 'ROAS',
+        head: 'ROAS',
+        group: 'Core',
+        format: 'ratio',
+        tone: roasTone,
+    },
+
+    {
+        id: 'ad_sales',
+        label: 'Ad Sales',
+        head: 'Ad Sales',
+        group: 'Meta Ads',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'ad_roas',
+        label: 'Ad ROAS',
+        head: 'Ad ROAS',
+        group: 'Meta Ads',
+        format: 'ratio',
+        tone: roasTone,
+        defaultVisible: false,
+    },
+    {
+        id: 'ad_purchases',
+        label: 'Ad Purchases',
+        head: 'Purchases',
+        group: 'Meta Ads',
+        format: 'int',
+        defaultVisible: false,
+    },
+    {
+        id: 'ad_cpp',
+        label: 'Ad CPP (spend / Meta purchases)',
+        head: 'Ad CPP',
+        group: 'Meta Ads',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'cpp',
+        label: 'CPP (spend / orders)',
+        head: 'CPP',
+        group: 'Meta Ads',
+        format: 'peso',
+        defaultVisible: false,
+    },
+
+    {
+        id: 'est_rts',
+        label: 'Est. RTS applied (trailing 30d)',
+        head: 'Est. RTS',
+        group: 'Estimated margin',
+        format: 'percent',
+        tone: rtsTone,
+        defaultVisible: false,
+    },
+    {
+        id: 'est_delivered_amount',
+        label: 'Est. Delivered (sales less RTS)',
+        head: 'Est. Del.',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cod_fee',
+        label: 'Est. COD Fee (2.75%)',
+        head: 'COD',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cod_fee_vat',
+        label: 'Est. COD Fee VAT (12%)',
+        head: 'COD VAT',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cogs',
+        label: 'Est. COGS (less RTS)',
+        head: 'Est. COGS',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_shipping_fee',
+        label: 'Est. Shipping (\u20b167 an order)',
+        head: 'Ship',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_gross_profit',
+        label: 'Est. Gross Profit',
+        head: 'Est. GP',
+        group: 'Estimated margin',
+        format: 'signed',
+        tone: marginTone,
+    },
+    {
+        id: 'est_opex_share',
+        label: 'Est. Opex Share (\u20b138 a delivered order)',
+        head: 'Opex',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_net_profit',
+        label: 'Est. Net Profit (gross less opex)',
+        head: 'Est. NP',
+        group: 'Estimated margin',
+        format: 'signed',
+        tone: marginTone,
+    },
+    {
+        id: 'est_commission',
+        label: 'Est. Commission (5% of net)',
+        head: 'Comm.',
+        group: 'Estimated margin',
+        // Signed, because a losing row owes a negative cut rather than nothing —
+        // and toned off the net it tracks, whose sign it always shares.
+        format: 'signed',
+        tone: (_, m) => marginTone(m?.est_net_profit ?? null, m),
+        defaultVisible: false,
+    },
+
+    {
+        id: 'delivered_amount',
+        label: 'Delivered',
+        head: 'Delivered',
+        group: 'Delivery',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'returning_amount',
+        label: 'Returning',
+        head: 'Returning',
+        group: 'Delivery',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'rts_rate',
+        label: 'RTS Rate',
+        head: 'RTS',
+        group: 'Delivery',
+        format: 'percent',
+        tone: rtsTone,
+        defaultVisible: false,
+    },
+];
+
+/**
+ * The all-pages group toggles like a column but is not one — it is a whole extra
+ * page group, so it rides in the same menu while being filtered out of `shown`.
+ */
+const ROLLUP_ID = '__rollup';
+
+const COLUMN_OPTIONS: ColumnOption[] = [
+    ...COLUMNS,
+    { id: ROLLUP_ID, label: 'All-pages total', group: 'Summary' },
+];
+
+const COLUMNS_STORAGE_KEY = 'page-roas-tracker-cols';
+
+/** Everything one cell needs: the figure, its tone, and whether it is worth ink. */
+function readCell(m: Metrics, col: MetricColumn) {
+    const raw = (m?.[col.id] ?? null) as number | null;
+
+    return {
+        text: format[col.format](raw),
+        title:
+            raw === null
+                ? undefined
+                : col.format === 'peso' || col.format === 'signed'
+                  ? PESO + exact(raw)
+                  : col.format === 'amount'
+                    ? exact(raw)
+                    : undefined,
+        tone: col.tone?.(raw, m),
+        // A zero carries no signal in a grid this dense — keep it, but let the
+        // eye slide over it so the real figures are what stand out.
+        blank: raw === null || raw === 0,
+    };
+}
+
+/* ── Page ────────────────────────────────────────────────────────────────── */
 
 export default function PageRoasTrackerIndex({
     workspace,
     dates,
     pages,
+    overall,
     filterOptions,
     query,
 }: Props) {
@@ -85,6 +480,18 @@ export default function PageRoasTrackerIndex({
         shops: query.shops ?? [],
         users: query.users ?? [],
     });
+
+    const { visibility, setVisibility } = useColumnVisibility(
+        COLUMN_OPTIONS,
+        COLUMNS_STORAGE_KEY,
+    );
+
+    const shown = useMemo(
+        () => COLUMNS.filter((c) => visibility[c.id] !== false),
+        [visibility],
+    );
+
+    const rollUp = visibility[ROLLUP_ID] !== false && overall !== null;
 
     const visit = (next: PageRoasFilterValue, start: string, end: string) => {
         router.get(
@@ -99,24 +506,64 @@ export default function PageRoasTrackerIndex({
         visit(next, query.start, query.end);
     };
 
-    // Shared cell styling. The first column of each page group gets a heavier
-    // left border so the groups read as distinct blocks.
-    const cell =
-        'whitespace-nowrap px-3 py-2 border-b border-black/5 dark:border-white/5';
-    const groupStart = 'border-l-2 border-l-black/10 dark:border-l-white/10';
+    /* Cell rhythm. Every figure is right-aligned on the same rail, tabular and
+       slashed-zero, so a column of numbers lines up digit for digit. */
+    const cell = 'h-8 whitespace-nowrap px-2.5 text-right';
+    const rowLine = 'border-b border-black/4 dark:border-white/4';
+    const groupStart = 'border-l-2 border-l-black/10 dark:border-l-white/12';
+    // The roll-up reads as a summary rather than a twentieth page. Its header
+    // ground has to be opaque — a translucent sticky cell lets the rows scroll
+    // straight through it — so the tint is baked in rather than an alpha wash.
+    const rollUpCell = 'bg-brand-500/5 dark:bg-brand-500/8';
+    const rollUpHead = 'bg-brand-50 dark:bg-brand-950';
     const stickyLeft =
-        'sticky left-0 z-10 border-r border-black/10 dark:border-white/10';
+        'sticky left-0 border-r border-black/8 dark:border-white/8';
 
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Page ROAS Tracker`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {/* Page title on the left, filters + date range on the right. */}
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                    <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-800 dark:text-gray-100">
-                        Page ROAS Tracker
-                    </h1>
+                {/* Title on the left, columns + filters + date range on the right. */}
+                <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-900 dark:text-gray-50">
+                            Page ROAS Tracker
+                        </h1>
+                        <p className="mt-1 font-mono text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
+                            {moment(query.start).format('MMM D')} –{' '}
+                            {moment(query.end).format('MMM D, YYYY')}
+                            <span className="mx-2 text-gray-300 dark:text-gray-600">
+                                /
+                            </span>
+                            {dates.length}d
+                            <span className="mx-2 text-gray-300 dark:text-gray-600">
+                                /
+                            </span>
+                            {pages.length} page{pages.length === 1 ? '' : 's'}
+                        </p>
+                        {/* The estimate is only readable if its assumptions are
+                            stated. The RTS is per page — hover a page header for
+                            the one it used. */}
+                        <p className="mt-1 font-mono text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
+                            Est. margin: sales less each day&rsquo;s
+                            trailing-30d RTS, COD 2.75% + 12% VAT, COGS less
+                            RTS, {PESO}67 a parcel, less ad spend
+                            <span className="mx-2 text-gray-300 dark:text-gray-600">
+                                /
+                            </span>
+                            net: less {PESO}38 an order delivered
+                            <span className="mx-2 text-gray-300 dark:text-gray-600">
+                                /
+                            </span>
+                            commission: 5% of net
+                        </p>
+                    </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        <ColumnsDropdown
+                            options={COLUMN_OPTIONS}
+                            visibility={visibility}
+                            onChange={setVisibility}
+                        />
                         <PageRoasFilters
                             value={filters}
                             pageOptions={filterOptions.pages}
@@ -146,237 +593,308 @@ export default function PageRoasTrackerIndex({
                 </div>
 
                 {pages.length === 0 ? (
-                    <div className="mt-4 rounded-[14px] border border-black/6 bg-white py-16 text-center text-[13px] text-gray-400 dark:border-white/6 dark:bg-zinc-900">
-                        No page performance for this range yet.
+                    <div className="mt-4 rounded-[14px] border border-black/6 bg-white py-20 text-center dark:border-white/6 dark:bg-zinc-900">
+                        <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400">
+                            No page performance for this range yet.
+                        </p>
+                        <p className="mt-1 text-[12px] text-gray-400 dark:text-gray-500">
+                            Widen the date range, or clear a filter.
+                        </p>
+                    </div>
+                ) : shown.length === 0 ? (
+                    <div className="mt-4 rounded-[14px] border border-black/6 bg-white py-20 text-center dark:border-white/6 dark:bg-zinc-900">
+                        <p className="text-[13px] font-medium text-gray-500 dark:text-gray-400">
+                            Every column is hidden.
+                        </p>
+                        <p className="mt-1 text-[12px] text-gray-400 dark:text-gray-500">
+                            Pick at least one from the Columns menu.
+                        </p>
                     </div>
                 ) : (
-                    <div className="mt-4 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                        <table className="border-collapse text-[12px] tabular-nums">
-                            <thead>
-                                {/* Page names span their four metric columns. */}
-                                <tr>
-                                    <th
-                                        rowSpan={2}
-                                        className={cn(
-                                            cell,
-                                            stickyLeft,
-                                            'z-30 bg-gray-50 text-left text-[11px] font-semibold tracking-wide text-gray-500 uppercase dark:bg-zinc-800',
-                                        )}
-                                    >
-                                        Date
-                                    </th>
-                                    {pages.map((page) => (
+                    <div className="mt-4 overflow-hidden rounded-[14px] border border-black/8 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] dark:border-white/8 dark:bg-zinc-900 dark:shadow-none">
+                        <div className="max-h-[calc(100vh-16rem)] overflow-auto overscroll-contain">
+                            <table className="border-separate border-spacing-0 font-mono text-[11px] slashed-zero tabular-nums">
+                                <thead>
+                                    {/* Page names span their visible metric columns. */}
+                                    <tr>
                                         <th
-                                            key={page.page_id}
-                                            colSpan={4}
-                                            className={cn(
-                                                cell,
-                                                groupStart,
-                                                'max-w-[22rem] truncate bg-blue-600 text-left font-semibold text-white',
-                                            )}
-                                            title={page.name}
-                                        >
-                                            {page.name}
-                                        </th>
-                                    ))}
-                                </tr>
-                                <tr>
-                                    {pages.map((page) => (
-                                        <Fragment key={page.page_id}>
-                                            <th
-                                                className={cn(
-                                                    cell,
-                                                    groupStart,
-                                                    'bg-blue-500 text-center text-[11px] font-medium text-white',
-                                                )}
-                                            >
-                                                Orders
-                                            </th>
-                                            <th
-                                                className={cn(
-                                                    cell,
-                                                    'bg-blue-500 text-right text-[11px] font-medium text-white',
-                                                )}
-                                            >
-                                                Sales
-                                            </th>
-                                            <th
-                                                className={cn(
-                                                    cell,
-                                                    'bg-blue-500 text-right text-[11px] font-medium text-white',
-                                                )}
-                                            >
-                                                Ad Spent
-                                            </th>
-                                            <th
-                                                className={cn(
-                                                    cell,
-                                                    'bg-blue-500 text-right text-[11px] font-medium text-white',
-                                                )}
-                                            >
-                                                ROAS
-                                            </th>
-                                        </Fragment>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {dates.map((date) => (
-                                    <tr key={date}>
-                                        <td
+                                            rowSpan={2}
                                             className={cn(
                                                 cell,
                                                 stickyLeft,
-                                                'bg-white font-medium text-gray-700 dark:bg-zinc-900 dark:text-gray-300',
+                                                'sticky top-0 z-40 border-b border-black/10 bg-stone-100 text-left font-mono text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:border-white/10 dark:bg-zinc-800 dark:text-gray-400',
                                             )}
                                         >
-                                            {date}
-                                        </td>
-                                        {pages.map((page) => {
-                                            const m = page.days[date];
-                                            return (
-                                                <Fragment key={page.page_id}>
-                                                    <td
-                                                        className={cn(
-                                                            cell,
-                                                            groupStart,
-                                                            'text-center text-gray-700 dark:text-gray-300',
-                                                        )}
-                                                    >
-                                                        {int(m.orders)}
-                                                    </td>
-                                                    <td
-                                                        className={cn(
-                                                            cell,
-                                                            'text-right text-gray-700 dark:text-gray-300',
-                                                        )}
-                                                    >
-                                                        {dec(m.sales)}
-                                                    </td>
-                                                    <td
-                                                        className={cn(
-                                                            cell,
-                                                            'text-right text-gray-700 dark:text-gray-300',
-                                                        )}
-                                                    >
-                                                        {dec(m.ad_spent)}
-                                                    </td>
-                                                    <td
-                                                        className={cn(
-                                                            cell,
-                                                            'text-right font-semibold',
-                                                            roasCell(m.roas),
-                                                        )}
-                                                    >
-                                                        {roasText(m.roas)}
-                                                    </td>
-                                                </Fragment>
-                                            );
-                                        })}
+                                            Date
+                                        </th>
+                                        {pages.map((page) => (
+                                            <th
+                                                key={page.page_id}
+                                                colSpan={shown.length}
+                                                className={cn(
+                                                    cell,
+                                                    groupStart,
+                                                    'sticky top-0 z-30 max-w-[22rem] truncate bg-stone-100 text-left text-[12px] font-semibold text-gray-800 dark:bg-zinc-800 dark:text-gray-100',
+                                                )}
+                                                title={`${page.name} — margin estimated at ${page.assumed_rts.toFixed(1)}% RTS across this range (each day uses its own trailing 30 days)`}
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    <span className="h-3 w-[3px] shrink-0 rounded-full bg-brand-500" />
+                                                    <span className="truncate font-sans text-[12px]">
+                                                        {page.name}
+                                                    </span>
+                                                </span>
+                                            </th>
+                                        ))}
+                                        {rollUp && (
+                                            <th
+                                                colSpan={shown.length}
+                                                className={cn(
+                                                    cell,
+                                                    groupStart,
+                                                    rollUpHead,
+                                                    'sticky top-0 z-30 text-left text-[12px] font-semibold text-gray-900 dark:text-gray-50',
+                                                )}
+                                            >
+                                                <span className="font-sans text-[12px]">
+                                                    All Pages
+                                                </span>
+                                            </th>
+                                        )}
                                     </tr>
-                                ))}
+                                    <tr>
+                                        {pages.map((page) => (
+                                            <Fragment key={page.page_id}>
+                                                {shown.map((col, i) => (
+                                                    <th
+                                                        key={col.id}
+                                                        title={col.label}
+                                                        className={cn(
+                                                            cell,
+                                                            i === 0 &&
+                                                                groupStart,
+                                                            'sticky top-8 z-30 border-b border-black/10 bg-white font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:border-white/10 dark:bg-zinc-900 dark:text-gray-500',
+                                                        )}
+                                                    >
+                                                        {col.head}
+                                                    </th>
+                                                ))}
+                                            </Fragment>
+                                        ))}
+                                        {rollUp &&
+                                            shown.map((col, i) => (
+                                                <th
+                                                    key={col.id}
+                                                    title={col.label}
+                                                    className={cn(
+                                                        cell,
+                                                        i === 0 && groupStart,
+                                                        rollUpHead,
+                                                        'sticky top-8 z-30 border-b border-black/10 font-mono text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:border-white/10 dark:text-gray-400',
+                                                    )}
+                                                >
+                                                    {col.head}
+                                                </th>
+                                            ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {dates.map((date) => {
+                                        // Weekends band the grid, which doubles as
+                                        // the zebra a table this wide needs.
+                                        const weekend = [0, 6].includes(
+                                            moment(date).day(),
+                                        );
 
-                                {/* Total row. */}
-                                <tr>
-                                    <td
-                                        className={cn(
-                                            cell,
-                                            stickyLeft,
-                                            'bg-amber-200 font-semibold text-gray-900 dark:bg-amber-400/80',
-                                        )}
-                                    >
-                                        Total Amount
-                                    </td>
-                                    {pages.map((page) => (
-                                        <Fragment key={page.page_id}>
-                                            <td
-                                                className={cn(
-                                                    cell,
-                                                    groupStart,
-                                                    'bg-amber-200 text-center font-semibold text-gray-900 dark:bg-amber-400/80',
-                                                )}
+                                        return (
+                                            <tr
+                                                key={date}
+                                                className="group/row"
                                             >
-                                                {int(page.total.orders)}
-                                            </td>
-                                            <td
-                                                className={cn(
-                                                    cell,
-                                                    'bg-amber-200 text-right font-semibold text-gray-900 dark:bg-amber-400/80',
-                                                )}
-                                            >
-                                                {dec(page.total.sales)}
-                                            </td>
-                                            <td
-                                                className={cn(
-                                                    cell,
-                                                    'bg-amber-200 text-right font-semibold text-gray-900 dark:bg-amber-400/80',
-                                                )}
-                                            >
-                                                {dec(page.total.ad_spent)}
-                                            </td>
-                                            <td
-                                                className={cn(
-                                                    cell,
-                                                    'bg-amber-200 text-right font-semibold text-gray-900 dark:bg-amber-400/80',
-                                                )}
-                                            >
-                                                {roasText(page.total.roas)}
-                                            </td>
-                                        </Fragment>
-                                    ))}
-                                </tr>
+                                                <td
+                                                    className={cn(
+                                                        cell,
+                                                        rowLine,
+                                                        stickyLeft,
+                                                        'z-20 text-left group-hover/row:bg-brand-500/6',
+                                                        weekend
+                                                            ? 'bg-stone-50 text-gray-400 dark:bg-white/3 dark:text-gray-500'
+                                                            : 'bg-white text-gray-600 dark:bg-zinc-900 dark:text-gray-400',
+                                                    )}
+                                                    title={date}
+                                                >
+                                                    {moment(date).format(
+                                                        'ddd DD MMM',
+                                                    )}
+                                                </td>
+                                                {pages.map((page) => (
+                                                    <Fragment
+                                                        key={page.page_id}
+                                                    >
+                                                        {shown.map((col, i) => {
+                                                            const c = readCell(
+                                                                page.days[date],
+                                                                col,
+                                                            );
+                                                            return (
+                                                                <td
+                                                                    key={col.id}
+                                                                    title={
+                                                                        c.title
+                                                                    }
+                                                                    className={cn(
+                                                                        cell,
+                                                                        rowLine,
+                                                                        i ===
+                                                                            0 &&
+                                                                            groupStart,
+                                                                        'group-hover/row:bg-brand-500/6',
+                                                                        weekend &&
+                                                                            'bg-stone-50/70 dark:bg-white/2',
+                                                                        c.tone
+                                                                            ? TONE[
+                                                                                  c
+                                                                                      .tone
+                                                                              ]
+                                                                            : c.blank
+                                                                              ? 'text-gray-300 dark:text-gray-600'
+                                                                              : 'text-gray-700 dark:text-gray-200',
+                                                                    )}
+                                                                >
+                                                                    {c.text}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </Fragment>
+                                                ))}
+                                                {rollUp &&
+                                                    shown.map((col, i) => {
+                                                        const c = readCell(
+                                                            overall!.days[date],
+                                                            col,
+                                                        );
+                                                        return (
+                                                            <td
+                                                                key={col.id}
+                                                                title={c.title}
+                                                                className={cn(
+                                                                    cell,
+                                                                    rowLine,
+                                                                    i === 0 &&
+                                                                        groupStart,
+                                                                    rollUpCell,
+                                                                    'font-semibold group-hover/row:bg-brand-500/10',
+                                                                    c.tone
+                                                                        ? TONE[
+                                                                              c
+                                                                                  .tone
+                                                                          ]
+                                                                        : c.blank
+                                                                          ? 'text-gray-400 dark:text-gray-600'
+                                                                          : 'text-gray-900 dark:text-gray-100',
+                                                                )}
+                                                            >
+                                                                {c.text}
+                                                            </td>
+                                                        );
+                                                    })}
+                                            </tr>
+                                        );
+                                    })}
 
-                                {/* Average row. */}
-                                <tr>
-                                    <td
-                                        className={cn(
-                                            cell,
-                                            stickyLeft,
-                                            'bg-teal-200 font-semibold text-gray-900 dark:bg-teal-400/80',
-                                        )}
-                                    >
-                                        Average
-                                    </td>
-                                    {pages.map((page) => (
-                                        <Fragment key={page.page_id}>
+                                    {/* Summary rows — sums for the amounts, blended
+                                        for the ratios. Not pinned: a sticky bottom
+                                        row sits under the horizontal scrollbar,
+                                        which clipped the Average clean in half. */}
+                                    {(
+                                        [
+                                            ['Total', 'total'],
+                                            ['Average', 'average'],
+                                        ] as const
+                                    ).map(([label, key], rowIndex) => (
+                                        <tr key={key}>
                                             <td
                                                 className={cn(
                                                     cell,
-                                                    groupStart,
-                                                    'bg-teal-200 text-center font-semibold text-gray-900 dark:bg-teal-400/80',
+                                                    stickyLeft,
+                                                    'z-20 bg-stone-100 text-left font-mono text-[10px] font-semibold tracking-wider text-gray-600 uppercase dark:bg-zinc-800 dark:text-gray-300',
+                                                    rowIndex === 0 &&
+                                                        'border-t border-black/12 dark:border-white/12',
                                                 )}
                                             >
-                                                {int(page.average.orders)}
+                                                {label}
                                             </td>
-                                            <td
-                                                className={cn(
-                                                    cell,
-                                                    'bg-teal-200 text-right font-semibold text-gray-900 dark:bg-teal-400/80',
-                                                )}
-                                            >
-                                                {dec(page.average.sales)}
-                                            </td>
-                                            <td
-                                                className={cn(
-                                                    cell,
-                                                    'bg-teal-200 text-right font-semibold text-gray-900 dark:bg-teal-400/80',
-                                                )}
-                                            >
-                                                {dec(page.average.ad_spent)}
-                                            </td>
-                                            <td
-                                                className={cn(
-                                                    cell,
-                                                    'bg-teal-200 text-right font-semibold text-gray-900 dark:bg-teal-400/80',
-                                                )}
-                                            >
-                                                {roasText(page.average.roas)}
-                                            </td>
-                                        </Fragment>
+                                            {pages.map((page) => (
+                                                <Fragment key={page.page_id}>
+                                                    {shown.map((col, i) => {
+                                                        const c = readCell(
+                                                            page[key],
+                                                            col,
+                                                        );
+                                                        return (
+                                                            <td
+                                                                key={col.id}
+                                                                title={c.title}
+                                                                className={cn(
+                                                                    cell,
+                                                                    i === 0 &&
+                                                                        groupStart,
+                                                                    'bg-stone-100 font-semibold dark:bg-zinc-800',
+                                                                    rowIndex ===
+                                                                        0 &&
+                                                                        'border-t border-black/12 dark:border-white/12',
+                                                                    c.tone
+                                                                        ? TONE[
+                                                                              c
+                                                                                  .tone
+                                                                          ]
+                                                                        : c.blank
+                                                                          ? 'text-gray-400 dark:text-gray-600'
+                                                                          : 'text-gray-900 dark:text-gray-100',
+                                                                )}
+                                                            >
+                                                                {c.text}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </Fragment>
+                                            ))}
+                                            {rollUp &&
+                                                shown.map((col, i) => {
+                                                    const c = readCell(
+                                                        overall![key],
+                                                        col,
+                                                    );
+                                                    return (
+                                                        <td
+                                                            key={col.id}
+                                                            title={c.title}
+                                                            className={cn(
+                                                                cell,
+                                                                i === 0 &&
+                                                                    groupStart,
+                                                                'bg-brand-500/12 font-semibold dark:bg-brand-500/15',
+                                                                rowIndex ===
+                                                                    0 &&
+                                                                    'border-t border-black/12 dark:border-white/12',
+                                                                c.tone
+                                                                    ? TONE[
+                                                                          c.tone
+                                                                      ]
+                                                                    : c.blank
+                                                                      ? 'text-gray-400 dark:text-gray-600'
+                                                                      : 'text-gray-900 dark:text-gray-100',
+                                                            )}
+                                                        >
+                                                            {c.text}
+                                                        </td>
+                                                    );
+                                                })}
+                                        </tr>
                                     ))}
-                                </tr>
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>

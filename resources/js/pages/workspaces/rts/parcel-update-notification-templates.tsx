@@ -1,12 +1,13 @@
 import PageHeader from '@/components/common/PageHeader';
+import ParcelJourneyShopTable from '@/components/rts/ParcelJourneyShopTable';
+import ParcelJourneyStatCards from '@/components/rts/ParcelJourneyStatCards';
 import TemplateForm from '@/components/rts/template-form';
 import { Button } from '@/components/ui/button';
-import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { DataTable } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
-import { toFrontendSort } from '@/lib/sort';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { ParcelJourneyNotificationTemplate } from '@/types/models/ParcelJourneyNotificationTemplate';
@@ -16,77 +17,22 @@ import { ColumnDef } from '@tanstack/react-table';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import { omit, startCase } from 'lodash';
-import { MessageSquare, Package, Send, TrendingUp } from 'lucide-react';
 import moment from 'moment';
 import { useMemo, useState } from 'react';
 import DateOption = flatpickr.Options.DateOption;
 
-interface Analytics {
-    tracked_orders: number;
-    sms_sent: number;
-    chat_sent: number;
-    total_sent: number;
-}
-
-interface ShopStat {
-    id: number;
-    shop_name: string;
-    parcel_journey_started: string | null;
-    tracked_orders: number;
-    sms_sent: number;
-    chat_sent: number;
-}
-
 type Props = {
     workspace: Workspace;
     templates: PaginatedData<ParcelJourneyNotificationTemplate>;
-    shopStats: PaginatedData<ShopStat>;
-    analytics: Analytics;
     query?: {
         start_date?: string;
         end_date?: string;
-        sort?: string | null;
-        stats_page?: number;
-        stats_per_page?: number;
     };
 };
-
-const statCards = (analytics: Analytics) => [
-    {
-        label: 'Tracked Orders',
-        value: analytics.tracked_orders.toLocaleString(),
-        icon: Package,
-        iconClass: 'text-blue-500 dark:text-blue-400',
-        bgClass: 'bg-blue-50 dark:bg-blue-500/10',
-    },
-    {
-        label: 'SMS Sent',
-        value: analytics.sms_sent.toLocaleString(),
-        icon: Send,
-        iconClass: 'text-amber-500 dark:text-amber-400',
-        bgClass: 'bg-amber-50 dark:bg-amber-500/10',
-    },
-    {
-        label: 'Chat Sent',
-        value: analytics.chat_sent.toLocaleString(),
-        icon: MessageSquare,
-        iconClass: 'text-violet-500 dark:text-violet-400',
-        bgClass: 'bg-violet-50 dark:bg-violet-500/10',
-    },
-    {
-        label: 'Total Sent',
-        value: analytics.total_sent.toLocaleString(),
-        icon: TrendingUp,
-        iconClass: 'text-emerald-500 dark:text-emerald-400',
-        bgClass: 'bg-emerald-50 dark:bg-emerald-500/10',
-    },
-];
 
 const ParcelUpdateNotificationTemplates = ({
     workspace,
     templates,
-    shopStats,
-    analytics,
     query,
 }: Props) => {
     const [openForm, setOpenForm] = useState(false);
@@ -102,11 +48,6 @@ const ParcelUpdateNotificationTemplates = ({
         query?.end_date ?? moment().endOf('month').format('YYYY-MM-DD'),
     ]);
 
-    const statsInitialSorting = useMemo(
-        () => toFrontendSort(query?.sort ?? null),
-        [query?.sort],
-    );
-
     const url = workspaces.rts.parcelJourneys.url(workspace.slug);
 
     const handleDateChange = (dates: Date[]) => {
@@ -114,6 +55,9 @@ const ParcelUpdateNotificationTemplates = ({
         const start = moment(dates[0]).format('YYYY-MM-DD');
         const end = moment(dates[1]).format('YYYY-MM-DD');
         setDateRange([start, end]);
+        // Nothing on the page render depends on the range any more — the cards
+        // and the shop table refetch off `dateRange` — so this only puts the
+        // window in the URL, for reloads and shared links.
         router.get(
             url,
             { start_date: start, end_date: end },
@@ -121,7 +65,7 @@ const ParcelUpdateNotificationTemplates = ({
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
-                only: ['analytics', 'shopStats', 'query'],
+                only: ['query'],
             },
         );
     };
@@ -203,66 +147,6 @@ const ParcelUpdateNotificationTemplates = ({
         [canManageTemplates],
     );
 
-    const shopStatsColumns = useMemo<ColumnDef<ShopStat>[]>(
-        () => [
-            {
-                accessorKey: 'shop_name',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Shop" />
-                ),
-                cell: ({ row }) => (
-                    <div>
-                        <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                            {row.original.shop_name}
-                        </p>
-                        <p className="font-mono text-[10px] text-gray-400">
-                            ID: {row.original.id}
-                        </p>
-                    </div>
-                ),
-                size: 220,
-            },
-            {
-                accessorKey: 'parcel_journey_started',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Journey Started" />
-                ),
-                cell: ({ row }) =>
-                    row.original.parcel_journey_started
-                        ? formatDate(
-                              new Date(row.original.parcel_journey_started),
-                              'MMM dd, yyyy',
-                          )
-                        : '-',
-            },
-            {
-                accessorKey: 'tracked_orders',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Tracked Orders" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.tracked_orders).toLocaleString(),
-            },
-            {
-                accessorKey: 'sms_sent',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="SMS Sent" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.sms_sent).toLocaleString(),
-            },
-            {
-                accessorKey: 'chat_sent',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Chat Sent" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.chat_sent).toLocaleString(),
-            },
-        ],
-        [],
-    );
-
     return (
         <AppLayout>
             <Head title={`${workspace.name} — Parcel Journey Templates`} />
@@ -280,70 +164,17 @@ const ParcelUpdateNotificationTemplates = ({
                     />
                 </PageHeader>
 
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {statCards(analytics).map((card) => {
-                        const Icon = card.icon;
-                        return (
-                            <div
-                                key={card.label}
-                                className="rounded-[14px] border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900"
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                            {card.label}
-                                        </p>
-                                        <p className="mt-1.5 text-[22px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
-                                            {card.value}
-                                        </p>
-                                    </div>
-                                    <div
-                                        className={`rounded-[10px] p-2 ${card.bgClass}`}
-                                    >
-                                        <Icon
-                                            className={`h-4 w-4 ${card.iconClass}`}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                <ParcelJourneyStatCards
+                    workspaceSlug={workspace.slug}
+                    startDate={dateRange[0]}
+                    endDate={dateRange[1]}
+                />
 
-                <div className="mb-6 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
-                        <p className="font-mono text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                            Per Shop Analytics
-                        </p>
-                    </div>
-                    <DataTable
-                        columns={shopStatsColumns}
-                        data={shopStats.data ?? []}
-                        initialSorting={statsInitialSorting}
-                        meta={omit(shopStats, ['data'])}
-                        onFetch={(params) =>
-                            router.get(
-                                url,
-                                {
-                                    sort: params?.sort,
-                                    stats_page: params?.page ?? 1,
-                                    per_page_stats:
-                                        params?.per_page ??
-                                        query?.stats_per_page ??
-                                        shopStats.per_page,
-                                    start_date: dateRange[0],
-                                    end_date: dateRange[1],
-                                },
-                                {
-                                    preserveState: true,
-                                    replace: true,
-                                    preserveScroll: true,
-                                    only: ['shopStats', 'query'],
-                                },
-                            )
-                        }
-                    />
-                </div>
+                <ParcelJourneyShopTable
+                    workspaceSlug={workspace.slug}
+                    startDate={dateRange[0]}
+                    endDate={dateRange[1]}
+                />
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable

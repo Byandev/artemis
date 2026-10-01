@@ -71,4 +71,13 @@ class RtsLocationQuery extends RtsBaseQuery
     {
         return $this->query->paginate($perPage);
     }
+
+    /**
+     * Every matching row, unpaginated. The heat map shades the whole country at
+     * once, so it cannot work off a page of results.
+     */
+    public function get()
+    {
+        return $this->query->get();
+    }
 }

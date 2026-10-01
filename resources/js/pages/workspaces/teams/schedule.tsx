@@ -1,5 +1,15 @@
 import { Can } from '@/components/can';
 import PageHeader from '@/components/common/PageHeader';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -21,7 +31,7 @@ import {
     Sunrise,
     X,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 /* ─── Types ───────────────────────────────────────────────── */
@@ -213,6 +223,8 @@ export default function TeamSchedule({
         useState<Map<CellKey, Schedule>>(initialMap);
     const [editingMember, setEditingMember] = useState<User | null>(null);
     const [saving, setSaving] = useState(false);
+    const [pendingNav, setPendingNav] = useState<(() => void) | null>(null);
+    const bypassGuard = useRef(false);
 
     const hasChanges = useMemo(() => {
         if (scheduleMap.size !== initialMap.size) return true;
@@ -228,30 +240,90 @@ export default function TeamSchedule({
         return false;
     }, [scheduleMap, initialMap]);
 
-    const handleSave = useCallback(() => {
-        const entries = Array.from(scheduleMap.values()).map((s) => ({
-            user_id: s.user_id,
-            date: s.date,
-            start_time: s.start_time,
-            end_time: s.end_time,
-        }));
-        setSaving(true);
-        router.put(
-            `/workspaces/${workspace.slug}/teams/${team.id}/schedule`,
-            { week_start: weekStart, schedules: entries },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Schedule saved');
-                    setSaving(false);
+    const handleSave = useCallback(
+        (onSaved?: () => void) => {
+            const entries = Array.from(scheduleMap.values()).map((s) => ({
+                user_id: s.user_id,
+                date: s.date,
+                start_time: s.start_time,
+                end_time: s.end_time,
+            }));
+            setSaving(true);
+            router.put(
+                `/workspaces/${workspace.slug}/teams/${team.id}/schedule`,
+                { week_start: weekStart, schedules: entries },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        toast.success('Schedule saved');
+                        setSaving(false);
+                        onSaved?.();
+                    },
+                    onError: () => {
+                        toast.error('Failed to save');
+                        setSaving(false);
+                    },
                 },
-                onError: () => {
-                    toast.error('Failed to save');
-                    setSaving(false);
-                },
-            },
-        );
-    }, [scheduleMap, workspace.slug, team.id, weekStart]);
+            );
+        },
+        [scheduleMap, workspace.slug, team.id, weekStart],
+    );
+
+    /* Warn before a tab close / hard reload drops unsaved edits */
+    useEffect(() => {
+        if (!hasChanges) return;
+        const warn = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [hasChanges]);
+
+    /* Block Inertia navigation (week arrows, Back, sidebar) while dirty */
+    useEffect(() => {
+        if (!hasChanges) return;
+        return router.on('before', (event) => {
+            if (bypassGuard.current) return;
+
+            const visit = event.detail.visit;
+
+            // Only real page navigations count — let form submits, link
+            // prefetches, background reloads and partial refreshes through.
+            if (
+                visit.method !== 'get' ||
+                visit.prefetch ||
+                visit.async ||
+                visit.only.length > 0 ||
+                visit.except.length > 0 ||
+                visit.url.href === window.location.href
+            )
+                return;
+
+            const { url, data, replace, preserveScroll, preserveState } = visit;
+            setPendingNav(() => () => {
+                bypassGuard.current = true;
+                router.visit(url, {
+                    method: 'get',
+                    data,
+                    replace,
+                    preserveScroll,
+                    preserveState,
+                    onFinish: () => {
+                        bypassGuard.current = false;
+                    },
+                });
+            });
+
+            return false;
+        });
+    }, [hasChanges]);
+
+    const leavePending = useCallback(() => {
+        const go = pendingNav;
+        setPendingNav(null);
+        go?.();
+    }, [pendingNav]);
 
     const navigateWeek = (dir: number) => {
         router.get(
@@ -304,6 +376,12 @@ export default function TeamSchedule({
                     description="Manage weekly work schedules for each team member"
                     stackActionsOnMobile
                 >
+                    {hasChanges && (
+                        <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-500/10 px-2.5 font-mono! text-[11px]! font-medium text-amber-700 dark:border-amber-500/20 dark:text-amber-400">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            Unsaved changes
+                        </span>
+                    )}
                     <Link
                         href={`/workspaces/${workspace.slug}/teams`}
                         className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-stone-100 px-3 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
@@ -313,7 +391,7 @@ export default function TeamSchedule({
                     </Link>
                     <Can permission={PERMISSIONS.ManageSchedule}>
                         <button
-                            onClick={handleSave}
+                            onClick={() => handleSave()}
                             disabled={saving || !hasChanges}
                             className="flex h-8 items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-brand-700 disabled:opacity-40"
                         >
@@ -563,6 +641,57 @@ export default function TeamSchedule({
                     onClose={() => setEditingMember(null)}
                 />
             )}
+
+            {/* Unsaved Changes Guard */}
+            <AlertDialog
+                open={!!pendingNav}
+                onOpenChange={(open) => !open && setPendingNav(null)}
+            >
+                <AlertDialogContent className="max-w-[440px] border-none shadow-2xl dark:bg-zinc-900">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                            Unsaved changes
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                            The schedule for{' '}
+                            <strong>{getWeekLabel(weekStart)}</strong> has
+                            changes that haven't been saved yet. Leaving this
+                            page will discard them.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="mt-4 gap-2">
+                        <AlertDialogCancel
+                            disabled={saving}
+                            className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        >
+                            Stay
+                        </AlertDialogCancel>
+                        <button
+                            type="button"
+                            onClick={leavePending}
+                            disabled={saving}
+                            className="h-9 rounded-lg border border-red-200 bg-red-50 px-4 font-mono! text-[12px]! font-medium text-red-600 transition-all hover:bg-red-100 disabled:opacity-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                        >
+                            Discard
+                        </button>
+                        {canManageSchedule && (
+                            <button
+                                type="button"
+                                onClick={() => handleSave(leavePending)}
+                                disabled={saving}
+                                className="flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-brand-700 disabled:opacity-50"
+                            >
+                                {saving ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Save className="h-3.5 w-3.5" />
+                                )}
+                                Save &amp; leave
+                            </button>
+                        )}
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }
@@ -618,8 +747,31 @@ function EditScheduleModal({
     const [local, setLocal] = useState<Map<string, Schedule>>(
         new Map(memberSchedules),
     );
+    const [confirmDiscard, setConfirmDiscard] = useState(false);
     const otherMembers = team.members.filter((m) => m.id !== member.id);
     const today = todayStr();
+
+    const isDirty = (() => {
+        if (local.size !== memberSchedules.size) return true;
+        for (const [date, val] of local) {
+            const orig = memberSchedules.get(date);
+            if (!orig) return true;
+            if (
+                orig.start_time !== val.start_time ||
+                orig.end_time !== val.end_time
+            )
+                return true;
+        }
+        return false;
+    })();
+
+    const requestClose = () => {
+        if (isDirty) {
+            setConfirmDiscard(true);
+            return;
+        }
+        onClose();
+    };
 
     const setDay = (date: string, start: string | null, end: string | null) => {
         setLocal((prev) => {
@@ -712,152 +864,185 @@ function EditScheduleModal({
     };
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[5vh]"
-            onClick={onClose}
-        >
+        <>
             <div
-                className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl dark:bg-zinc-900"
-                onClick={(e) => e.stopPropagation()}
+                className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[5vh]"
+                onClick={requestClose}
             >
-                {/* Header — with Clear All */}
-                <div className="flex items-center justify-between border-b border-black/6 px-6 py-4 dark:border-white/6">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500/10 text-[13px] font-bold text-brand-700 dark:text-brand-400">
-                            {getInitials(member.name)}
+                <div
+                    className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl dark:bg-zinc-900"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Header — with Clear All */}
+                    <div className="flex items-center justify-between border-b border-black/6 px-6 py-4 dark:border-white/6">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500/10 text-[13px] font-bold text-brand-700 dark:text-brand-400">
+                                {getInitials(member.name)}
+                            </div>
+                            <div>
+                                <h2 className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                                    Edit Schedule — {member.name}
+                                </h2>
+                                <p className="text-[12px] text-gray-400">
+                                    Week of {getWeekLabel(weekStart)}
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
-                                Edit Schedule — {member.name}
-                            </h2>
-                            <p className="text-[12px] text-gray-400">
-                                Week of {getWeekLabel(weekStart)}
-                            </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={clearAll}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-[11px] font-medium text-red-600 transition-all hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                            >
+                                <Eraser className="h-3.5 w-3.5" />
+                                Clear All
+                            </button>
+                            <button
+                                onClick={requestClose}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-stone-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-gray-300"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={clearAll}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-[11px] font-medium text-red-600 transition-all hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-                        >
-                            <Eraser className="h-3.5 w-3.5" />
-                            Clear All
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-stone-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-gray-300"
-                        >
-                            <X className="h-5 w-5" />
-                        </button>
-                    </div>
-                </div>
 
-                {/* Quick Fill */}
-                <div className="border-b border-black/6 px-6 py-4 dark:border-white/6">
-                    <p className="mb-3 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                        Quick Fill
-                    </p>
-
-                    {/* Everyday (Mon – Sun) */}
-                    <div className="mb-3">
-                        <p className="mb-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400">
-                            Everyday (Mon – Sun)
+                    {/* Quick Fill */}
+                    <div className="border-b border-black/6 px-6 py-4 dark:border-white/6">
+                        <p className="mb-3 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Quick Fill
                         </p>
-                        <div className="flex flex-wrap gap-2">
-                            <QuickBtn
-                                label="All AM"
-                                sub="6 AM – 3 PM"
-                                icon={Sunrise}
-                                cls="border-amber-200 bg-amber-500/5 text-amber-700 hover:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400"
-                                onClick={() => fillAll('am')}
-                            />
-                            <QuickBtn
-                                label="All PM"
-                                sub="3 PM – 12 MN"
-                                icon={Moon}
-                                cls="border-indigo-200 bg-indigo-500/5 text-indigo-700 hover:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-400"
-                                onClick={() => fillAll('pm')}
-                            />
-                            <QuickBtn
-                                label="All MID"
-                                sub="9 AM – 6 PM"
-                                icon={Sun}
-                                cls="border-blue-light-200 bg-blue-light-500/5 text-blue-light-700 hover:bg-blue-light-500/10 dark:border-blue-light-500/20 dark:text-blue-light-400"
-                                onClick={() => fillAll('mid')}
-                            />
-                            <QuickBtn
-                                label="All OFF"
-                                sub="Day Off"
-                                icon={Moon}
-                                cls="border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700"
-                                onClick={fillAllOff}
-                            />
+
+                        {/* Everyday (Mon – Sun) */}
+                        <div className="mb-3">
+                            <p className="mb-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                                Everyday (Mon – Sun)
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <QuickBtn
+                                    label="All AM"
+                                    sub="6 AM – 3 PM"
+                                    icon={Sunrise}
+                                    cls="border-amber-200 bg-amber-500/5 text-amber-700 hover:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400"
+                                    onClick={() => fillAll('am')}
+                                />
+                                <QuickBtn
+                                    label="All PM"
+                                    sub="3 PM – 12 MN"
+                                    icon={Moon}
+                                    cls="border-indigo-200 bg-indigo-500/5 text-indigo-700 hover:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-400"
+                                    onClick={() => fillAll('pm')}
+                                />
+                                <QuickBtn
+                                    label="All MID"
+                                    sub="9 AM – 6 PM"
+                                    icon={Sun}
+                                    cls="border-blue-light-200 bg-blue-light-500/5 text-blue-light-700 hover:bg-blue-light-500/10 dark:border-blue-light-500/20 dark:text-blue-light-400"
+                                    onClick={() => fillAll('mid')}
+                                />
+                                <QuickBtn
+                                    label="All OFF"
+                                    sub="Day Off"
+                                    icon={Moon}
+                                    cls="border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700"
+                                    onClick={fillAllOff}
+                                />
+                            </div>
                         </div>
+
+                        {/* Copy from */}
+                        {otherMembers.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <Copy className="h-3 w-3 text-gray-400" />
+                                <span className="text-[11px] text-gray-500">
+                                    Copy from:
+                                </span>
+                                {otherMembers.map((m) => (
+                                    <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => copyFrom(m.id)}
+                                        className="rounded-md border border-black/6 bg-stone-50 px-2 py-1 text-[10px] font-medium text-gray-500 transition-all hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700"
+                                    >
+                                        {m.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Copy from */}
-                    {otherMembers.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                            <Copy className="h-3 w-3 text-gray-400" />
-                            <span className="text-[11px] text-gray-500">
-                                Copy from:
-                            </span>
-                            {otherMembers.map((m) => (
-                                <button
-                                    key={m.id}
-                                    type="button"
-                                    onClick={() => copyFrom(m.id)}
-                                    className="rounded-md border border-black/6 bg-stone-50 px-2 py-1 text-[10px] font-medium text-gray-500 transition-all hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700"
-                                >
-                                    {m.name}
-                                </button>
+                    {/* Day-by-day */}
+                    <div className="px-6 py-4">
+                        <p className="mb-3 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Daily Schedule
+                        </p>
+                        <div className="space-y-2">
+                            {weekDates.map((date, i) => (
+                                <DayRow
+                                    key={date}
+                                    date={date}
+                                    dayLabel={DAYS_FULL[i]}
+                                    isToday={date === today}
+                                    isWeekend={i >= 5}
+                                    schedule={local.get(date) ?? null}
+                                    onSet={(start, end) =>
+                                        setDay(date, start, end)
+                                    }
+                                    onClear={() => clearDay(date)}
+                                />
                             ))}
                         </div>
-                    )}
-                </div>
+                    </div>
 
-                {/* Day-by-day */}
-                <div className="px-6 py-4">
-                    <p className="mb-3 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                        Daily Schedule
-                    </p>
-                    <div className="space-y-2">
-                        {weekDates.map((date, i) => (
-                            <DayRow
-                                key={date}
-                                date={date}
-                                dayLabel={DAYS_FULL[i]}
-                                isToday={date === today}
-                                isWeekend={i >= 5}
-                                schedule={local.get(date) ?? null}
-                                onSet={(start, end) => setDay(date, start, end)}
-                                onClear={() => clearDay(date)}
-                            />
-                        ))}
+                    {/* Footer */}
+                    <div className="flex items-center justify-end gap-2 border-t border-black/6 px-6 py-4 dark:border-white/6">
+                        <button
+                            type="button"
+                            onClick={requestClose}
+                            className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onSave(local)}
+                            className="flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-brand-700"
+                        >
+                            <Save className="h-3.5 w-3.5" />
+                            Apply Changes
+                        </button>
                     </div>
                 </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-2 border-t border-black/6 px-6 py-4 dark:border-white/6">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onSave(local)}
-                        className="flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-brand-700"
-                    >
-                        <Save className="h-3.5 w-3.5" />
-                        Apply Changes
-                    </button>
-                </div>
             </div>
-        </div>
+
+            <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+                <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                            Discard changes?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                            Your edits to <strong>{member.name}</strong>'s week
+                            haven't been applied yet. Closing now will lose
+                            them.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="mt-4 gap-2">
+                        <AlertDialogCancel className="h-9 rounded-lg border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700">
+                            Keep editing
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setConfirmDiscard(false);
+                                onClose();
+                            }}
+                            className="h-9 rounded-lg bg-red-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-red-700"
+                        >
+                            Discard
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }
 

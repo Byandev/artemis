@@ -38,6 +38,12 @@ enum Permission: string
     case CreateProducts = 'Create Products';
     case EditProducts = 'Edit Products';
     case DeleteProducts = 'Delete Products';
+    case ViewProductForms = 'View Product Forms';
+    case ManageProductForms = 'Manage Product Forms';
+    case ViewTargetMarkets = 'View Target Markets';
+    case ManageTargetMarkets = 'Manage Target Markets';
+    case ViewProductResearch = 'View RDP Builder';
+    case ManageProductResearch = 'Manage RDP Builder';
 
     // Teams
     case ViewTeams = 'View Teams';
@@ -58,6 +64,7 @@ enum Permission: string
 
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
+    case ViewCallLogs = 'View Call Logs';
     case ViewRtsAiChat = 'View RTS AI Chat';
     case ViewRmoManagement = 'View RMO Management';
     case ManageRmoSettings = 'Manage RMO Settings';
@@ -134,6 +141,7 @@ enum Permission: string
 
     // Pancake
     case ViewOrders = 'View Orders';
+    case ImportOrderShippingFees = 'Import Order Shipping Fees';
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
@@ -177,11 +185,16 @@ enum Permission: string
     case ViewSalesMarketingDailyReport = 'View S&M Daily Report';
     case ViewPageRoasTracker = 'View Page ROAS Tracker';
     case ViewSalesTargets = 'View Sales Targets';
+    case ManageSalesTargets = 'Manage Sales Targets';
 
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
     case ManageDiscordNotifications = 'Manage Discord Notifications';
+    // The ERP credentials the Gencys sync pipeline logs in with. They only
+    // exist for workspaces running Gencys ERP, so the grant rides on that
+    // module toggle — see Workspace::hiddenPermissionNames().
+    case ManageErpCredentials = 'Manage ERP Credentials';
 
     // Billing
     case ViewBillingSettings = 'View Billing Settings';
@@ -199,6 +212,13 @@ enum Permission: string
     case ViewAdAccounts = 'View Ad Accounts';
     case ViewOptimizationLogs = 'View Optimization Logs';
     case ViewAdSpentSummary = 'View Adspent Summary';
+
+    // Welle
+    //
+    // Welle credentials belong to the person rather than the workspace, so the
+    // grant is only ever over their own record — see the Welle module toggle in
+    // Workspace::hiddenPermissionNames().
+    case ViewMyEsc = 'View My ESC';
 
     // Data Access
     case ViewAllWorkspaceData = 'View All Workspace Data';
@@ -234,7 +254,13 @@ enum Permission: string
             self::ViewProducts,
             self::CreateProducts,
             self::EditProducts,
-            self::DeleteProducts => 'Products',
+            self::DeleteProducts,
+            self::ViewProductForms,
+            self::ManageProductForms,
+            self::ViewTargetMarkets,
+            self::ManageTargetMarkets,
+            self::ViewProductResearch,
+            self::ManageProductResearch => 'Products',
 
             self::ViewTeams,
             self::CreateTeams,
@@ -251,6 +277,7 @@ enum Permission: string
             self::DeleteDepartments => 'Departments',
 
             self::ViewRtsAnalytics,
+            self::ViewCallLogs,
             self::ViewRtsAiChat,
             self::ViewRmoManagement,
             self::ManageRmoSettings,
@@ -311,6 +338,7 @@ enum Permission: string
             self::ApproveFinanceRequestFunds => 'Finance',
 
             self::ViewOrders,
+            self::ImportOrderShippingFees,
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
 
@@ -341,11 +369,13 @@ enum Permission: string
             self::ViewSalesMarketingDashboard,
             self::ViewSalesMarketingDailyReport,
             self::ViewPageRoasTracker,
-            self::ViewSalesTargets => 'Sales & Marketing',
+            self::ViewSalesTargets,
+            self::ManageSalesTargets => 'Sales & Marketing',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys,
-            self::ManageDiscordNotifications => 'Settings',
+            self::ManageDiscordNotifications,
+            self::ManageErpCredentials => 'Settings',
 
             self::ViewBillingSettings,
             self::ManageBillingSettings,
@@ -365,6 +395,8 @@ enum Permission: string
             self::ApproveOptimizationRules,
             self::ViewOptimizationLogs,
             self::ViewAdSpentSummary => 'Meta Ads',
+
+            self::ViewMyEsc => 'Welle',
 
             self::ViewAllWorkspaceData => 'Data Access',
         };

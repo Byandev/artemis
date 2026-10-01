@@ -3,12 +3,14 @@
 namespace Modules\MetaAds\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\MetaAds\Console\Commands\BackfillAdSetBudgetHistoryCommand;
 use Modules\MetaAds\Console\Commands\CaptureBudgetSnapshotsCommand;
 use Modules\MetaAds\Console\Commands\DiscoverSystemAccountsCommand;
 use Modules\MetaAds\Console\Commands\EvaluateOptimizationRulesCommand;
 use Modules\MetaAds\Console\Commands\ReportPageBudgetsToDiscordCommand;
 use Modules\MetaAds\Console\Commands\ReportTeamBudgetsToDiscordCommand;
 use Modules\MetaAds\Console\Commands\ReportUserBudgetsToDiscordCommand;
+use Modules\MetaAds\Console\Commands\SyncAdAccountPeopleCommand;
 use Modules\MetaAds\Console\Commands\SyncAdAccountsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdSetsCommand;
@@ -37,6 +39,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
      */
     protected array $commands = [
         SyncAdAccountsCommand::class,
+        SyncAdAccountPeopleCommand::class,
         SyncCampaignsCommand::class,
         SyncAdSetsCommand::class,
         SyncAdsCommand::class,
@@ -44,6 +47,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         SyncInsightsCommand::class,
         SyncAllCommand::class,
         CaptureBudgetSnapshotsCommand::class,
+        BackfillAdSetBudgetHistoryCommand::class,
         DiscoverSystemAccountsCommand::class,
         EvaluateOptimizationRulesCommand::class,
         ReportPageBudgetsToDiscordCommand::class,

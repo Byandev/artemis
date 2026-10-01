@@ -292,7 +292,9 @@ test('a raised purchase order is never reordered, whatever stage it sits at', fu
         'is_active' => true,
         'lead_time' => 10,
         'days_of_coverage' => 10,
-        'three_days_average' => 10,   // 20 days of cover = 200 units wanted
+        // Read live, so demand comes from the item: 10 a day means 20 days of
+        // cover and lead want 200 units.
+        'three_days_average' => 10,
     ]);
 
     $order = function (int $status, int $count) use ($workspace, $item) {

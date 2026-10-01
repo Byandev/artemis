@@ -50,6 +50,7 @@ import {
     FormatBadge,
     InitialAvatar,
 } from './components/atoms';
+import { CreativeCode } from './components/creative-code';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
 import CreativesDateFilter from './components/creatives-date-filter';
 import CreativesFilter, {
@@ -273,6 +274,19 @@ export default function CreativesIndex({
                   } as ColumnDef<Creative>,
               ]
             : []),
+        {
+            accessorKey: 'code',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Code" />
+            ),
+            cell: ({ row }) =>
+                row.original.code ? (
+                    <CreativeCode code={row.original.code} />
+                ) : (
+                    <span className="text-gray-300 dark:text-gray-700">—</span>
+                ),
+        },
         {
             accessorKey: 'name',
             enableSorting: true,

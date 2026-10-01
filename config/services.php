@@ -52,6 +52,8 @@ return [
         'gencys_intern_daily_records_webhook_url' => env('N8N_GENCYS_INTERN_DAILY_RECORDS_WEBHOOK_URL'),
         'gencys_pages_webhook_url' => env('N8N_GENCYS_PAGES_WEBHOOK_URL'),
         'gencys_page_details_webhook_url' => env('N8N_GENCYS_PAGE_DETAILS_WEBHOOK_URL'),
+        // External RMO team Google Sheet -> RMO management (rmo:trigger-external-team-sync).
+        'rmo_external_team_webhook_url' => env('N8N_RMO_EXTERNAL_TEAM_WEBHOOK_URL'),
 
         // Public base URL n8n posts callbacks back to (e.g. an ngrok/Herd tunnel
         // in local dev). Falls back to APP_URL when unset.
@@ -68,6 +70,7 @@ return [
     'discord' => [
         'webhook_url' => env('DISCORD_WEBHOOK_URL'),
         'inventory_webhook_url' => env('INVENTORY_DISCORD_WEBHOOK_URL'),
+        'meta_ads_webhook_url' => env('META_ADS_DISCORD_WEBHOOK_URL'),
     ],
 
     // SMS providers for parcel-journey notifications. Credentials are stored
@@ -79,6 +82,26 @@ return [
 
     'sendgate' => [
         'base_url' => env('SENDGATE_BASE_URL', 'https://sendgate-test.on-forge.com'),
+    ],
+
+    // Welle. Every user connects their own account (users.welle_email /
+    // welle_password), so there is no shared credential here — only where the
+    // API lives, and how long one sign-in is worth reusing.
+    //
+    // The paths are config rather than constants so the client can be pointed
+    // at a staging host, or follow a moved endpoint, without a code change.
+    'welle' => [
+        'base_url' => env('WELLE_BASE_URL'),
+        'timeout' => env('WELLE_TIMEOUT', 30),
+
+        'login_path' => env('WELLE_LOGIN_PATH', 'api/v1/login'),
+        'progress_path' => env('WELLE_PROGRESS_PATH', 'api/v1/progress/week'),
+        'range_path' => env('WELLE_RANGE_PATH', 'api/v1/progress/range'),
+
+        // Welle issues a Sanctum token per device and wants the device named.
+        // Ours says which system is holding it, so a user can tell this apart
+        // from their phone in a token list.
+        'device_name' => env('WELLE_DEVICE_NAME', 'Artemis'),
     ],
 
 ];

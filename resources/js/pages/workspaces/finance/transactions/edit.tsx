@@ -17,6 +17,7 @@ interface Props {
     transaction: FinanceTransaction;
     accounts: AccountOpt[];
     transactionTypes: TransactionTypeItem[];
+    cogsDeliveryTypeIds: number[];
     users: UserOpt[];
     products: string[];
     fundRequests: FundRequestOption[];
@@ -29,6 +30,7 @@ export default function TransactionEdit({
     transaction,
     accounts,
     transactionTypes,
+    cogsDeliveryTypeIds,
     users,
     products,
     fundRequests,
@@ -59,6 +61,7 @@ export default function TransactionEdit({
                         transaction={transaction}
                         accounts={accounts}
                         transactionTypes={transactionTypes}
+                        cogsDeliveryTypeIds={cogsDeliveryTypeIds}
                         users={users}
                         products={products}
                         fundRequests={fundRequests}

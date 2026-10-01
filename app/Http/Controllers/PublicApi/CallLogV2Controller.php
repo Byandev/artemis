@@ -4,6 +4,7 @@ namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
 use App\Models\CallLog;
+use App\Support\CallLogPersona;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
@@ -38,7 +39,8 @@ class CallLogV2Controller extends Controller
                 'assignee_user_id' => $request->input('assignee_user_id'),
                 'phone_number' => $log['phone_number'],
                 'type' => $log['type'],
-                'duration' => $log['duration'],
+                // Zeroed for a rejected call — see CallLog::durationFor().
+                'duration' => CallLog::durationFor($log['type'], (int) $log['duration']),
                 'call_date' => $timestamp->toDateString(),
                 'call_time' => $timestamp->toTimeString(),
                 'created_at' => $now,
@@ -46,13 +48,18 @@ class CallLogV2Controller extends Controller
             ];
         }, $request->input('call_logs'));
 
+        // Match each number against that day's deliveries to work out whether
+        // it was the customer or the rider, and which order. The payload is
+        // unchanged — the app still posts only a number and a timestamp.
+        $rows = CallLogPersona::stamp($rows);
+
         $inserted = 0;
 
         foreach (array_chunk($rows, 500) as $chunk) {
             $inserted += CallLog::upsert(
                 $chunk,
                 ['workspace_id', 'user_id', 'phone_number', 'call_date', 'call_time'],
-                ['type', 'duration', 'assignee_user_id', 'updated_at']
+                ['type', 'duration', 'assignee_user_id', 'order_id', 'order_for_delivery_id', 'persona', 'updated_at']
             );
         }
 

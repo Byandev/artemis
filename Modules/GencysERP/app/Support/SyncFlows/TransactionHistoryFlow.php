@@ -7,17 +7,22 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
-use Modules\Inventory\Models\InventoryItem;
 
 /**
- * Inventory transaction history, one run per item per date.
+ * Inventory transaction history, one run per date.
  *
- * n8n takes an items[] array and loops it on a single ERP session, so a group can
- * carry many runs — which is what keeps this from opening one ERP login per item
- * and tripping the rate limit.
+ * n8n reads the ERP's transaction report for a date in a single pass and posts
+ * back everything it found there, grouped by item name — so a date, not an item,
+ * is the subject of the sync. One run covers the whole date, which is also why
+ * there is never more than one transaction-history run in flight per workspace.
+ *
+ * The item list used to travel with the request, a run per item and twenty per
+ * call. It doesn't any more: we no longer tell the ERP which items to look up,
+ * we take whatever the report contains — including items we have never seen,
+ * which the callback creates rather than drops. See TransactionHistoryController.
  *
  * Parameters (under the `transaction_history` key of the batch): dates[] (m/d/Y),
- * item_ids[], webhook, inline.
+ * webhook, inline.
  */
 class TransactionHistoryFlow extends SyncFlow
 {
@@ -37,11 +42,6 @@ class TransactionHistoryFlow extends SyncFlow
             ?: config('services.n8n.transaction_history_webhook_url');
     }
 
-    public function defaultGroupSize(): int
-    {
-        return (int) config('gencyserp.batch.group_size', 20);
-    }
-
     /** Yesterday and today — enough to catch late-posted movements. */
     public function defaultParameters(): array
     {
@@ -57,31 +57,25 @@ class TransactionHistoryFlow extends SyncFlow
     {
         return array_filter([
             'dates' => array_filter([data_get($run->meta, 'date')]),
-            'item_ids' => array_filter([$run->inventory_item_id]),
         ]);
     }
 
     public function buildRuns(GencysSyncBatch $batch): int
     {
-        $parameters = $batch->parametersFor($this->type());
-
-        $dates = (array) data_get($parameters, 'dates', []);
-        $itemIds = (array) data_get($parameters, 'item_ids', []);
-
-        $workspaces = $this->eligibleWorkspaces($batch)
-            ->with(['inventoryItems' => fn ($query) => $this->syncableItems($query, $itemIds)])
-            ->get();
+        $dates = (array) data_get($batch->parametersFor($this->type()), 'dates', []);
+        $workspaces = $this->eligibleWorkspaces($batch)->get();
 
         $created = 0;
 
         foreach ($dates as $date) {
             foreach ($workspaces as $workspace) {
-                $groupKey = $this->groupKey($workspace->id, ["d:{$date}"]);
-
-                foreach ($workspace->inventoryItems as $item) {
-                    $this->queueRun($batch, $workspace->id, $groupKey, ['date' => $date], $item->id);
-                    $created++;
-                }
+                $this->queueRun(
+                    $batch,
+                    $workspace->id,
+                    $this->groupKey($workspace->id, ["d:{$date}"]),
+                    ['date' => $date],
+                );
+                $created++;
             }
         }
 
@@ -90,36 +84,20 @@ class TransactionHistoryFlow extends SyncFlow
 
     public function buildPayload(GencysSyncBatch $batch, Workspace $workspace, Collection $runs): array
     {
-        $skus = InventoryItem::query()
-            ->whereIn('id', $runs->pluck('inventory_item_id')->filter())
-            ->pluck('sku', 'id');
+        $run = $runs->first();
 
         return [
             'workspace_id' => $workspace->id,
             'workspace_api_key' => $workspace->apiKeys->first()->reveal(),
             'erp_username' => $workspace->erp_username,
             'erp_password' => $workspace->erp_password,
-            'date' => data_get($runs->first()->meta, 'date'),
+            'date' => data_get($run->meta, 'date'),
             'webhook_url' => $this->callbackUrl('api/v1/public/inventory-items/transactions/bulk-sync'),
-            'items' => $runs->map(fn (GencysSyncRun $run) => [
-                'id' => $run->inventory_item_id,
-                'keyword' => $skus[$run->inventory_item_id] ?? null,
-                'sync_run_id' => $run->id,
-            ])->values()->all(),
+            // Only needed if the report is too big to post back in one call: the
+            // data callback then heartbeats instead of closing the run, and this
+            // is what ends it. See GencysSyncRun::finishById().
+            'finish_webhook_url' => $this->callbackUrl('api/v1/public/gencys/sync-runs/finish'),
+            'sync_run_id' => $run->id,
         ];
-    }
-
-    /**
-     * The items worth asking the ERP about: parent items are grouping
-     * placeholders with no SKU, and an explicit selection beats the active-only
-     * default so a single inactive item can still be re-synced.
-     */
-    protected function syncableItems($query, array $itemIds)
-    {
-        $query->where('is_parent', false);
-
-        return empty($itemIds)
-            ? $query->where('is_active', true)
-            : $query->whereIn('id', $itemIds);
     }
 }

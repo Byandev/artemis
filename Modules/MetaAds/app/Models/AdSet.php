@@ -41,6 +41,21 @@ class AdSet extends Model
         return $this->hasMany(Ad::class, 'meta_ads_set_id');
     }
 
+    /**
+     * Daily budget history, newest date first — one row per date, written
+     * forward by `metaads:capture-budgets` and backwards (for dates before this
+     * ad set was first captured) by `metaads:backfill-adset-budgets`.
+     *
+     * meta_ads_budget_snapshots is shared with campaigns and pages, so the
+     * relation pins entity_type itself rather than going through a morph map.
+     */
+    public function budgetSnapshots(): HasMany
+    {
+        return $this->hasMany(BudgetSnapshot::class, 'entity_id')
+            ->where('entity_type', BudgetSnapshot::ENTITY_AD_SET)
+            ->orderByDesc('date');
+    }
+
     public function page()
     {
         return $this->belongsTo(Page::class, 'meta_page_id');

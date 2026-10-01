@@ -44,10 +44,14 @@ interface Props {
     workspace: Workspace;
     order: PurchasedOrder;
     items: InventoryItem[];
+    /** The list URL this screen was opened from — filters, sort and page kept. */
+    returnTo?: string | null;
 }
 
-export default function Edit({ workspace, order, items }: Props) {
-    const { data, setData, put, processing, errors } = useForm({
+export default function Edit({ workspace, order, items, returnTo }: Props) {
+    const backTo =
+        returnTo ?? `/workspaces/${workspace.slug}/inventory/purchased-orders`;
+    const { data, setData, put, processing, errors, transform } = useForm({
         issue_date: order.issue_date ?? '',
         delivery_no: order.delivery_no ?? '',
         expected_delivery_date: order.expected_delivery_date ?? '',
@@ -127,14 +131,16 @@ export default function Edit({ workspace, order, items }: Props) {
 
         const url = `/workspaces/${workspace.slug}/inventory/purchased-orders/${order.id}`;
 
+        // `return_to` steers the post-save redirect; it isn't a model field, so
+        // the controller reads it separately.
+        transform((d) => (returnTo ? { ...d, return_to: returnTo } : d));
+
         put(url, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Purchased order updated successfully');
 
-                router.visit(
-                    `/workspaces/${workspace.slug}/inventory/purchased-orders`,
-                );
+                router.visit(backTo);
             },
             onError: (errors) => {
                 console.error(errors);
@@ -152,11 +158,7 @@ export default function Edit({ workspace, order, items }: Props) {
                 >
                     <button
                         type="button"
-                        onClick={() =>
-                            router.get(
-                                `/workspaces/${workspace.slug}/inventory/purchased-orders`,
-                            )
-                        }
+                        onClick={() => router.get(backTo)}
                         className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
                     >
                         Cancel
@@ -468,11 +470,7 @@ export default function Edit({ workspace, order, items }: Props) {
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"
-                            onClick={() =>
-                                router.get(
-                                    `/workspaces/${workspace.slug}/inventory/purchased-orders`,
-                                )
-                            }
+                            onClick={() => router.get(backTo)}
                             className="flex h-9 items-center rounded-lg border border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300"
                         >
                             Cancel

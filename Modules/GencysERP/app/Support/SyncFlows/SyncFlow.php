@@ -61,9 +61,12 @@ abstract class SyncFlow
     abstract public function buildPayload(GencysSyncBatch $batch, Workspace $workspace, Collection $runs): array;
 
     /**
-     * How many runs may travel in one n8n request. Flows whose webhook takes a
-     * single subject per call leave this at 1 — grouping them would mean changing
-     * the n8n workflow, which this restructure deliberately doesn't.
+     * How many runs may travel in one n8n request.
+     *
+     * Every flow now sends one subject — a date, a range — per call and gets the
+     * whole report back, so nothing overrides this. The batch's grouping is kept
+     * because it costs nothing and a future flow taking a list may want it; a
+     * batch can still pin its own size. See BatchRunner::nextRuns().
      */
     public function defaultGroupSize(): int
     {
