@@ -52,6 +52,8 @@ return [
         'gencys_intern_daily_records_webhook_url' => env('N8N_GENCYS_INTERN_DAILY_RECORDS_WEBHOOK_URL'),
         'gencys_pages_webhook_url' => env('N8N_GENCYS_PAGES_WEBHOOK_URL'),
         'gencys_page_details_webhook_url' => env('N8N_GENCYS_PAGE_DETAILS_WEBHOOK_URL'),
+        // External RMO team Google Sheet -> RMO management (rmo:trigger-external-team-sync).
+        'rmo_external_team_webhook_url' => env('N8N_RMO_EXTERNAL_TEAM_WEBHOOK_URL'),
 
         // Public base URL n8n posts callbacks back to (e.g. an ngrok/Herd tunnel
         // in local dev). Falls back to APP_URL when unset.

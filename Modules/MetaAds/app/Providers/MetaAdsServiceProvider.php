@@ -18,6 +18,7 @@ use Modules\MetaAds\Console\Commands\SyncAllCommand;
 use Modules\MetaAds\Console\Commands\SyncCampaignsCommand;
 use Modules\MetaAds\Console\Commands\SyncCreativesCommand;
 use Modules\MetaAds\Console\Commands\SyncInsightsCommand;
+use Modules\MetaAds\Console\Commands\SyncTestingDailyRecordsCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class MetaAdsServiceProvider extends ModuleServiceProvider
@@ -46,6 +47,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         SyncCreativesCommand::class,
         SyncInsightsCommand::class,
         SyncAllCommand::class,
+        SyncTestingDailyRecordsCommand::class,
         CaptureBudgetSnapshotsCommand::class,
         BackfillAdSetBudgetHistoryCommand::class,
         DiscoverSystemAccountsCommand::class,

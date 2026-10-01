@@ -383,6 +383,13 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('upsell', function ($query, $value) {
                     $this->applyUpsellFilter($query, $value);
                 }),
+                AllowedFilter::callback('rmo_by_external_team', function ($query, $value) use ($workspace) {
+                    // Only offered while the workspace syncs the external
+                    // team's sheet; a stale URL param is ignored otherwise.
+                    if ($workspace->rmoExternalTeamSyncEnabled()) {
+                        $this->applyExternalTeamFilter($query, $value);
+                    }
+                }),
             ])
             ->allowedSorts([
                 'status',
@@ -432,6 +439,7 @@ class ForDeliveryController extends Controller
             'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
             'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
             'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
+            'enable_external_team_sync' => $workspace->rmoExternalTeamSyncEnabled(),
         ]);
     }
 
@@ -624,6 +632,13 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('upsell', function ($query, $value) {
                     $this->applyUpsellFilter($query, $value);
                 }),
+                AllowedFilter::callback('rmo_by_external_team', function ($query, $value) use ($workspace) {
+                    // Only offered while the workspace syncs the external
+                    // team's sheet; a stale URL param is ignored otherwise.
+                    if ($workspace->rmoExternalTeamSyncEnabled()) {
+                        $this->applyExternalTeamFilter($query, $value);
+                    }
+                }),
             ])
             ->whereDate('delivery_date', $deliveryDate);
     }
@@ -700,6 +715,36 @@ class ForDeliveryController extends Controller
             $query->where(function ($q) {
                 $q->whereNull('upsell_price')->orWhere('upsell_price', '<=', 0);
             });
+        }
+    }
+
+    /**
+     * Narrow the list by whether the RMO is handled by an external team.
+     *
+     * Accepts `external` / `internal`; anything else leaves the query untouched.
+     * Like the upsell filter, the value is `mixed` because Spatie coerces a bare
+     * "true"/"false" into a boolean before it reaches us.
+     *
+     * @param  string|array<int, string>|bool|null  $value
+     */
+    private function applyExternalTeamFilter(Builder $query, mixed $value): void
+    {
+        $value = is_array($value) ? ($value[0] ?? null) : $value;
+
+        if (is_bool($value)) {
+            $value = $value ? 'external' : 'internal';
+        }
+
+        $value = strtolower(trim((string) $value));
+
+        if (in_array($value, ['external', '1', 'true', 'yes'], true)) {
+            $query->where('rmo_by_external_team', true);
+
+            return;
+        }
+
+        if (in_array($value, ['internal', '0', 'false', 'no'], true)) {
+            $query->where('rmo_by_external_team', false);
         }
     }
 

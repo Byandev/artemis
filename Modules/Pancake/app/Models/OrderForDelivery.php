@@ -22,6 +22,7 @@ class OrderForDelivery extends Model
         // string. Cast so the JSON matches the `number | null` the frontend type
         // declares.
         'shop_rts_rate' => 'float',
+        'rmo_by_external_team' => 'boolean',
     ];
 
     public function order(): BelongsTo

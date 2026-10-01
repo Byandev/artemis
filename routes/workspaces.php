@@ -29,6 +29,7 @@ use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DailyReportController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DashboardController as SalesMarketingDashboardController;
+use App\Http\Controllers\Workspaces\SalesMarketing\NewCreativesTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\PageRoasTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\SalesTargetController;
 use App\Http\Controllers\Workspaces\SalesMarketing\TeamAdSpendGoalController;
@@ -88,6 +89,7 @@ use Modules\MetaAds\Http\Controllers\AdSpentSummaryController;
 use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
 use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
+use Modules\MetaAds\Http\Controllers\LaunchComparisonController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
 use Modules\MetaAds\Http\Controllers\RemoveFbAccountController;
@@ -188,6 +190,17 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('page-roas-tracker');
         Route::get('/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('ad-spend-goals');
         Route::get('/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('ad-spent-summary');
+
+        Route::get('/new-creatives-tracker', [NewCreativesTrackerController::class, 'index'])->name('new-creatives-tracker');
+        // JSON the "Add Testing Item" modal fetches as you search.
+        Route::get('/new-creatives-tracker/available-items', [NewCreativesTrackerController::class, 'availableItems'])->name('new-creatives-tracker.available-items');
+        Route::post('/new-creatives-tracker/items', [NewCreativesTrackerController::class, 'store'])->name('new-creatives-tracker.items.store');
+        Route::post('/new-creatives-tracker/items/manual', [NewCreativesTrackerController::class, 'storeManual'])->name('new-creatives-tracker.items.manual');
+        Route::patch('/new-creatives-tracker/items/{item}/pause', [NewCreativesTrackerController::class, 'togglePause'])->name('new-creatives-tracker.items.pause');
+        Route::patch('/new-creatives-tracker/items/{item}/days/{day}', [NewCreativesTrackerController::class, 'updateDay'])->whereNumber('day')->name('new-creatives-tracker.items.day');
+        Route::put('/new-creatives-tracker/items/{item}', [NewCreativesTrackerController::class, 'updateManual'])->name('new-creatives-tracker.items.update-manual');
+        Route::delete('/new-creatives-tracker/items/{item}', [NewCreativesTrackerController::class, 'destroy'])->name('new-creatives-tracker.items.destroy');
+        Route::patch('/new-creatives-tracker/items/{item}', [NewCreativesTrackerController::class, 'updateDecision'])->name('new-creatives-tracker.items.update');
 
         Route::get('/sales-targets', [SalesTargetController::class, 'index'])->name('sales-targets');
         Route::post('/sales-targets', [SalesTargetController::class, 'store'])->name('sales-targets.store');
@@ -384,6 +397,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ads-calendar', [AdsCalendarController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-calendar');
+    Route::get('/workspaces/{workspace}/integrations/meta/launch-comparison', [LaunchComparisonController::class, 'index'])
+        ->middleware('can:View Launch Comparison,workspace')
+        ->name('workspaces.metaads.launch-comparison');
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.health');

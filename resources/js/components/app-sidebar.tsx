@@ -32,6 +32,7 @@ import {
     ExternalLink,
     Facebook,
     FileText,
+    GitCompareArrows,
     Goal,
     GraduationCap,
     Headset,
@@ -47,6 +48,7 @@ import {
     MessageSquare,
     Package,
     PhoneCall,
+    Palette,
     PieChart,
     ReceiptText,
     RotateCcw,
@@ -121,6 +123,10 @@ export function AppSidebar() {
                           PERMISSIONS.ViewAdSpendGoals,
                           PERMISSIONS.ViewAdSpentSummary,
                           PERMISSIONS.ViewSalesTargets,
+                          PERMISSIONS.ViewNewCreativesTracker,
+                          PERMISSIONS.CreateNewCreativesTracker,
+                          PERMISSIONS.EditNewCreativesTracker,
+                          PERMISSIONS.DeleteNewCreativesTracker,
                           // The Budget Tracker below rides on the Meta Ads
                           // grant, so that grant has to be able to open the
                           // group on its own.
@@ -193,6 +199,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/sales-marketing/sales-targets`,
                               icon: Target,
                               permission: PERMISSIONS.ViewSalesTargets,
+                          },
+                          {
+                              title: 'New Creatives Tracker',
+                              href: `/workspaces/${slug}/sales-marketing/new-creatives-tracker`,
+                              icon: Palette,
+                              permission: PERMISSIONS.ViewNewCreativesTracker,
                           },
                       ],
                   },
@@ -419,6 +431,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewOptimizationRules,
                           PERMISSIONS.ApproveOptimizationRules,
                           PERMISSIONS.ViewOptimizationLogs,
+                          PERMISSIONS.ViewLaunchComparison,
                       ],
                       items: [
                           {
@@ -450,6 +463,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/integrations/meta/ads-calendar`,
                               icon: CalendarDays,
                               permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Launch Comparison',
+                              href: `/workspaces/${slug}/integrations/meta/launch-comparison`,
+                              icon: GitCompareArrows,
+                              permission: PERMISSIONS.ViewLaunchComparison,
                           },
                           {
                               title: 'Optimization Rules',
