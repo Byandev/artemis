@@ -39,6 +39,23 @@ class FundRequest extends Model
      */
     public const PAYMENT_METHODS_WITH_ACCOUNT = ['online_banking', 'e_wallet'];
 
+    /**
+     * The popular banks and e-wallets in the Philippines, offered as choices for
+     * `bank_name` under each method that goes to an account. The first is the
+     * one preselected. `bank_name` stays free text, so one not listed here can
+     * still be typed in.
+     */
+    public const PAYMENT_PROVIDERS = [
+        'online_banking' => [
+            'BDO', 'BPI', 'Metrobank', 'Landbank', 'PNB', 'Security Bank', 'UnionBank',
+            'RCBC', 'China Bank', 'EastWest Bank', 'PSBank', 'AUB', 'DBP', 'Maybank',
+            'GoTyme Bank', 'Maya Bank', 'SeaBank', 'CIMB Bank', 'Tonik',
+        ],
+        'e_wallet' => [
+            'GCash', 'Maya', 'GrabPay', 'ShopeePay', 'Coins.ph', 'PalawanPay', 'GoTyme',
+        ],
+    ];
+
     protected $fillable = [
         'workspace_id',
         'request_date',
