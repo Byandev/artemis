@@ -32,6 +32,7 @@ import {
     ExternalLink,
     Facebook,
     FileText,
+    GitCompareArrows,
     Goal,
     GraduationCap,
     Headset,
@@ -430,6 +431,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewOptimizationRules,
                           PERMISSIONS.ApproveOptimizationRules,
                           PERMISSIONS.ViewOptimizationLogs,
+                          PERMISSIONS.ViewLaunchComparison,
                       ],
                       items: [
                           {
@@ -461,6 +463,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/integrations/meta/ads-calendar`,
                               icon: CalendarDays,
                               permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Launch Comparison',
+                              href: `/workspaces/${slug}/integrations/meta/launch-comparison`,
+                              icon: GitCompareArrows,
+                              permission: PERMISSIONS.ViewLaunchComparison,
                           },
                           {
                               title: 'Optimization Rules',

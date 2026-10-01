@@ -43,7 +43,6 @@ import {
     Goal,
     Image as ImageIcon,
     Layers,
-    LayoutGrid,
     Loader2,
     Megaphone,
     Play,
@@ -66,6 +65,8 @@ import {
 } from 'react';
 import { InlineOwner, OwnerOption } from '../components/inline-owner';
 import {
+    AccountMultiPicker,
+    AccountOption,
     ColumnVisibilityMenu,
     GridFilter,
     INSIGHTS_OPTIONS,
@@ -195,11 +196,6 @@ function isVideoCreative(r: {
     video_id?: number | string | null;
 }): boolean {
     return r.media_type ? r.media_type === 'video' : r.video_id != null;
-}
-
-interface AccountOption {
-    id: string;
-    name: string;
 }
 
 interface Props {
@@ -1113,119 +1109,6 @@ function CreativeDetailDrawer({
                 </div>
             </SheetContent>
         </Sheet>
-    );
-}
-
-/* ───────────────────── Account multi-picker ─────────────────── */
-
-interface AccountMultiPickerProps {
-    accounts: AccountOption[];
-    selected: string[];
-    onChange: (next: string[]) => void;
-}
-
-function AccountMultiPicker({
-                                accounts,
-                                selected,
-                                onChange,
-                            }: AccountMultiPickerProps) {
-    const [open, setOpen] = useState(false);
-    const [search, setSearch] = useState('');
-
-    useEffect(() => {
-        if (!open) setSearch('');
-    }, [open]);
-
-    const allSelected = selected.length === accounts.length;
-    const q = search.toLowerCase();
-    const filtered = accounts.filter(
-        (a) => !q || a.name.toLowerCase().includes(q),
-    );
-
-    const toggle = (id: string) => {
-        const set = new Set(selected);
-        if (set.has(id)) set.delete(id);
-        else set.add(id);
-        onChange(accounts.filter((a) => set.has(a.id)).map((a) => a.id));
-    };
-
-    const toggleAll = () =>
-        onChange(allSelected ? [] : accounts.map((a) => a.id));
-
-    const label = allSelected
-        ? 'All accounts'
-        : selected.length === 0
-            ? 'No accounts'
-            : `${selected.length} of ${accounts.length} accounts`;
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-1.5 font-mono! text-[12px]!"
-                >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                    {label}
-                    <ChevronDown className="h-3 w-3 text-gray-400" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                align="start"
-                className="w-72 p-0 font-mono text-[11px]"
-            >
-                <div className="border-b border-black/6 p-2 dark:border-white/6">
-                    <div className="relative">
-                        <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3 w-3 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                        <input
-                            type="text"
-                            placeholder="Search accounts..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            autoFocus
-                            className="h-7 w-full rounded-md border border-black/6 bg-stone-50 pr-2 pl-7 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-200"
-                        />
-                    </div>
-                </div>
-
-                <label className="flex cursor-pointer items-center gap-2 border-b border-black/6 px-3 py-2 hover:bg-stone-50 dark:border-white/6 dark:hover:bg-zinc-800/50">
-                    <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleAll}
-                        className="h-3.5 w-3.5 rounded border-gray-300 accent-emerald-500"
-                    />
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                        Select all
-                    </span>
-                </label>
-
-                <div className="max-h-64 overflow-y-auto py-1">
-                    {filtered.length === 0 && (
-                        <p className="py-4 text-center text-gray-400 dark:text-gray-500">
-                            No accounts match.
-                        </p>
-                    )}
-                    {filtered.map((a) => {
-                        const checked = selected.includes(a.id);
-                        return (
-                            <button
-                                key={a.id}
-                                type="button"
-                                onClick={() => toggle(a.id)}
-                                className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
-                            >
-                                <span className="truncate">{a.name}</span>
-                                {checked && (
-                                    <Check className="h-3 w-3 shrink-0 text-emerald-500" />
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
-            </PopoverContent>
-        </Popover>
     );
 }
 

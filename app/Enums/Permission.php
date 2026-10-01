@@ -216,6 +216,7 @@ enum Permission: string
     case ViewAdAccounts = 'View Ad Accounts';
     case ViewOptimizationLogs = 'View Optimization Logs';
     case ViewAdSpentSummary = 'View Adspent Summary';
+    case ViewLaunchComparison = 'View Launch Comparison';
 
     // Welle
     //
@@ -402,7 +403,8 @@ enum Permission: string
             self::ManageOptimizationRules,
             self::ApproveOptimizationRules,
             self::ViewOptimizationLogs,
-            self::ViewAdSpentSummary => 'Meta Ads',
+            self::ViewAdSpentSummary,
+            self::ViewLaunchComparison => 'Meta Ads',
 
             self::ViewMyEsc => 'Welle',
 
