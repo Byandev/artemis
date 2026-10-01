@@ -10,16 +10,23 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import clsx from 'clsx';
-import { ChartColumn } from 'lucide-react';
+import { ChartColumn, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { OwnerOption } from '../components/inline-owner';
 import {
     AccountMultiPicker,
     AccountOption,
+    GridFilter,
     INSIGHTS_OPTIONS,
+    InsightFilterBuilder,
     InsightsMetrics,
+    ObjectiveOption,
+    deserializeGridFilters,
     formatMetricNumber,
     metricLabel,
     metricValue,
+    serializeDateFilters,
+    serializeMetricFilters,
 } from './_shared';
 import {
     MetricPicker,
@@ -52,6 +59,15 @@ interface Props {
     perPageOptions: number[];
     /** Only launches that started in this window (Y-m-d, inclusive); open ends are null. */
     startRange: { from: string | null; to: string | null };
+    /** The Ads Manager filters in force, as the server parsed them. */
+    filters: {
+        search: string;
+        creatorId: string | null;
+        metric: unknown[];
+        date: unknown[];
+    };
+    objectives: ObjectiveOption[];
+    members: OwnerOption[];
     items: Item[];
     pagination: {
         currentPage: number;
@@ -418,6 +434,9 @@ export default function LaunchComparison({
     maxDays,
     perPageOptions,
     startRange,
+    filters: serverFilters,
+    objectives,
+    members,
     items,
     pagination,
 }: Props) {
@@ -431,36 +450,67 @@ export default function LaunchComparison({
         range: { since: string; until: string };
     } | null>(null);
 
-    // Local selections give instant feedback; the visit is debounced so a few
-    // quick clicks in a picker cost one reload, not one each.
+    // Local copies give instant feedback; the visit is debounced where a few
+    // quick edits (picker clicks, typing) should cost one reload, not one each.
     const [pendingAccounts, setPendingAccounts] = useState(selectedAccounts);
-    useEffect(() => setPendingAccounts(selectedAccounts), [selectedAccounts]);
+    const [searchValue, setSearchValue] = useState(serverFilters.search);
+    const [creatorId, setCreatorId] = useState(serverFilters.creatorId ?? '');
+    const [filters, setFilters] = useState<GridFilter[]>(() =>
+        deserializeGridFilters(serverFilters.metric, serverFilters.date),
+    );
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const visit = (
-        next: Partial<{
-            level: Level;
-            days: number;
-            accounts: string[];
-            page: number;
-            perPage: number;
-            startRange: { from: string | null; to: string | null };
-        }>,
-        debounce = false,
-    ) => {
-        const accts = next.accounts ?? pendingAccounts;
-        const range = next.startRange ?? startRange;
+    interface Query {
+        level: Level;
+        days: number;
+        accounts: string[];
+        page: number;
+        perPage: number;
+        startRange: { from: string | null; to: string | null };
+        search: string;
+        creatorId: string;
+        filters: GridFilter[];
+    }
+
+    // Every control goes through here: the URL is rebuilt from the whole
+    // current state plus the one change, so no control can drop another's
+    // setting. Any change but paging starts back on page 1.
+    const visit = (next: Partial<Query>, debounce = false) => {
+        const q: Query = {
+            level,
+            days,
+            accounts: pendingAccounts,
+            page: 1,
+            perPage: pagination.perPage,
+            startRange,
+            search: searchValue,
+            creatorId,
+            filters,
+            ...next,
+        };
+        const metricFilters = serializeMetricFilters(q.filters);
+        const dateFilters = serializeDateFilters(q.filters);
+
         const params = {
-            level: next.level ?? level,
-            days: next.days ?? days,
-            ...(accts.length !== accounts.length ? { accounts: accts } : {}),
-            ...(range.from ? { start_from: range.from } : {}),
-            ...(range.to ? { start_to: range.to } : {}),
-            // Any other change reshuffles the list, so it starts from page 1.
-            ...(next.page && next.page > 1 ? { page: next.page } : {}),
-            ...((next.perPage ?? pagination.perPage) !== perPageOptions[0]
-                ? { per_page: next.perPage ?? pagination.perPage }
+            level: q.level,
+            days: q.days,
+            // All accounts is the default, so it stays out of the URL. No
+            // accounts sends a sentinel that matches none — an empty list
+            // would drop out of the URL and read as "all" again.
+            ...(q.accounts.length !== accounts.length
+                ? { accounts: q.accounts.length ? q.accounts : ['none'] }
                 : {}),
+            ...(q.startRange.from ? { start_from: q.startRange.from } : {}),
+            ...(q.startRange.to ? { start_to: q.startRange.to } : {}),
+            ...(q.search.trim() ? { search: q.search.trim() } : {}),
+            // Creator is tagged per ad, so it only applies at the ad level.
+            ...(q.level === 'ad' && q.creatorId
+                ? { creator_id: q.creatorId }
+                : {}),
+            ...(metricFilters ? { metric_filters: metricFilters } : {}),
+            ...(dateFilters ? { date_filters: dateFilters } : {}),
+            ...(q.page > 1 ? { page: q.page } : {}),
+            ...(q.perPage !== perPageOptions[0] ? { per_page: q.perPage } : {}),
         };
         const go = () =>
             router.get(base, params, {
@@ -546,54 +596,131 @@ export default function LaunchComparison({
                     />
                 </div>
 
-                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-black/6 bg-white/70 p-2 shadow-sm backdrop-blur-sm dark:border-white/6 dark:bg-zinc-900/70">
-                    <AccountMultiPicker
-                        accounts={accounts}
-                        selected={pendingAccounts}
-                        onChange={(next) => {
-                            setPendingAccounts(next);
-                            visit({ accounts: next }, true);
-                        }}
-                    />
-                    <Segmented
-                        label="Group by"
-                        value={level}
-                        options={LEVELS.map((l) => ({
-                            id: l.id,
-                            label: l.label,
-                        }))}
-                        onChange={(next) => visit({ level: next })}
-                    />
-                    <DaysControl
-                        value={days}
-                        presets={dayPresets}
-                        max={maxDays}
-                        onChange={(next) => visit({ days: next })}
-                    />
-                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                <div className="mb-4 space-y-2 rounded-2xl border border-black/6 bg-white/70 p-2 shadow-sm backdrop-blur-sm dark:border-white/6 dark:bg-zinc-900/70">
+                    {/* Which launches — the Ads Manager's filter bar. */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <AccountMultiPicker
+                            accounts={accounts}
+                            selected={pendingAccounts}
+                            onChange={(next) => {
+                                setPendingAccounts(next);
+                                visit({ accounts: next }, true);
+                            }}
+                        />
                         <Segmented
-                            label="Daily or running total"
-                            value={mode}
-                            options={[
-                                { id: 'daily', label: 'Daily' },
-                                { id: 'cumulative', label: 'Running total' },
-                            ]}
-                            onChange={setMode}
+                            label="Group by"
+                            value={level}
+                            options={LEVELS.map((l) => ({
+                                id: l.id,
+                                label: l.label,
+                            }))}
+                            onChange={(next) => {
+                                // Creator only exists per ad.
+                                if (next !== 'ad') setCreatorId('');
+                                visit({ level: next, creatorId: '' });
+                            }}
                         />
-                        <MetricPicker
-                            selected={metrics}
-                            onChange={setMetrics}
-                            options={METRIC_OPTIONS}
-                            defaults={DEFAULT_METRICS}
+                        <div className="relative min-w-[180px] flex-1">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                            <input
+                                type="text"
+                                placeholder={`Search ${levelMeta.plural}...`}
+                                aria-label={`Search ${levelMeta.plural}`}
+                                value={searchValue}
+                                onChange={(e) => {
+                                    setSearchValue(e.target.value);
+                                    visit({ search: e.target.value }, true);
+                                }}
+                                className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400 dark:focus:bg-zinc-900"
+                            />
+                        </div>
+                        {level === 'ad' && (
+                            <Select
+                                value={creatorId || 'all'}
+                                onValueChange={(v) => {
+                                    const next = v === 'all' ? '' : v;
+                                    setCreatorId(next);
+                                    visit({ creatorId: next });
+                                }}
+                            >
+                                <SelectTrigger
+                                    aria-label="Creator"
+                                    className="h-9 w-[180px] font-mono text-[11px]"
+                                >
+                                    <SelectValue placeholder="All creators" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All creators
+                                    </SelectItem>
+                                    <SelectItem value="unassigned">
+                                        Unassigned
+                                    </SelectItem>
+                                    {members.map((m) => (
+                                        <SelectItem
+                                            key={m.id}
+                                            value={String(m.id)}
+                                        >
+                                            {m.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        <InsightFilterBuilder
+                            filters={filters}
+                            onChange={(next) => {
+                                setFilters(next);
+                                visit({ filters: next });
+                            }}
+                            groupBy={level}
+                            objectives={objectives}
                         />
+                    </div>
+
+                    {/* How to compare them. */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <DaysControl
+                            value={days}
+                            presets={dayPresets}
+                            max={maxDays}
+                            onChange={(next) => visit({ days: next })}
+                        />
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                            <Segmented
+                                label="Daily or running total"
+                                value={mode}
+                                options={[
+                                    { id: 'daily', label: 'Daily' },
+                                    {
+                                        id: 'cumulative',
+                                        label: 'Running total',
+                                    },
+                                ]}
+                                onChange={setMode}
+                            />
+                            <MetricPicker
+                                selected={metrics}
+                                onChange={setMetrics}
+                                options={METRIC_OPTIONS}
+                                defaults={DEFAULT_METRICS}
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {items.length === 0 ? (
                     <p className="rounded-2xl border border-dashed border-black/10 py-20 text-center font-mono text-[11px] text-gray-400 dark:border-white/10 dark:text-gray-500">
-                        {startRange.from || startRange.to
-                            ? `No ${levelMeta.plural} started in this date range.`
-                            : `No ${levelMeta.plural} have launched in the selected accounts yet.`}
+                        {pendingAccounts.length === 0
+                            ? 'No ad accounts selected — pick at least one.'
+                            : startRange.from ||
+                                startRange.to ||
+                                searchValue.trim() ||
+                                creatorId ||
+                                serializeMetricFilters(filters) ||
+                                serializeDateFilters(filters)
+                              ? `No ${levelMeta.plural} match these filters.`
+                              : `No ${levelMeta.plural} have launched in the selected accounts yet.`}
                     </p>
                 ) : (
                     <>

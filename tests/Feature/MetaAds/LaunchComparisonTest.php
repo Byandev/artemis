@@ -210,6 +210,56 @@ it('filters launches by start date range', function () {
             ->where('startRange.to', '2026-09-03'));
 });
 
+it('applies the Ads Manager filters', function () {
+    ['workspace' => $workspace, 'user' => $user] = actingAsWorkspaceOwner();
+
+    seedLaunches($workspace, [
+        ['id' => 1000, 'start' => '2026-09-01 00:00:00', 'insights' => [
+            '2026-09-01' => 100,
+            '2026-09-02' => 100,
+            '2026-09-09' => 5000, // Day 9 — outside a 3-day window
+        ]],
+        ['id' => 2000, 'start' => '2026-09-03 00:00:00', 'insights' => ['2026-09-03' => 900]],
+        ['id' => 3000, 'start' => '2026-09-05 00:00:00'], // never delivered
+    ]);
+
+    Campaign::whereKey(1000)->update(['objective' => 'OUTCOME_SALES', 'name' => 'Sale Broad']);
+    Campaign::whereKey(2000)->update(['objective' => 'OUTCOME_LEADS', 'created_time' => '2026-08-20 10:00:00']);
+    Ad::whereKey(1002)->update(['creator_id' => $user->id]);
+
+    $props = fn (array $query) => $this->get(launchComparisonUrl($workspace, ['days' => 3, ...$query]))
+        ->assertOk()
+        ->inertiaProps();
+    $ids = fn (array $query) => array_column($props($query)['items'], 'id');
+    $metric = fn (array $rows) => ['metric_filters' => json_encode($rows)];
+
+    // Name search.
+    expect($ids(['search' => 'sale']))->toBe(['1000'])
+        // Objective rides in metric_filters, like on the Ads Manager.
+        ->and($ids($metric([['field' => 'campaign_objective', 'op' => 'is', 'value' => 'OUTCOME_LEADS']])))->toBe(['2000'])
+        ->and($ids($metric([['field' => 'campaign_objective', 'op' => 'is_not', 'value' => 'OUTCOME_LEADS']])))->toBe(['3000', '1000'])
+        // Lifecycle dates.
+        ->and($ids(['date_filters' => json_encode([['field' => 'created_date', 'op' => 'on', 'value' => '2026-08-20']])]))->toBe(['2000'])
+        ->and($ids(['date_filters' => json_encode([['field' => 'started_date', 'op' => 'after', 'value' => '2026-09-02']])]))->toBe(['3000', '2000'])
+        // Metrics test Day 1..N only: campaign 1000 spent 200 in its first 3
+        // days (its 5000 on Day 9 doesn't count).
+        ->and($ids($metric([['field' => 'spend', 'op' => 'gt', 'value' => 500]])))->toBe(['2000'])
+        ->and($ids($metric([['field' => 'spend', 'op' => 'range', 'value' => 150, 'value2' => 250]])))->toBe(['1000'])
+        // An item that never delivered still tests as 0.
+        ->and($ids($metric([['field' => 'spend', 'op' => 'eq', 'value' => 0]])))->toBe(['3000'])
+        // Creator is ad-level: it narrows ads, and is ignored for campaigns.
+        ->and($ids(['level' => 'ad', 'creator_id' => (string) $user->id]))->toBe(['1002'])
+        ->and($ids(['level' => 'ad', 'creator_id' => 'unassigned']))->toBe(['3002', '2002'])
+        ->and($ids(['creator_id' => (string) $user->id]))->toBe(['3000', '2000', '1000']);
+
+    // The pager counts the filtered set, and the filters come back for a refresh.
+    $filtered = $props([...$metric([['field' => 'spend', 'op' => 'gte', 'value' => 0]]), 'search' => 'Campaign']);
+
+    expect($filtered['pagination']['total'])->toBe(2)
+        ->and($filtered['filters']['search'])->toBe('Campaign')
+        ->and($filtered['filters']['metric'][0])->toMatchArray(['field' => 'spend', 'op' => 'gte']);
+});
+
 it('pages through launches instead of capping them', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
 
@@ -232,6 +282,21 @@ it('pages through launches instead of capping them', function () {
     // A bigger page fits them all; an unsupported size falls back to 10.
     expect($this->get(launchComparisonUrl($workspace, ['per_page' => 25]))->inertiaProps('items'))->toHaveCount(12)
         ->and($this->get(launchComparisonUrl($workspace, ['per_page' => 3]))->inertiaProps('pagination.perPage'))->toBe(10);
+});
+
+it('shows nothing when every account is unticked', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    seedLaunches($workspace, [
+        ['id' => 1000, 'start' => '2026-09-01 00:00:00', 'insights' => ['2026-09-01' => 5]],
+    ]);
+
+    // The page sends this sentinel for an empty selection; no accounts param
+    // at all would mean "all".
+    $props = $this->get(launchComparisonUrl($workspace, ['accounts' => ['none']]))->assertOk()->inertiaProps();
+
+    expect($props['items'])->toBe([])
+        ->and($props['selectedAccounts'])->toBe([]);
 });
 
 it('leaves out launches from accounts outside the workspace', function () {

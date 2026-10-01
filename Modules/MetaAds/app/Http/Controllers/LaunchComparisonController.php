@@ -11,10 +11,13 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\MetaAds\Http\Controllers\Concerns\AppliesAdsManagerFilters;
 use Modules\MetaAds\Models\AdAccount;
 
 class LaunchComparisonController extends Controller
 {
+    use AppliesAdsManagerFilters;
+
     /** Rows per page; the first is the default. */
     public const PER_PAGE_OPTIONS = [10, 25, 50];
 
@@ -55,15 +58,28 @@ class LaunchComparisonController extends Controller
         $perPage = $this->resolvePerPage($request);
         [$startFrom, $startTo] = $this->resolveStartRange($request);
 
-        // Every launched item — or those that started within the picked
-        // range — newest first, a page at a time.
-        $page = $accountIds->isEmpty()
-            ? null
-            : $this->launchedQuery($config, $accountIds->all())
+        // The Ads Manager's filters, parsed exactly as it parses them.
+        $filters = [
+            'search' => trim((string) $request->query('search', '')),
+            // Internal creator is tagged per ad, so it only means anything there.
+            'creator' => $level === 'ad' ? ((string) $request->query('creator_id', '') ?: null) : null,
+            'metric' => $this->parseMetricFilters($request),
+            'date' => $this->parseDateFilters($request),
+            'objective' => $this->parseObjectiveFilters($request),
+        ];
+
+        // Every launched item that passes the filters, newest first, a page at
+        // a time.
+        $page = null;
+        if ($accountIds->isNotEmpty()) {
+            $query = $this->launchedQuery($config, $accountIds->all())
                 ->when($startFrom, fn ($q) => $q->where("{$config['table']}.start_time", '>=', $startFrom->copy()->startOfDay()))
-                ->when($startTo, fn ($q) => $q->where("{$config['table']}.start_time", '<', $startTo->copy()->addDay()->startOfDay()))
-                ->paginate($perPage)
-                ->withQueryString();
+                ->when($startTo, fn ($q) => $q->where("{$config['table']}.start_time", '<', $startTo->copy()->addDay()->startOfDay()));
+
+            $this->applyFilters($query, $config, $level, $filters, $days);
+
+            $page = $query->paginate($perPage)->withQueryString();
+        }
 
         return Inertia::render('workspaces/integrations/meta-ads/launch-comparison', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
@@ -78,6 +94,19 @@ class LaunchComparisonController extends Controller
                 'from' => $startFrom?->toDateString(),
                 'to' => $startTo?->toDateString(),
             ],
+            // Handed back so a refresh or a shared link restores the filters.
+            'filters' => [
+                'search' => $filters['search'],
+                'creatorId' => $filters['creator'],
+                // Objective rows ride in metric_filters, as on the Ads Manager.
+                'metric' => [
+                    ...$filters['metric'],
+                    ...array_map(fn ($f) => ['field' => 'campaign_objective', ...$f], $filters['objective']),
+                ],
+                'date' => $filters['date'],
+            ],
+            'objectives' => $this->availableObjectives($allAccountIds),
+            'members' => $this->workspaceMembers($workspace),
             'items' => $page ? $this->alignedSeries($config, collect($page->items()), $days) : [],
             'pagination' => [
                 'currentPage' => $page?->currentPage() ?? 1,
@@ -147,6 +176,64 @@ class LaunchComparisonController extends Controller
             ->orderByDesc("{$table}.start_time")
             ->orderByDesc("{$table}.id")
             ->select($selects);
+    }
+
+    /**
+     * The Ads Manager's filters, applied to items of one level:
+     *
+     * - search: the item's name contains the text;
+     * - creator: ads tagged to a member, or untagged ("unassigned");
+     * - campaign objective: through the item's campaign;
+     * - created / start date: the item's own created_time / start_time (ads
+     *   now carry a start_time of their own);
+     * - metric conditions: tested against the item's totals over its Day 1 –
+     *   Day N window — the days this page compares — rather than a calendar
+     *   range, which this page doesn't have.
+     *
+     * @param  array{search: string, creator: ?string, metric: array, date: array, objective: array}  $filters
+     */
+    private function applyFilters(Builder $query, array $config, string $level, array $filters, int $days): void
+    {
+        $table = $config['table'];
+
+        if ($filters['search'] !== '') {
+            $query->where("{$table}.name", 'like', '%'.$filters['search'].'%');
+        }
+
+        $this->applyCreatorFilter($query, $filters['creator']);
+
+        $this->constrainByObjectives(
+            $query,
+            $level === 'campaign' ? "{$table}.id" : "{$table}.meta_ads_campaign_id",
+            $filters['objective'],
+        );
+
+        foreach ($filters['date'] as $f) {
+            $column = $f['field'] === 'created_date' ? "{$table}.created_time" : "{$table}.start_time";
+            $this->applyDateCondition($query, $column, $f);
+        }
+
+        if ($filters['metric'] === []) {
+            return;
+        }
+
+        // `i` is what the shared metric expressions sum: each item's own
+        // insights, Day 1 to Day N. LEFT JOIN so an item that never delivered
+        // still tests as 0 (e.g. "spend = 0").
+        $query->leftJoin('meta_ads_insights as i', function ($join) use ($table, $config, $days) {
+            $join->on("i.{$config['key']}", '=', "{$table}.id")
+                ->whereRaw("i.date >= DATE({$table}.start_time)")
+                ->whereRaw("i.date < DATE({$table}.start_time) + INTERVAL ? DAY", [$days]);
+        });
+
+        $query->groupBy(array_filter([
+            "{$table}.id",
+            "{$table}.name",
+            "{$table}.start_time",
+            $config['parent_table'] ? 'parent.name' : null,
+        ]));
+
+        $this->applyMetricFilters($query, $filters['metric']);
     }
 
     /**
