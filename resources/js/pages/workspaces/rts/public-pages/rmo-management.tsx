@@ -104,6 +104,8 @@ interface Props {
             parcel_status?: string | string[];
             /** 'with' | 'without' — orders that carry an upsell, or don't. */
             upsell?: string | string[];
+            /** 'external' | 'internal' — who handles the RMO. */
+            rmo_by_external_team?: string | string[];
         };
         page?: number;
         perPage?: number;
@@ -131,6 +133,11 @@ interface Props {
      * overwrite manual edits, so the page says so out loud.
      */
     enable_auto_tag_status?: boolean;
+    /**
+     * Whether the workspace syncs the external RMO team's Google Sheet. The
+     * "External Team" filter only exists while it's on.
+     */
+    enable_external_team_sync?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -656,6 +663,7 @@ function RmoManagement({
     enable_edit_previous_day = false,
     enable_bulk_status_update = false,
     enable_auto_tag_status = false,
+    enable_external_team_sync = false,
 }: Props) {
     const { appEnv, flash } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
@@ -772,6 +780,18 @@ function RmoManagement({
         [query?.filter?.upsell],
     );
 
+    // Empty while external team sync is off, so a stale filter in the URL
+    // isn't carried into the next navigation or export.
+    const currentExternalTeam = useMemo(
+        () =>
+            !enable_external_team_sync
+                ? ''
+                : Array.isArray(query?.filter?.rmo_by_external_team)
+                  ? (query.filter.rmo_by_external_team[0] ?? '')
+                  : (query?.filter?.rmo_by_external_team ?? ''),
+        [enable_external_team_sync, query?.filter?.rmo_by_external_team],
+    );
+
     // CSRs by name, for the assignee picker — the list comes off the shops in
     // this workspace, in whatever order the query returned it.
     const assigneeOptions = useMemo(
@@ -879,6 +899,7 @@ function RmoManagement({
                 assigneeId?: string;
             },
             upsell?: string,
+            externalTeam?: string,
         ) => {
             const pageIds = ids?.pageIds ?? selectedPageIds;
             const shopIds = ids?.shopIds ?? selectedShopIds;
@@ -911,6 +932,13 @@ function RmoManagement({
                     : currentUpsell
                       ? { 'filter[upsell]': currentUpsell }
                       : {}),
+                ...(externalTeam !== undefined
+                    ? externalTeam
+                        ? { 'filter[rmo_by_external_team]': externalTeam }
+                        : {}
+                    : currentExternalTeam
+                      ? { 'filter[rmo_by_external_team]': currentExternalTeam }
+                      : {}),
                 ...(pageIds.length
                     ? { 'filter[page_id]': pageIds.join(',') }
                     : {}),
@@ -937,6 +965,7 @@ function RmoManagement({
             currentStatus,
             currentParcelStatus,
             currentUpsell,
+            currentExternalTeam,
             selectedPageIds,
             selectedShopIds,
             selectedUserIds,
@@ -1043,6 +1072,26 @@ function RmoManagement({
         [workspace, buildAllParams, query?.sort],
     );
 
+    const handleExternalTeamChange = useCallback(
+        (externalTeam: string) => {
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                buildAllParams(
+                    query?.sort,
+                    1,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    externalTeam,
+                ),
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [workspace, buildAllParams, query?.sort],
+    );
+
     useEffect(() => {
         const name = localStorage.getItem('user_name');
         if (name) setUserName(name);
@@ -1118,6 +1167,8 @@ function RmoManagement({
         if (currentParcelStatus)
             params.set('filter[parcel_status]', currentParcelStatus);
         if (currentUpsell) params.set('filter[upsell]', currentUpsell);
+        if (currentExternalTeam)
+            params.set('filter[rmo_by_external_team]', currentExternalTeam);
         if (selectedPageIds.length)
             params.set('filter[page_id]', selectedPageIds.join(','));
         if (selectedShopIds.length)
@@ -1140,6 +1191,7 @@ function RmoManagement({
         currentStatus,
         currentParcelStatus,
         currentUpsell,
+        currentExternalTeam,
         selectedPageIds,
         selectedShopIds,
         selectedUserIds,
@@ -1187,6 +1239,12 @@ function RmoManagement({
                     ...(currentUpsell
                         ? { 'filter[upsell]': currentUpsell }
                         : {}),
+                    ...(currentExternalTeam
+                        ? {
+                              'filter[rmo_by_external_team]':
+                                  currentExternalTeam,
+                          }
+                        : {}),
                     ...(selectedPageIds.length
                         ? { 'filter[page_id]': selectedPageIds.join(',') }
                         : {}),
@@ -1217,6 +1275,7 @@ function RmoManagement({
             currentStatus,
             currentParcelStatus,
             currentUpsell,
+            currentExternalTeam,
             selectedPageIds,
             selectedShopIds,
             selectedUserIds,
@@ -2339,6 +2398,21 @@ function RmoManagement({
                             <option value="with">With Upsell</option>
                             <option value="without">Without Upsell</option>
                         </select>
+
+                        {enable_external_team_sync && (
+                            <select
+                                value={currentExternalTeam}
+                                onChange={(e) =>
+                                    handleExternalTeamChange(e.target.value)
+                                }
+                                title="Show only orders RMO'd by an external team, or by the internal team"
+                                className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
+                            >
+                                <option value="">All Teams</option>
+                                <option value="external">External Team</option>
+                                <option value="internal">Internal Team</option>
+                            </select>
+                        )}
 
                         <select
                             value={selectedAssigneeId}
