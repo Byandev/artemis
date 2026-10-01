@@ -161,6 +161,7 @@ export const PERMISSIONS = {
     ApproveOptimizationRules: 'Approve Optimization Rules',
     ViewOptimizationLogs: 'View Optimization Logs',
     ViewAdSpentSummary: 'View Adspent Summary',
+    ViewLaunchComparison: 'View Launch Comparison',
 
     // Dashboards
     ViewMainDashboard: 'View Main Dashboard',
