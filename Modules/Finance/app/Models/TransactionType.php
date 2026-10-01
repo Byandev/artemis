@@ -3,8 +3,10 @@
 namespace Modules\Finance\Models;
 
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class TransactionType extends Model
 {
@@ -48,7 +50,36 @@ class TransactionType extends Model
         'nature',
         'income_statement_section',
         'opex_allocation_basis',
+        'fund_requestable',
+        'fund_requestable_per_product',
     ];
+
+    protected $casts = [
+        'fund_requestable' => 'boolean',
+        'fund_requestable_per_product' => 'boolean',
+    ];
+
+    /**
+     * Whether this type is the freight cost carried on top of a purchase order
+     * — the "Delivery Fee of COGS" kind of entry, whose amount belongs to the
+     * products of one order rather than to the business at large.
+     *
+     * Matched on the type's name, since types are workspace-authored free text
+     * with no flag to key off (the same approach TransactionController takes to
+     * find the legacy "expenses" type). Both halves must be present, so plain
+     * "Cost of Goods" and a general "Delivery Fee" are both left out.
+     */
+    public function isCogsDelivery(): bool
+    {
+        $name = mb_strtolower($this->name ?? '');
+
+        $isCogs = str_contains($name, 'cogs') || str_contains($name, 'cost of goods');
+        $isDelivery = str_contains($name, 'delivery')
+            || str_contains($name, 'freight')
+            || str_contains($name, 'shipping');
+
+        return $isCogs && $isDelivery;
+    }
 
     /** The effective basis: the configured one, or the default when unset. */
     public function allocationBasis(): string
@@ -56,8 +87,30 @@ class TransactionType extends Model
         return $this->opex_allocation_basis ?: self::DEFAULT_ALLOCATION_BASIS;
     }
 
+    /** Types a fund request can be raised against. */
+    public function scopeFundRequestable(Builder $query): void
+    {
+        $query->where('fund_requestable', true);
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    /**
+     * The attachments a fund request of this type calls for.
+     */
+    public function attachments(): BelongsToMany
+    {
+        return $this->belongsToMany(FundRequestAttachmentRequirement::class, 'finance_fund_request_transaction_type_attachments', 'transaction_type_id', 'attachment_requirement_id')->orderBy('name');
+    }
+
+    /**
+     * The checklist items a fund request of this type is checked against.
+     */
+    public function checklists(): BelongsToMany
+    {
+        return $this->belongsToMany(FundRequestChecklistRequirement::class, 'finance_fund_request_transaction_type_checklists', 'transaction_type_id', 'checklist_requirement_id')->orderBy('name');
     }
 }

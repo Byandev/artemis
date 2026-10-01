@@ -52,7 +52,7 @@ function lowStockOrder($workspace, InventoryItem $item, string $issuedAt, int $c
 }
 
 test('po needed is the buffer plus lead-time demand less stock on hand', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -60,8 +60,8 @@ test('po needed is the buffer plus lead-time demand less stock on hand', functio
         'is_active' => true,
         'lead_time' => 5,
         'days_of_coverage' => 10,
-        'three_days_average' => 4,
     ]);
+    seedDemandFeed($item, 4);
     stockLedger($item, 12);
 
     $data = lowStock($owner, $workspace);
@@ -75,18 +75,17 @@ test('po needed is the buffer plus lead-time demand less stock on hand', functio
 });
 
 test('items are ranked by po needed, worst first', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     // Same buffer and lead time throughout, so the daily average sets the order.
     foreach ([['LOW', 1], ['HIGH', 9], ['MID', 5]] as [$sku, $average]) {
-        InventoryItem::create([
+        seedDemandFeed(InventoryItem::create([
             'workspace_id' => $workspace->id,
             'sku' => $sku,
             'is_active' => true,
             'lead_time' => 5,
             'days_of_coverage' => 10,
-            'three_days_average' => $average,
-        ]);
+        ]), $average);
     }
 
     $data = lowStock($owner, $workspace);
@@ -95,7 +94,7 @@ test('items are ranked by po needed, worst first', function () {
 });
 
 test('a group recomputes po needed from its parts instead of summing children', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -114,8 +113,8 @@ test('a group recomputes po needed from its parts instead of summing children', 
             'is_active' => true,
             'lead_time' => 5,
             'days_of_coverage' => 10,
-            'three_days_average' => $average,
         ]);
+        seedDemandFeed($child, $average);
         stockLedger($child, 10);
     }
 
@@ -133,7 +132,7 @@ test('a group recomputes po needed from its parts instead of summing children', 
 });
 
 test('incoming purchase-order stock is counted once, not twice', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -141,8 +140,8 @@ test('incoming purchase-order stock is counted once, not twice', function () {
         'is_active' => true,
         'lead_time' => 5,
         'days_of_coverage' => 10,
-        'three_days_average' => 4,
     ]);
+    seedDemandFeed($item, 4);
     stockLedger($item, 12);
 
     $order = PurchasedOrder::create([
@@ -166,17 +165,16 @@ test('incoming purchase-order stock is counted once, not twice', function () {
 });
 
 test('only the worst 20 groups are listed', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     foreach (range(1, 25) as $n) {
-        InventoryItem::create([
+        seedDemandFeed(InventoryItem::create([
             'workspace_id' => $workspace->id,
             'sku' => 'SKU-'.str_pad((string) $n, 2, '0', STR_PAD_LEFT),
             'is_active' => true,
             'lead_time' => 1,
             'days_of_coverage' => 0,
-            'three_days_average' => $n,
-        ]);
+        ]), $n);
     }
 
     $data = lowStock($owner, $workspace);
@@ -189,7 +187,7 @@ test('only the worst 20 groups are listed', function () {
 });
 
 test('covered items and inactive items are left out', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     // Well stocked against its demand -> nothing to order.
     $covered = InventoryItem::create([
@@ -198,27 +196,25 @@ test('covered items and inactive items are left out', function () {
         'is_active' => true,
         'lead_time' => 5,
         'days_of_coverage' => 10,
-        'three_days_average' => 1,
     ]);
+    seedDemandFeed($covered, 1);
     stockLedger($covered, 500);
 
-    InventoryItem::create([
+    seedDemandFeed(InventoryItem::create([
         'workspace_id' => $workspace->id,
         'sku' => 'RETIRED',
         'is_active' => false,
         'lead_time' => 5,
         'days_of_coverage' => 10,
-        'three_days_average' => 9,
-    ]);
+    ]), 9);
 
-    InventoryItem::create([
+    seedDemandFeed(InventoryItem::create([
         'workspace_id' => $workspace->id,
         'sku' => 'SHORT',
         'is_active' => true,
         'lead_time' => 5,
         'days_of_coverage' => 10,
-        'three_days_average' => 2,
-    ]);
+    ]), 2);
 
     $data = lowStock($owner, $workspace);
 
@@ -226,17 +222,16 @@ test('covered items and inactive items are left out', function () {
 });
 
 test('one workspace never sees another workspace items', function () {
-    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
-    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspaceA] = makeGencysWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeGencysWorkspaceWithOwner();
 
-    InventoryItem::create([
+    seedDemandFeed(InventoryItem::create([
         'workspace_id' => $workspaceB->id,
         'sku' => 'B-ONLY',
         'is_active' => true,
         'lead_time' => 5,
         'days_of_coverage' => 10,
-        'three_days_average' => 9,
-    ]);
+    ]), 9);
 
     $data = lowStock($owner, $workspaceA);
 
@@ -245,20 +240,22 @@ test('one workspace never sees another workspace items', function () {
 });
 
 test('last PO issued reports the most recent order across the whole group', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'PARENT', 'is_parent' => true,
-        'is_active' => true, 'lead_time' => 10, 'days_of_coverage' => 10, 'three_days_average' => 10,
+        'is_active' => true, 'lead_time' => 10, 'days_of_coverage' => 10,
     ]);
     $childA = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'CHILD-A', 'parent_id' => $parent->id,
-        'is_active' => true, 'three_days_average' => 5,
+        'is_active' => true,
     ]);
     $childB = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'CHILD-B', 'parent_id' => $parent->id,
-        'is_active' => true, 'three_days_average' => 5,
+        'is_active' => true,
     ]);
+    seedDemandFeed($childA, 5);
+    seedDemandFeed($childB, 5);
 
     // Delivered orders still count — the question is when you last ordered,
     // not whether it is still open.
@@ -273,12 +270,12 @@ test('last PO issued reports the most recent order across the whole group', func
 });
 
 test('a group that has never been ordered reports no date at all', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
-    InventoryItem::create([
+    seedDemandFeed(InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'NEVER-ORDERED', 'is_active' => true,
-        'lead_time' => 10, 'days_of_coverage' => 10, 'three_days_average' => 10,
-    ]);
+        'lead_time' => 10, 'days_of_coverage' => 10,
+    ]), 10);
 
     $row = collect(lowStock($owner, $workspace)['items'])->firstWhere('sku', 'NEVER-ORDERED');
 

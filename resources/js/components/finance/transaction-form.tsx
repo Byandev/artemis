@@ -4,7 +4,12 @@ import {
     inputCls,
 } from '@/components/finance/account-form-dialog';
 import {
+    PurchasedOrderOption,
+    PurchasedOrderPicker,
+} from '@/components/finance/purchased-order-picker';
+import {
     allocatedTotal,
+    proportionalShares,
     Share,
     ShareAllocator,
     sharesBalanced,
@@ -53,6 +58,8 @@ export interface FundRequestOption {
     amount_requested: number;
     status: string;
     transaction_type_id: number | null;
+    requested_by: number | null;
+    approved_by: number | null;
     department: string | null;
     charge_to: { user_id: number; name: string; amount: number }[];
     products: { product_label: string; amount: number }[];
@@ -102,6 +109,11 @@ interface Props {
     transaction?: FinanceTransaction | null;
     accounts: AccountOpt[];
     transactionTypes: TransactionTypeItem[];
+    /**
+     * Ids of the types whose entries are a purchase order's freight bill —
+     * these get the PO picker (see TransactionType::isCogsDelivery()).
+     */
+    cogsDeliveryTypeIds?: number[];
     users: UserOpt[];
     products?: string[];
     fundRequests?: FundRequestOption[];
@@ -129,7 +141,7 @@ const money = (n: number) =>
  * grid on the right. Defined at module scope so the inputs it wraps keep focus
  * across re-renders.
  */
-function Section({
+export function Section({
     title,
     hint,
     children,
@@ -156,7 +168,7 @@ function Section({
 }
 
 /** Spans both columns of a Section's field grid. */
-function Wide({
+export function Wide({
     children,
     ref,
 }: {
@@ -174,6 +186,7 @@ export function TransactionForm({
     transaction,
     accounts,
     transactionTypes,
+    cogsDeliveryTypeIds = [],
     users,
     products = [],
     fundRequests = [],
@@ -245,6 +258,18 @@ export function TransactionForm({
     const [autoSplit, setAutoSplit] = React.useState(true);
     const [autoSplitProducts, setAutoSplitProducts] = React.useState(true);
 
+    // The purchase order a delivery fee belongs to. Held only for as long as the
+    // split follows it: the moment a share is touched by hand the allocation is
+    // the user's, and the picker steps back out of the way.
+    const [purchasedOrder, setPurchasedOrder] =
+        React.useState<PurchasedOrderOption | null>(null);
+
+    // Whether the chosen type is a purchase order's freight bill, which is what
+    // makes the PO picker (and the quantity-weighted split) worth offering.
+    const isCogsDelivery = cogsDeliveryTypeIds.includes(
+        Number(data.transaction_type_id),
+    );
+
     const selectedAccount = accounts.find(
         (a) => String(a.id) === data.account_id,
     );
@@ -282,6 +307,13 @@ export function TransactionForm({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.transaction_type_id]);
 
+    // Switching to a type that isn't a delivery fee retires the order: the
+    // shares it produced stay put and stop tracking the amount, rather than a
+    // hidden picker going on quietly rewriting them.
+    useEffect(() => {
+        if (!isCogsDelivery && purchasedOrder) setPurchasedOrder(null);
+    }, [isCogsDelivery, purchasedOrder]);
+
     const totalAmount = parseFloat(data.amount) || 0;
 
     // The allocators work in `{key, amount}` rows; the payload keys each row by
@@ -306,10 +338,74 @@ export function TransactionForm({
     }, [products, data.products]);
 
     /**
+     * Re-cut the product shares by the selected order's quantities. Kept in an
+     * effect rather than done once on pick so the split follows the amount:
+     * typing the fee after choosing the order still lands correctly, as does
+     * correcting it afterwards.
+     */
+    useEffect(() => {
+        if (!purchasedOrder || purchasedOrder.products.length === 0) return;
+
+        const shares = proportionalShares(
+            totalAmount,
+            purchasedOrder.products.map((p) => p.qty),
+        );
+        const next = purchasedOrder.products.map((p, i) => ({
+            product: p.product,
+            amount: shares[i],
+        }));
+
+        const unchanged =
+            next.length === data.products.length &&
+            next.every(
+                (row, i) =>
+                    row.product === data.products[i]?.product &&
+                    row.amount === data.products[i]?.amount,
+            );
+
+        if (!unchanged) setData('products', next);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [purchasedOrder, totalAmount]);
+
+    /**
+     * Take an order's quantities as the split. The shares themselves are left to
+     * the effect above, which is also what keeps them in step with the amount.
+     */
+    const pickPurchasedOrder = (order: PurchasedOrderOption | null) => {
+        setPurchasedOrder(order);
+
+        // Even-splitting would fight the quantity weighting; an order with no
+        // quantities to weigh by has nothing to say, so the form carries on as
+        // it did before.
+        if (order && order.products.length > 0) setAutoSplitProducts(false);
+    };
+
+    /**
+     * Product rows straight from the allocator. Adding or removing a product by
+     * hand means the order's own list is no longer what is on screen, so the
+     * split stops tracking it — the shares stay, they just stop being rewritten.
+     */
+    const setProductRows = (rows: Share[]) => {
+        setData(
+            'products',
+            rows.map((r) => ({ product: r.key, amount: r.amount })),
+        );
+
+        if (!purchasedOrder) return;
+
+        const picked = rows.map((r) => r.key).sort();
+        const fromOrder = purchasedOrder.products.map((p) => p.product).sort();
+
+        if (picked.join('\u0000') !== fromOrder.join('\u0000')) {
+            setPurchasedOrder(null);
+        }
+    };
+
+    /**
      * Fill the form in from an approved fund request. Everything stays editable
      * afterwards — this saves retyping the request into the ledger, it does not
-     * bind the entry to it. The type/department fall back to whatever is already
-     * set when the request carries none.
+     * bind the entry to it. The type, department, requester and approver fall
+     * back to whatever is already set when the request carries none.
      */
     const pullFromFundRequest = (id: string) => {
         setData('fund_request_id', id ? Number(id) : '');
@@ -318,6 +414,9 @@ export function TransactionForm({
 
         if (!request) return;
 
+        // The request brings its own product shares — they replace whatever an
+        // order had produced.
+        setPurchasedOrder(null);
         setAutoSplit(false);
         setAutoSplitProducts(false);
 
@@ -330,6 +429,8 @@ export function TransactionForm({
                 request.transaction_type_id != null
                     ? String(request.transaction_type_id)
                     : current.transaction_type_id,
+            requested_by: request.requested_by ?? current.requested_by,
+            approved_by: request.approved_by ?? current.approved_by,
             department: request.department ?? current.department,
             charge_to: request.charge_to.map((row) => ({
                 user_id: row.user_id,
@@ -378,6 +479,9 @@ export function TransactionForm({
     useEffect(() => {
         if (!active) return;
         setShowShareErrors(false);
+        // A saved entry's shares are whatever was saved; nothing links it back
+        // to an order, so the picker starts empty either way.
+        setPurchasedOrder(null);
         if (transaction) {
             // A saved balance and saved shares are left exactly as they were.
             setAutoBalance(
@@ -767,21 +871,23 @@ export function TransactionForm({
                         />
                     </Wide>
 
+                    {isCogsDelivery && (
+                        <Wide>
+                            <PurchasedOrderPicker
+                                workspaceSlug={workspaceSlug}
+                                selected={purchasedOrder}
+                                onSelect={pickPurchasedOrder}
+                            />
+                        </Wide>
+                    )}
+
                     <Wide ref={productsRef}>
                         <ShareAllocator
                             label="Product"
                             options={productOptions}
                             rows={productRows}
                             total={totalAmount}
-                            onChange={(rows) =>
-                                setData(
-                                    'products',
-                                    rows.map((r) => ({
-                                        product: r.key,
-                                        amount: r.amount,
-                                    })),
-                                )
-                            }
+                            onChange={setProductRows}
                             placeholder="No product"
                             error={
                                 productsError ??
@@ -790,7 +896,13 @@ export function TransactionForm({
                                     : undefined)
                             }
                             autoSplit={autoSplitProducts}
-                            onAutoSplitChange={setAutoSplitProducts}
+                            onAutoSplitChange={(auto) => {
+                                // Reached only from editing a share or hitting
+                                // "Split equally" — both are the user taking the
+                                // allocation over from the order.
+                                setAutoSplitProducts(auto);
+                                setPurchasedOrder(null);
+                            }}
                             hint="Attribute this entry to one or more products for the per-product income statement. Split across several? Edit a share to divide it your way — every share must be filled in and they have to add up to the amount, or this can’t be saved."
                         />
                     </Wide>

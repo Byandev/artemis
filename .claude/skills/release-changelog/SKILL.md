@@ -1,6 +1,6 @@
 ---
 name: release-changelog
-description: Write a new release entry in resources/js/pages/workspaces/changelog.tsx from the commits merged since the last release, picking the semver bump (major/minor/patch) from what actually changed. Use when asked to "update the changelog", "cut a release", "add vX.Y.Z to the changelog", or to write release notes for a merge/release commit.
+description: Write a new release entry in resources/js/pages/workspaces/changelog.tsx from the commits merged since the last release, using the bump or version you name (major/minor/patch, or vX.Y.Z) and otherwise picking the semver bump from what actually changed. Use when asked to "update the changelog", "cut a release", "add vX.Y.Z to the changelog", or to write release notes for a merge/release commit.
 ---
 
 # Release changelog
@@ -55,12 +55,24 @@ scaffolding that was thrown away on the way there).
 
 ## 3. Pick the version
 
-Decide this yourself from what the diffs actually changed — only take a version
-the user names outright. Semantic versioning, read for an internal web app with
-no public API: "breaking" means the people using Artemis have to change what they
-do, not that a function signature moved.
+Versions are `vX.Y.Z` — X major, Y minor, Z patch. Take the version at the top of
+the file and move exactly one part, zeroing every part to its right:
 
-Start from the latest version at the top of the file and bump one part:
+| Bump      | Moves               | v3.37.1 becomes |
+| --------- | ------------------- | --------------- |
+| **major** | X + 1, Y and Z to 0 | v4.0.0          |
+| **minor** | Y + 1, Z to 0       | v3.38.0         |
+| **patch** | Z + 1               | v3.37.2         |
+
+**If the user names it, use it** — a bump ("major", "minor", "patch", "minor
+only") or an exact version ("use v3.37.1"). Don't re-derive it from the diffs or
+argue the table at them; they know things you don't, such as whether the version
+above already went out to users. Write the entry and say which version you used.
+
+Otherwise decide it yourself from what the diffs actually changed. Semantic
+versioning, read for an internal web app with no public API: "breaking" means the
+people using Artemis have to change what they do, not that a function signature
+moved.
 
 | Bump      | When                                                                                                                                                                                              |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

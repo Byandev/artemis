@@ -3,13 +3,15 @@
 namespace Modules\Finance\Services;
 
 use App\Models\User;
-use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\IncomeStatement;
-use Modules\Finance\Models\TransactionType;
+use Modules\Finance\Services\Concerns\ClosesOutSlices;
+use Modules\Finance\Statements\LossCarryovers;
 use Modules\Finance\Statements\OrderTotals;
+use Modules\Finance\Statements\ProductCostAllocator;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
+use Modules\Finance\Statements\TransactionTotals;
 
 /**
  * Builds, saves and reads the per-user slices of an income statement — the same
@@ -21,17 +23,26 @@ use Modules\Finance\Statements\StatementOrderSourceFactory;
  * whole order's money goes there. Orders whose cell resolves to nobody roll into
  * a single "Unassigned" row.
  *
- * The costs that aren't carried on the order itself — ad spend, bought goods and
- * the freight on them — come from the charge-to shares on finance transactions,
- * which is the user-side counterpart of the product tags the product statement
- * reads.
+ * The costs that aren't carried on the order itself reach a user two ways. Ad
+ * spend is known per person directly — from the page it ran on, or from the
+ * charge-to shares. Bought goods and their freight are tagged to a product
+ * instead, so a user takes the share of each product matching their share of
+ * its delivered orders; those columns are therefore the sum of this user's rows
+ * on the user-and-product statement.
  *
  * The result is snapshotted into `finance_income_user_statements` when the parent
  * statement is saved or regenerated. A first view with no snapshot builds one.
  */
 class UserIncomeStatementService
 {
-    public function __construct(private readonly StatementOrderSourceFactory $sources) {}
+    use ClosesOutSlices;
+
+    public function __construct(
+        private readonly StatementOrderSourceFactory $sources,
+        private readonly TransactionTotals $transactions,
+        private readonly LossCarryovers $carryovers,
+        private readonly ProductCostAllocator $allocator,
+    ) {}
 
     /** (Re)compute and store every per-user row for the statement's month. */
     public function snapshot(IncomeStatement $statement): void
@@ -45,13 +56,29 @@ class UserIncomeStatementService
         $advisoryRate = (float) $statement->advisory_rate;
         $gencysPartner = (bool) $workspace->is_gencys_partner;
 
-        $totals = $this->sources->for($workspace)->totalsByUser($workspace, $from, $to);
+        $source = $this->sources->for($workspace);
+        $totals = $source->totalsByUser($workspace, $from, $to);
 
-        // Charged costs are already per user, so they key in directly.
+        // Goods bought and their freight are tagged to a product, not to a
+        // person, so a user's figure is their share of every product they
+        // moved — the per-product-per-user allocation added up along the
+        // product axis. That makes this column the sum of the same user's rows
+        // on the user-and-product statement, by construction rather than by
+        // coincidence.
+        $allocated = $this->allocator->byUser($this->allocator->allocate(
+            [
+                'total_bought_cogs' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS, withUntagged: true),
+                'total_bought_cogs_delivery_fee' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY, withUntagged: true),
+            ],
+            $source->totalsByUserProduct($workspace, $from, $to),
+        ));
+
+        // Ad spend stays per person: it is known directly, from the page it ran
+        // on (whose owner is the seller) or from the charge-to shares.
         $charged = [
-            'ad_spent' => $this->chargedTotalsForTypes($workspace, $from, $to, $this->adSpentTypeIds($workspace)),
-            'total_bought_cogs' => $this->chargedTotalsForTypes($workspace, $from, $to, $this->costOfGoodsTypeIds($workspace)),
-            'total_bought_cogs_delivery_fee' => $this->chargedTotalsForTypes($workspace, $from, $to, $this->cogDeliveryTypeIds($workspace)),
+            'ad_spent' => $source->adSpendByUser($workspace, $from, $to),
+            'total_bought_cogs' => $allocated['total_bought_cogs'] ?? [],
+            'total_bought_cogs_delivery_fee' => $allocated['total_bought_cogs_delivery_fee'] ?? [],
         ];
 
         // A user earns a row for a charged cost even with no orders behind it.
@@ -59,6 +86,16 @@ class UserIncomeStatementService
             foreach (array_keys($amounts) as $key) {
                 $totals[(string) $key] ??= OrderTotals::empty();
             }
+        }
+
+        // And for a deficit carried in. Someone who owes from last month has to
+        // appear even having sold nothing this one, or what they owe quietly
+        // disappears the month they stop selling — and reappears if they start
+        // again, which is worse.
+        $carried = $this->carryovers->forUsers($workspace, $from);
+
+        foreach (array_keys($carried) as $key) {
+            $totals[(string) $key] ??= OrderTotals::empty();
         }
 
         $names = User::whereIn('id', array_values(array_filter(array_keys($totals), fn ($k) => $k !== '')))
@@ -74,8 +111,10 @@ class UserIncomeStatementService
             $adSpent = round((float) ($charged['ad_spent'][(int) $key] ?? 0), 2);
             $shippingFee = round($t->shippingFee, 2);
             $deliveredCogs = round($t->deliveredCogs, 2);
-            $boughtCogs = round((float) ($charged['total_bought_cogs'][(int) $key] ?? 0), 2);
-            $boughtFreight = round((float) ($charged['total_bought_cogs_delivery_fee'][(int) $key] ?? 0), 2);
+            // Keyed by $key rather than (int) $key: the allocation puts costs
+            // for a product nobody delivered under '', which would cast to 0.
+            $boughtCogs = round((float) ($charged['total_bought_cogs'][$key] ?? 0), 2);
+            $boughtFreight = round((float) ($charged['total_bought_cogs_delivery_fee'][$key] ?? 0), 2);
 
             // Both margins take the same costs off delivered revenue and differ
             // only in which cost of goods they charge.
@@ -115,6 +154,18 @@ class UserIncomeStatementService
             ];
         })->values();
 
+        // The advisory and OPEX are allocated from the parent statement once
+        // every row's gross profit is settled — see ClosesOutSlices.
+        $rows = $this->closeSlice($statement, $rows->all());
+
+        // Then the deficit carried into the month, entered at the seller-and-
+        // product grain and added up to whatever grain this slice reports at.
+        $rows = collect($this->applyCarriedLoss(
+            $rows,
+            $carried,
+            fn (array $row) => (string) ($row['user_id'] ?? ''),
+        ));
+
         DB::transaction(function () use ($statement, $rows) {
             $statement->userStatements()->delete();
 
@@ -133,6 +184,16 @@ class UserIncomeStatementService
     public function payload(IncomeStatement $statement): array
     {
         $this->ensureSnapshot($statement);
+
+        // The company's OPEX split by type, which each row's own share is
+        // then divided along.
+        $opexTypes = $this->opexTypes($statement);
+
+        // Which carried figures were typed rather than worked out — the page
+        // marks those boxes, and clearing one has to mean something different
+        // from clearing a box that only ever showed a derived figure.
+        [$from] = $this->range($statement);
+        $entered = $this->carryovers->entered($statement->workspace, $from);
 
         $rows = $statement->userStatements()->get()->map(fn ($r) => [
             'user_id' => $r->user_id,
@@ -154,6 +215,15 @@ class UserIncomeStatementService
             'gross_profit_bought_cogs' => (float) $r->gross_profit_bought_cogs,
             'gross_profit_bought_cogs_advisory_share' => (float) $r->gross_profit_bought_cogs_advisory_share,
             'gross_profit_bought_cogs_after_advisory_share' => (float) $r->gross_profit_bought_cogs_after_advisory_share,
+            'opex' => (float) $r->opex,
+            'opex_share_percentage' => (float) $r->opex_share_percentage,
+            'opex_breakdown' => $this->opexByType($opexTypes, (float) $r->opex),
+            'loss_brought_forward' => (float) $r->loss_brought_forward,
+            'loss_brought_forward_entered' => array_key_exists((string) ($r->user_id ?? ''), $entered),
+            'cumulative_profit_delivered_cogs' => (float) $r->cumulative_profit_delivered_cogs,
+            'cumulative_profit_bought_cogs' => (float) $r->cumulative_profit_bought_cogs,
+            'net_profit_delivered_cogs' => (float) $r->net_profit_delivered_cogs,
+            'net_profit_bought_cogs' => (float) $r->net_profit_bought_cogs,
         ]);
 
         $named = $rows->filter(fn ($r) => $r['user_id'] !== null)
@@ -184,6 +254,15 @@ class UserIncomeStatementService
             'gross_profit_bought_cogs' => $sum('gross_profit_bought_cogs'),
             'gross_profit_bought_cogs_advisory_share' => $sum('gross_profit_bought_cogs_advisory_share'),
             'gross_profit_bought_cogs_after_advisory_share' => $sum('gross_profit_bought_cogs_after_advisory_share'),
+            'opex' => $sum('opex'),
+            'opex_breakdown' => $this->opexByType($opexTypes, $sum('opex')),
+            'loss_brought_forward' => $sum('loss_brought_forward'),
+            'loss_brought_forward_entered' => false,
+            'cumulative_profit_delivered_cogs' => $sum('cumulative_profit_delivered_cogs'),
+            'cumulative_profit_bought_cogs' => $sum('cumulative_profit_bought_cogs'),
+            'opex_share_percentage' => $sum('opex_share_percentage'),
+            'net_profit_delivered_cogs' => $sum('net_profit_delivered_cogs'),
+            'net_profit_bought_cogs' => $sum('net_profit_bought_cogs'),
         ];
 
         $unassigned = $rows->first(fn ($r) => $r['user_id'] === null);
@@ -224,68 +303,6 @@ class UserIncomeStatementService
         if (! $statement->userStatements()->exists()) {
             $this->snapshot($statement);
         }
-    }
-
-    /**
-     * Charge-to totals per user for the given transaction types — the user-side
-     * counterpart of the product tags the product statement reads. A transaction
-     * split across several people contributes each person's share.
-     *
-     * @param  list<int>  $typeIds
-     * @return array<int, float>
-     */
-    private function chargedTotalsForTypes(Workspace $workspace, Carbon $from, Carbon $to, array $typeIds): array
-    {
-        if (empty($typeIds)) {
-            return [];
-        }
-
-        return DB::table('finance_transaction_charge_to as ct')
-            ->join('finance_transactions as t', 't.id', '=', 'ct.transaction_id')
-            ->where('t.workspace_id', $workspace->id)
-            ->where('t.type', 'out')
-            ->whereIn('t.transaction_type_id', $typeIds)
-            ->whereBetween('t.date', [$from->toDateString(), $to->toDateString()])
-            ->groupBy('ct.user_id')
-            ->selectRaw('ct.user_id, SUM(ct.amount) as amount')
-            ->get()
-            ->mapWithKeys(fn ($r) => [(int) $r->user_id => round((float) $r->amount, 2)])
-            ->all();
-    }
-
-    /** @return list<int> */
-    private function adSpentTypeIds(Workspace $workspace): array
-    {
-        return $this->typeIdsMatching($workspace, ['%adspent%', '%ad spent%', '%ad spend%']);
-    }
-
-    /** @return list<int> */
-    private function costOfGoodsTypeIds(Workspace $workspace): array
-    {
-        return $this->typeIdsMatching($workspace, ['%cost of goods%']);
-    }
-
-    /** @return list<int> */
-    private function cogDeliveryTypeIds(Workspace $workspace): array
-    {
-        return $this->typeIdsMatching($workspace, ['%delivery of cog%', '%delivery of goods%', '%cog delivery%']);
-    }
-
-    /**
-     * @param  list<string>  $patterns
-     * @return list<int>
-     */
-    private function typeIdsMatching(Workspace $workspace, array $patterns): array
-    {
-        return TransactionType::where('workspace_id', $workspace->id)
-            ->where(function ($q) use ($patterns) {
-                foreach ($patterns as $pattern) {
-                    $q->orWhereRaw('LOWER(name) LIKE ?', [$pattern]);
-                }
-            })
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
     }
 
     /** @return array{0:Carbon, 1:Carbon} [from, to] for the statement's month. */

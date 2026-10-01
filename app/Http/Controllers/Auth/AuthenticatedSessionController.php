@@ -89,7 +89,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         if ($user->is_super_admin) {
-            return redirect()->route('admin.workspaces.index');
+            return redirect()->route('admin.dashboard');
         }
 
         $workspace = $user->ownedWorkspaces()->first()

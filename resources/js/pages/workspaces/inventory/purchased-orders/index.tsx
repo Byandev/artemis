@@ -27,7 +27,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
@@ -122,6 +122,19 @@ interface PurchasedOrder {
  */
 const LINE_CLASS = 'flex h-6 items-center';
 
+/** Peso amount, cents only when the figure has any — ₱24,000 / ₱24,000.50. */
+const peso = (value: number | string) =>
+    `₱${Number(value).toLocaleString('en-PH', { maximumFractionDigits: 2 })}`;
+
+/** A line item's share of the PO — whole percents, one decimal under 10%. */
+const percent = (value: number, total: number) => {
+    const share = (value / total) * 100;
+
+    return `${share.toLocaleString('en-PH', {
+        maximumFractionDigits: share < 10 ? 1 : 0,
+    })}%`;
+};
+
 /**
  * Every delivery on the PO, flattened across line items, oldest first. The
  * owning line item travels with each delivery because editing one still has to
@@ -141,6 +154,14 @@ const orderDeliveries = (order: PurchasedOrder) =>
 /** Total quantity still owed across the whole PO. */
 const orderBalance = (order: PurchasedOrder) =>
     order.items.reduce((sum, item) => sum + item.balance, 0);
+
+/**
+ * What the line items add up to. Deliberately not the PO's own total_amount —
+ * that includes the delivery fee, so the per-item shares below would never
+ * reach 100%.
+ */
+const itemsTotal = (order: PurchasedOrder) =>
+    order.items.reduce((sum, item) => sum + Number(item.total_amount), 0);
 
 interface Totals {
     delivery_fee: number;
@@ -191,6 +212,13 @@ export default function PurchasedOrderIndex({
     );
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
+    // The list URL as it stands (filters, sort, page) so a save on the edit
+    // screen lands back on the same view instead of an unfiltered first page.
+    const currentUrl = usePage().url;
+    const returnTo = useMemo(
+        () => encodeURIComponent(currentUrl),
+        [currentUrl],
+    );
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [statusValue, setStatusValue] = useState(
@@ -355,6 +383,32 @@ export default function PurchasedOrderIndex({
                 },
             },
             {
+                accessorKey: 'delivery_fee',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Delivery Fee" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 tabular-nums dark:text-gray-400">
+                        {peso(row.original.delivery_fee)}
+                    </span>
+                ),
+            },
+            {
+                // The PO's own figure, delivery fee included — the item column's
+                // per-line amounts add up to this minus that fee.
+                accessorKey: 'total_amount',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Total Amount" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] font-medium whitespace-nowrap text-gray-800 tabular-nums dark:text-gray-200">
+                        {peso(row.original.total_amount)}
+                    </span>
+                ),
+            },
+            {
                 id: 'item_name',
                 enableSorting: false,
                 meta: { cellClassName: 'min-w-[240px]' },
@@ -363,41 +417,61 @@ export default function PurchasedOrderIndex({
                         Item Name
                     </span>
                 ),
-                cell: ({ row }) => (
-                    <div className="flex flex-col">
-                        {row.original.items.map((item) => (
-                            <div
-                                key={item.id}
-                                className={`group/item gap-2 ${LINE_CLASS}`}
-                            >
-                                <span
-                                    className="truncate font-mono text-[11px] text-gray-800 dark:text-gray-200"
-                                    title={item.inventory_item?.sku}
+                cell: ({ row }) => {
+                    /* Share of the PO is only meaningful when there is
+                       something to share it with — a single-item PO is
+                       always 100%. */
+                    const showShare = row.original.items.length > 1;
+                    const base = showShare ? itemsTotal(row.original) : 0;
+
+                    return (
+                        <div className="flex flex-col">
+                            {row.original.items.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className={`group/item gap-2 ${LINE_CLASS}`}
                                 >
-                                    {item.inventory_item?.product?.name ??
-                                        item.inventory_item?.sku ??
-                                        '—'}
-                                </span>
-                                {canEditPurchasedOrders && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setDeliveryFor({
-                                                itemId: item.id,
-                                                balance: item.balance,
-                                                delivery: null,
-                                            })
-                                        }
-                                        aria-label="Record delivery"
-                                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-emerald-600 opacity-0 transition-all group-hover/item:opacity-100 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
-                                    >
-                                        <Plus className="h-3 w-3" />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                ),
+                                    <span className="flex min-w-0 items-center gap-1">
+                                        <span
+                                            className="truncate font-mono text-[11px] text-gray-800 dark:text-gray-200"
+                                            title={item.inventory_item?.sku}
+                                        >
+                                            {item.inventory_item?.product
+                                                ?.name ??
+                                                item.inventory_item?.sku ??
+                                                '—'}
+                                        </span>
+                                        {/* What this line cost, so the PO's total
+                                            can be read off its own items. */}
+                                        <span className="shrink-0 font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                                            ({peso(item.total_amount)}
+                                            {showShare && base > 0
+                                                ? ` · ${percent(Number(item.total_amount), base)}`
+                                                : ''}
+                                            )
+                                        </span>
+                                    </span>
+                                    {canEditPurchasedOrders && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setDeliveryFor({
+                                                    itemId: item.id,
+                                                    balance: item.balance,
+                                                    delivery: null,
+                                                })
+                                            }
+                                            aria-label="Record delivery"
+                                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-emerald-600 opacity-0 transition-all group-hover/item:opacity-100 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                                        >
+                                            <Plus className="h-3 w-3" />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                },
             },
             {
                 id: 'deliveries',
@@ -639,7 +713,7 @@ export default function PurchasedOrderIndex({
                                         <DropdownMenuItem
                                             onClick={() =>
                                                 router.get(
-                                                    `${baseUrl}/${order.id}/edit`,
+                                                    `${baseUrl}/${order.id}/edit?return_to=${returnTo}`,
                                                 )
                                             }
                                         >
@@ -674,6 +748,7 @@ export default function PurchasedOrderIndex({
         );
     }, [
         baseUrl,
+        returnTo,
         canDeletePurchasedOrders,
         canEditPurchasedOrders,
         canManagePurchasedOrders,
@@ -826,6 +901,7 @@ export default function PurchasedOrderIndex({
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
+                        stickyHeader
                         columns={columns}
                         enableInternalPagination={false}
                         data={orders.data || []}

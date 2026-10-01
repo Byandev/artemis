@@ -33,6 +33,8 @@ class Workspace extends Model
         'owner_id',
         'monthly_order_volume',
         'max_shops',
+        'messenger_link',
+        'last_interaction_at',
         'inventory_module_enabled',
         'finance_module_enabled',
         'products_module_enabled',
@@ -53,6 +55,7 @@ class Workspace extends Model
         'ad_spend_goals_module_enabled',
         'billing_module_enabled',
         'courses_module_enabled',
+        'welle_module_enabled',
         'inventory_sync',
         'public_password',
         'erp_username',
@@ -92,8 +95,10 @@ class Workspace extends Model
         'ad_spend_goals_module_enabled' => 'boolean',
         'billing_module_enabled' => 'boolean',
         'courses_module_enabled' => 'boolean',
+        'welle_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
+        'last_interaction_at' => 'datetime',
         // Reversible encryption so the automation pipeline can read it back.
         'erp_password' => 'encrypted',
     ];
@@ -136,10 +141,11 @@ class Workspace extends Model
      */
     public function hiddenPermissionNames(): array
     {
-        return array_values(array_filter([
-            // Sales & Marketing is a group of pages behind one module switch, so
-            // the switch hides every grant in it. Ad Spend Goals has a second switch
+        return array_values(array_unique(array_filter([
+            // Sales & Marketing is a group of pages behind one module switch,
+            // so the switch hides every grant in the group. Ad Spend Goals has a second switch
             // of its own and can be hidden while the rest of the group is on.
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDashboard->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDailyReport->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewPageRoasTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesTargets->value,
@@ -158,7 +164,18 @@ class Workspace extends Model
             $this->rmo_module_enabled ? null : PermissionEnum::ViewRmoManagement->value,
             $this->rmo_module_enabled ? null : PermissionEnum::ManageRmoSettings->value,
             $this->leaderboard_module_enabled ? null : PermissionEnum::ViewLeaderboards->value,
-        ]));
+            // My ESC is the only page behind the Welle toggle, so the toggle
+            // hides its one grant rather than a whole category.
+            $this->welle_module_enabled ? null : PermissionEnum::ViewMyEsc->value,
+            // ERP credentials are only ever read by the Gencys sync pipeline,
+            // so a workspace without Gencys ERP has nothing to point them at —
+            // the grant sits in the Settings category and is hidden on its own
+            // rather than with the whole 'Gencys ERP' category.
+            $this->gencys_module_enabled ? null : PermissionEnum::ManageErpCredentials->value,
+            // Gencys partners read page ROAS in Gencys itself, so the tracker is
+            // hidden for them even with the rest of the S&M group switched on.
+            $this->is_gencys_partner ? PermissionEnum::ViewPageRoasTracker->value : null,
+        ])));
     }
 
     /**
@@ -489,6 +506,19 @@ class Workspace extends Model
     public function rmoAutoTagStatusEnabled(): bool
     {
         return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_auto_tag_status;
+    }
+
+    /**
+     * Whether the external RMO team's Google Sheet is synced into this
+     * workspace — n8n reads the sheet and auto-tags the rows it lists. Needs
+     * both the switch and a sheet link; off by default. Also gates the
+     * "External Team" filter on the RMO page.
+     */
+    public function rmoExternalTeamSyncEnabled(): bool
+    {
+        $setting = $this->loadMissing('rmoSetting')->rmoSetting;
+
+        return (bool) $setting?->enable_external_team_sync && filled($setting?->external_team_sheet_url);
     }
 
     public function allowedMetrics(): array

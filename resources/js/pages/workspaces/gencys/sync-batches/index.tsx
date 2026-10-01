@@ -40,10 +40,16 @@ import { omit } from 'lodash';
 import { Ban, Layers, ListChecks, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+/** One tickable sync type. */
+interface SyncTypeOption {
+    value: string;
+    label: string;
+}
+
 interface Props {
     workspace: Workspace;
     batches: PaginatedData<SyncBatch>;
-    syncTypes: { value: string; label: string }[];
+    syncTypes: SyncTypeOption[];
     queuedCount: number;
     running: SyncBatch | null;
     itemCount: number;
@@ -423,7 +429,7 @@ function NewBatchDialog({
     itemCount,
 }: {
     indexUrl: string;
-    syncTypes: { value: string; label: string }[];
+    syncTypes: SyncTypeOption[];
     itemCount: number;
 }) {
     const [open, setOpen] = useState(false);

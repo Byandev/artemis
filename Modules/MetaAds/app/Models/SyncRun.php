@@ -18,6 +18,8 @@ class SyncRun extends Model
 
     public const ENTITY_AD_ACCOUNTS = 'ad_accounts';
 
+    public const ENTITY_AD_ACCOUNT_PEOPLE = 'ad_account_people';
+
     public const ENTITY_CAMPAIGNS = 'campaigns';
 
     public const ENTITY_AD_SETS = 'ad_sets';

@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,6 +8,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Modules\Inventory\Exports\InventoryItemReportExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
+use Modules\Products\Models\Product;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -258,24 +258,6 @@ test('flat view lists the individual child SKUs, tagged with their parent', func
             expect($child)->not->toBeNull();
             expect($child['parent_sku'])->toBe('GROUP');
         });
-});
-
-test('the n8n keywords endpoint excludes parent items', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['raw' => $raw] = makeApiKey($workspace);
-
-    // A parent and a child, both with keywords.
-    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true, 'sales_keywords' => 'parent-kw']);
-    $child = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'is_active' => true, 'sales_keywords' => 'child-kw']);
-
-    $response = $this->getJson('/api/v1/public/inventory-items/keywords', [
-        'Authorization' => 'Bearer '.$raw,
-    ])->assertOk();
-
-    $ids = collect($response->json())->pluck('inventory_item_id');
-
-    expect($ids)->toContain($child->id);
-    expect($ids)->not->toContain($parent->id);
 });
 
 test('the export rolls children up into one row per group', function () {

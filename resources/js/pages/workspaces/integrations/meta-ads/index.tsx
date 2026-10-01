@@ -33,16 +33,26 @@ import clsx from 'clsx';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import { omit } from 'lodash';
+import type { LucideIcon } from 'lucide-react';
 import {
+    ChartColumn,
     Check,
     ChevronDown,
     Download,
+    Flag,
+    Goal,
     Image as ImageIcon,
+    Layers,
     LayoutGrid,
     Loader2,
+    Megaphone,
     Play,
     Search,
+    Target,
+    Type,
     UserPlus,
+    UserRound,
+    Wallet,
     X,
 } from 'lucide-react';
 import moment from 'moment';
@@ -57,28 +67,89 @@ import {
 import { InlineOwner, OwnerOption } from '../components/inline-owner';
 import {
     ColumnVisibilityMenu,
+    GridFilter,
     INSIGHTS_OPTIONS,
     InsightFilterBuilder,
     InsightsMetrics,
-    MetricFilter,
+    ObjectiveOption,
     StatusLabel,
     buildInsightsColumns,
-    deserializeMetricFilters,
+    deserializeGridFilters,
     formatBudget,
+    serializeDateFilters,
     serializeMetricFilters,
     useColumnPresets,
 } from './_shared';
+import { RowTimelineModal, TimelineTarget } from './row-timeline-modal';
 
 import DateOption = flatpickr.Options.DateOption;
 
-type GroupBy = 'ad_name' | 'ad' | 'campaign' | 'ad_set' | 'account';
+type GroupBy =
+    | 'ad_name'
+    | 'ad'
+    | 'campaign'
+    | 'ad_set'
+    | 'account'
+    | 'page'
+    | 'page_owner'
+    | 'optimization_goal'
+    | 'campaign_objective';
 
-const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
-    { value: 'ad_name', label: 'Ad Name' },
-    { value: 'ad', label: 'Ad Id' },
-    { value: 'campaign', label: 'Campaign' },
-    { value: 'ad_set', label: 'Ad Set' },
-    { value: 'account', label: 'Ad Account' },
+const GROUP_BY_OPTIONS: {
+    value: GroupBy;
+    label: string;
+    icon: LucideIcon;
+    hint: string;
+}[] = [
+    {
+        value: 'ad_name',
+        label: 'Ad Name',
+        icon: Type,
+        hint: 'Ads sharing a name, collapsed',
+    },
+    { value: 'ad', label: 'Ad Id', icon: ImageIcon, hint: 'One row per ad' },
+    {
+        value: 'campaign',
+        label: 'Campaign',
+        icon: Megaphone,
+        hint: 'Rolled up per campaign',
+    },
+    {
+        value: 'ad_set',
+        label: 'Ad Set',
+        icon: Layers,
+        hint: 'Rolled up per ad set',
+    },
+    {
+        value: 'account',
+        label: 'Ad Account',
+        icon: Wallet,
+        hint: 'Rolled up per ad account',
+    },
+    {
+        value: 'page',
+        label: 'Page',
+        icon: Flag,
+        hint: 'The page the ad set promotes',
+    },
+    {
+        value: 'page_owner',
+        label: 'Page Owner',
+        icon: UserRound,
+        hint: 'Who owns that page',
+    },
+    {
+        value: 'optimization_goal',
+        label: 'Optimization Goal',
+        icon: Target,
+        hint: "The ad set's optimization goal",
+    },
+    {
+        value: 'campaign_objective',
+        label: 'Campaign Objective',
+        icon: Goal,
+        hint: "The campaign's objective",
+    },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -88,6 +159,10 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
     campaign: true,
     ad_set: true,
     account: false,
+    page: false,
+    page_owner: false,
+    optimization_goal: false,
+    campaign_objective: false,
 };
 
 interface Row extends InsightsMetrics {
@@ -132,6 +207,8 @@ interface Props {
     accounts: AccountOption[];
     members: OwnerOption[];
     selectedAccounts: string[];
+    /** Campaign objectives available to the Filters builder's value picker. */
+    objectives?: ObjectiveOption[];
     dateRange: { since: string; until: string };
     query?: {
         sort?: string | null;
@@ -142,6 +219,7 @@ interface Props {
         until?: string;
         filter?: { search?: string };
         metricFilters?: unknown[];
+        dateFilters?: unknown[];
     };
 }
 
@@ -182,17 +260,17 @@ function useCreatorTagging(
         setRows((prev) =>
             prev
                 ? {
-                      ...prev,
-                      data: prev.data.map((r) =>
-                          ids.has(r.id)
-                              ? {
-                                    ...r,
-                                    creator_id: creator?.id ?? null,
-                                    creator_name: creator?.name ?? null,
-                                }
-                              : r,
-                      ),
-                  }
+                    ...prev,
+                    data: prev.data.map((r) =>
+                        ids.has(r.id)
+                            ? {
+                                ...r,
+                                creator_id: creator?.id ?? null,
+                                creator_name: creator?.name ?? null,
+                            }
+                            : r,
+                    ),
+                }
                 : prev,
         );
 
@@ -223,17 +301,17 @@ function useCreatorTagging(
             snapshot = prev;
             return prev
                 ? {
-                      ...prev,
-                      data: prev.data.map((r) =>
-                          ids.includes(r.id)
-                              ? {
-                                    ...r,
-                                    creator_id: next?.id ?? null,
-                                    creator_name: next?.name ?? null,
-                                }
-                              : r,
-                      ),
-                  }
+                    ...prev,
+                    data: prev.data.map((r) =>
+                        ids.includes(r.id)
+                            ? {
+                                ...r,
+                                creator_id: next?.id ?? null,
+                                creator_name: next?.name ?? null,
+                            }
+                            : r,
+                    ),
+                }
                 : prev;
         });
         axios
@@ -274,9 +352,9 @@ function useRowSelection() {
  * clear the creator across the currently selected ads.
  */
 function BulkCreatorControl({
-    members,
-    onAssign,
-}: {
+                                members,
+                                onAssign,
+                            }: {
     members: OwnerOption[];
     onAssign: (creatorId: number | null) => void;
 }) {
@@ -371,27 +449,28 @@ interface GroupTarget {
  * per-dimension column presets re-init when the dimension changes.
  */
 function GridTable({
-    groupBy,
-    groupLabel,
-    rows,
-    loading,
-    sort,
-    onFetch,
-    onSelectAd,
-    onOpenGroup,
-    // Creator tagging (only wired for the `ad` grouping + the ads-in-group modal).
-    showCreator = false,
-    members = [],
-    canEditCreator = false,
-    creatorSaving = {},
-    onAssignCreator,
-    // Bulk selection.
-    selectedIds,
-    onToggleRow,
-    onToggleAll,
-    onClearSelection,
-    onBulkAssignCreator,
-}: {
+                       groupBy,
+                       groupLabel,
+                       rows,
+                       loading,
+                       sort,
+                       onFetch,
+                       onSelectAd,
+                       onOpenGroup,
+                       onOpenTimeline,
+                       // Creator tagging (only wired for the `ad` grouping + the ads-in-group modal).
+                       showCreator = false,
+                       members = [],
+                       canEditCreator = false,
+                       creatorSaving = {},
+                       onAssignCreator,
+                       // Bulk selection.
+                       selectedIds,
+                       onToggleRow,
+                       onToggleAll,
+                       onClearSelection,
+                       onBulkAssignCreator,
+                   }: {
     groupBy: GroupBy;
     groupLabel: string;
     rows: PaginatedData<Row> | null;
@@ -400,6 +479,7 @@ function GridTable({
     onFetch: (params?: { [key: string]: string | number | null }) => void;
     onSelectAd: (ad: Row) => void;
     onOpenGroup?: (row: Row) => void;
+    onOpenTimeline?: (row: Row) => void;
     showCreator?: boolean;
     members?: OwnerOption[];
     canEditCreator?: boolean;
@@ -538,84 +618,100 @@ function GridTable({
                             </span>
                         )}
                     </div>
+                    {onOpenTimeline && (
+                        <button
+                            type="button"
+                            // The row itself opens the creative / ads drill-down,
+                            // so the chart has to claim its own click.
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenTimeline(row.original);
+                            }}
+                            title="View timeline"
+                            aria-label={`View the timeline for ${row.original.name ?? 'this row'}`}
+                            className="mt-0.5 shrink-0 rounded-md p-1 text-gray-300 transition-colors hover:bg-stone-100 hover:text-emerald-600 dark:text-gray-600 dark:hover:bg-zinc-700 dark:hover:text-emerald-400"
+                        >
+                            <ChartColumn className="h-3.5 w-3.5" />
+                        </button>
+                    )}
                 </div>
             ),
         },
         ...(showStatus
             ? [
-                  {
-                      id: 'status',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'status',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Status
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => (
-                          <StatusLabel
-                              status={
-                                  row.original.effective_status ??
-                                  row.original.status ??
-                                  null
-                              }
-                          />
-                      ),
-                  } as ColumnDef<Row>,
-              ]
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => (
+                        <StatusLabel
+                            status={
+                                row.original.effective_status ??
+                                row.original.status ??
+                                null
+                            }
+                        />
+                    ),
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...(showBudget
             ? [
-                  {
-                      id: 'budget',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="text-right font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'budget',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="text-right font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Budget
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => {
-                          const b = formatBudget(
-                              row.original.daily_budget ?? null,
-                              row.original.lifetime_budget ?? null,
-                          );
-                          return (
-                              <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
-                                  {b.value}
-                                  {b.label && (
-                                      <span className="block text-[10px] text-gray-400 dark:text-gray-500">
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => {
+                        const b = formatBudget(
+                            row.original.daily_budget ?? null,
+                            row.original.lifetime_budget ?? null,
+                        );
+                        return (
+                            <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                                {b.value}
+                                {b.label && (
+                                    <span className="block text-[10px] text-gray-400 dark:text-gray-500">
                                           {b.label}
                                       </span>
-                                  )}
-                              </div>
-                          );
-                      },
-                  } as ColumnDef<Row>,
-              ]
+                                )}
+                            </div>
+                        );
+                    },
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...(showCreator
             ? [
-                  {
-                      id: 'creator',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'creator',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Creator
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => (
-                          <InlineOwner
-                              label="Creator"
-                              owner={creatorOf(row.original)}
-                              users={members}
-                              canEdit={canEditCreator}
-                              saving={creatorSaving[row.original.id] ?? false}
-                              onAssign={(id) =>
-                                  onAssignCreator?.(row.original, id)
-                              }
-                          />
-                      ),
-                  } as ColumnDef<Row>,
-              ]
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => (
+                        <InlineOwner
+                            label="Creator"
+                            owner={creatorOf(row.original)}
+                            users={members}
+                            canEdit={canEditCreator}
+                            saving={creatorSaving[row.original.id] ?? false}
+                            onAssign={(id) =>
+                                onAssignCreator?.(row.original, id)
+                            }
+                        />
+                    ),
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...buildInsightsColumns<Row>(),
     ];
@@ -623,8 +719,8 @@ function GridTable({
     const rowClick = showThumbnail
         ? (r: unknown) => onSelectAd(r as Row)
         : onOpenGroup
-          ? (r: unknown) => onOpenGroup(r as Row)
-          : undefined;
+            ? (r: unknown) => onOpenGroup(r as Row)
+            : undefined;
 
     return (
         <div className="relative overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -692,16 +788,17 @@ function GridTable({
 }
 
 function GroupAdsModal({
-    slug,
-    target,
-    dateRange,
-    selectedAccounts,
-    accountsTotal,
-    members,
-    canEditCreator,
-    onClose,
-    onSelectAd,
-}: {
+                           slug,
+                           target,
+                           dateRange,
+                           selectedAccounts,
+                           accountsTotal,
+                           members,
+                           canEditCreator,
+                           onClose,
+                           onSelectAd,
+                           onOpenTimeline,
+                       }: {
     slug: string;
     target: GroupTarget | null;
     dateRange: { since: string; until: string };
@@ -711,6 +808,7 @@ function GroupAdsModal({
     canEditCreator: boolean;
     onClose: () => void;
     onSelectAd: (ad: Row) => void;
+    onOpenTimeline?: (row: Row) => void;
 }) {
     const open = target != null;
     const [rows, setRows] = useState<PaginatedData<Row> | null>(null);
@@ -806,6 +904,7 @@ function GroupAdsModal({
                                 setPerPage(Number(p.per_page) || 25);
                         }}
                         onSelectAd={onSelectAd}
+                        onOpenTimeline={onOpenTimeline}
                         showCreator
                         members={members}
                         canEditCreator={canEditCreator}
@@ -844,10 +943,10 @@ interface AdDetail {
 }
 
 function DimRow({
-    label,
-    value,
-    mono,
-}: {
+                    label,
+                    value,
+                    mono,
+                }: {
     label: string;
     value: ReactNode;
     mono?: boolean;
@@ -870,10 +969,10 @@ function DimRow({
 }
 
 function CreativeDetailDrawer({
-    slug,
-    ad,
-    onClose,
-}: {
+                                  slug,
+                                  ad,
+                                  onClose,
+                              }: {
     slug: string;
     ad: Row | null;
     onClose: () => void;
@@ -911,8 +1010,8 @@ function CreativeDetailDrawer({
     const isImage = dim?.media_type
         ? dim.media_type !== 'video'
         : ad
-          ? !isVideoCreative(ad)
-          : false;
+            ? !isVideoCreative(ad)
+            : false;
     // Spinner while the detail request is in flight OR the iframe is still painting.
     const showSpinner = loading || (!!src && !iframeLoaded);
 
@@ -1026,10 +1125,10 @@ interface AccountMultiPickerProps {
 }
 
 function AccountMultiPicker({
-    accounts,
-    selected,
-    onChange,
-}: AccountMultiPickerProps) {
+                                accounts,
+                                selected,
+                                onChange,
+                            }: AccountMultiPickerProps) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
 
@@ -1056,8 +1155,8 @@ function AccountMultiPicker({
     const label = allSelected
         ? 'All accounts'
         : selected.length === 0
-          ? 'No accounts'
-          : `${selected.length} of ${accounts.length} accounts`;
+            ? 'No accounts'
+            : `${selected.length} of ${accounts.length} accounts`;
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -1133,9 +1232,9 @@ function AccountMultiPicker({
 /* ───────────────────── Group-by selector ────────────────────── */
 
 function GroupBySelect({
-    value,
-    onChange,
-}: {
+                           value,
+                           onChange,
+                       }: {
     value: GroupBy;
     onChange: (next: GroupBy) => void;
 }) {
@@ -1154,6 +1253,7 @@ function GroupBySelect({
                     <span className="text-gray-400 dark:text-gray-500">
                         Group by
                     </span>
+                    <active.icon className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
                     <span className="font-medium">{active.label}</span>
                     <ChevronDown className="h-3 w-3 text-gray-400" />
                 </Button>
@@ -1170,11 +1270,12 @@ function GroupBySelect({
                             onChange(o.value);
                             setOpen(false);
                         }}
-                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
                     >
-                        {o.label}
+                        <o.icon className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                        <span className="flex-1">{o.label}</span>
                         {o.value === value && (
-                            <Check className="h-3 w-3 text-emerald-500" />
+                            <Check className="h-3 w-3 shrink-0 text-emerald-500" />
                         )}
                     </button>
                 ))}
@@ -1184,13 +1285,14 @@ function GroupBySelect({
 }
 
 export default function MetaAdsManager({
-    workspace,
-    accounts,
-    members,
-    selectedAccounts,
-    dateRange,
-    query,
-}: Props) {
+                                           workspace,
+                                           accounts,
+                                           members,
+                                           selectedAccounts,
+                                           objectives = [],
+                                           dateRange,
+                                           query,
+                                       }: Props) {
     const canEditCreator = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
 
     const [groupBy, setGroupBy] = useState<GroupBy>(
@@ -1199,8 +1301,21 @@ export default function MetaAdsManager({
     const [selected, setSelected] = useState<string[]>(selectedAccounts);
     const [range, setRange] = useState(dateRange);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() =>
-        deserializeMetricFilters(query?.metricFilters),
+    // Metric and date filters share one list and one dropdown — they differ
+    // only in which query param carries them to the server.
+    const [filters, setFilters] = useState<GridFilter[]>(() =>
+        deserializeGridFilters(query?.metricFilters, query?.dateFilters),
+    );
+    // Serialized once so the grid fetch and the row chart send the same
+    // filters, and so the fetch effect depends on the strings rather than on a
+    // list identity that changes on every render.
+    const serializedMetricFilters = useMemo(
+        () => serializeMetricFilters(filters),
+        [filters],
+    );
+    const serializedDateFilters = useMemo(
+        () => serializeDateFilters(filters),
+        [filters],
     );
     // Creator filter: '' (all), 'unassigned', or a member id as string.
     const [creatorFilter, setCreatorFilter] = useState<string>('');
@@ -1214,6 +1329,9 @@ export default function MetaAdsManager({
     const [loading, setLoading] = useState(true);
     const [previewAd, setPreviewAd] = useState<Row | null>(null);
     const [groupTarget, setGroupTarget] = useState<GroupTarget | null>(null);
+    const [timelineTarget, setTimelineTarget] = useState<TimelineTarget | null>(
+        null,
+    );
 
     const {
         saving: creatorSaving,
@@ -1247,8 +1365,12 @@ export default function MetaAdsManager({
         qs.set('until', range.until);
         if (sort) qs.set('sort', sort);
         if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
-        const mf = serializeMetricFilters(metricFilters);
-        if (mf) qs.set('metric_filters', mf);
+        if (serializedMetricFilters) {
+            qs.set('metric_filters', serializedMetricFilters);
+        }
+        if (serializedDateFilters) {
+            qs.set('date_filters', serializedDateFilters);
+        }
         // Creator filter is ad-level only.
         if (groupBy === 'ad' && creatorFilter) {
             qs.set('creator_id', creatorFilter);
@@ -1286,7 +1408,8 @@ export default function MetaAdsManager({
         sort,
         page,
         perPage,
-        metricFilters,
+        serializedMetricFilters,
+        serializedDateFilters,
         creatorFilter,
         debouncedSearch,
         accounts.length,
@@ -1313,8 +1436,8 @@ export default function MetaAdsManager({
         setRange({ since, until });
         setPage(1);
     };
-    const onMetricFilters = (next: MetricFilter[]) => {
-        setMetricFilters(next);
+    const onFilters = (next: GridFilter[]) => {
+        setFilters(next);
         setPage(1);
     };
     const onSearch = (v: string) => {
@@ -1414,8 +1537,10 @@ export default function MetaAdsManager({
                             </Select>
                         )}
                         <InsightFilterBuilder
-                            filters={metricFilters}
-                            onChange={onMetricFilters}
+                            filters={filters}
+                            onChange={onFilters}
+                            groupBy={groupBy}
+                            objectives={objectives}
                         />
                     </div>
                 </div>
@@ -1429,6 +1554,18 @@ export default function MetaAdsManager({
                     sort={sort}
                     onFetch={onTableFetch}
                     onSelectAd={setPreviewAd}
+                    onOpenTimeline={(row) =>
+                        setTimelineTarget({
+                            scopeBy: groupBy,
+                            // ad_name groups by the name itself, so that's what
+                            // identifies the group server-side.
+                            scope:
+                                groupBy === 'ad_name'
+                                    ? (row.name ?? '')
+                                    : String(row.id),
+                            label: row.name ?? '—',
+                        })
+                    }
                     onOpenGroup={(row) =>
                         setGroupTarget({
                             groupBy,
@@ -1460,6 +1597,17 @@ export default function MetaAdsManager({
                 onClose={() => setPreviewAd(null)}
             />
 
+            <RowTimelineModal
+                slug={workspace.slug}
+                target={timelineTarget}
+                dateRange={range}
+                selectedAccounts={selected}
+                accountsTotal={accounts.length}
+                groupLabel={groupLabel}
+                metricFilters={serializedMetricFilters}
+                onClose={() => setTimelineTarget(null)}
+            />
+
             <GroupAdsModal
                 slug={workspace.slug}
                 target={groupTarget}
@@ -1470,6 +1618,13 @@ export default function MetaAdsManager({
                 canEditCreator={canEditCreator}
                 onClose={() => setGroupTarget(null)}
                 onSelectAd={(ad) => setPreviewAd(ad)}
+                onOpenTimeline={(row) =>
+                    setTimelineTarget({
+                        scopeBy: 'ad',
+                        scope: String(row.id),
+                        label: row.name ?? '—',
+                    })
+                }
             />
         </AppLayout>
     );

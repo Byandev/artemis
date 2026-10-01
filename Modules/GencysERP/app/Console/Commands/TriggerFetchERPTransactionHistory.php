@@ -11,7 +11,7 @@ use Modules\GencysERP\Support\SyncFlows\SyncFlowRegistry;
 
 /**
  * Queues a transaction-history batch by hand. The schedule uses
- * `gencys-erp:sync` instead — this exists for re-running a specific date or item.
+ * `gencys-erp:sync` instead — this exists for re-running a specific date.
  */
 class TriggerFetchERPTransactionHistory extends Command
 {
@@ -19,7 +19,7 @@ class TriggerFetchERPTransactionHistory extends Command
         {--date= : Sync a single transaction history date in Y-m-d format. Shortcut that overrides --start-date/--end-date}
         {--start-date= : Start of the date range in Y-m-d format}
         {--end-date= : End of the date range in Y-m-d format (defaults to today when --start-date is given)}
-        {--item=* : Limit to specific inventory item id(s); repeat (--item=1 --item=2) or comma-separate (--item=1,2). Omit for all active items}
+        {--item=* : Deprecated and ignored — one call now brings back every item on that ERP report}
         {--workspace= : Limit the batch to one workspace id. Omit to cover every ERP-connected workspace}
         {--delay= : Deprecated and ignored — the batch paces itself by waiting for each group to report back}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
@@ -38,6 +38,10 @@ class TriggerFetchERPTransactionHistory extends Command
 
         if ($this->option('delay')) {
             $this->warn('--delay is ignored: the batch sends the next group only once the previous one reports back.');
+        }
+
+        if ($this->option('item')) {
+            $this->warn('--item is ignored: the ERP report is read a date at a time and comes back with every item on it.');
         }
 
         $flow = $flows->for(GencysSyncRun::TYPE_TRANSACTION_HISTORY);
@@ -60,7 +64,6 @@ class TriggerFetchERPTransactionHistory extends Command
             parameters: [
                 GencysSyncRun::TYPE_TRANSACTION_HISTORY => array_filter([
                     ...$dateParameters,
-                    'item_ids' => $this->itemIds(),
                     'webhook' => $this->option('webhook') ?: null,
                     'inline' => (bool) $this->option('sync') ?: null,
                 ]),
@@ -78,7 +81,7 @@ class TriggerFetchERPTransactionHistory extends Command
         }
 
         if ($batch->total_runs === 0) {
-            $this->warn('No workspaces found with ERP credentials, an API key and syncable items.');
+            $this->warn('No workspaces found with ERP credentials and an API key.');
 
             return self::SUCCESS;
         }
@@ -144,22 +147,5 @@ class TriggerFetchERPTransactionHistory extends Command
                 "Invalid --{$option} '{$value}'. Expected format: Y-m-d (e.g. 2026-06-24)."
             );
         }
-    }
-
-    /**
-     * Parse the --item option into a list of inventory item ids. Accepts repeated
-     * flags (--item=1 --item=2) and/or comma-separated values (--item=1,2).
-     *
-     * @return int[]
-     */
-    private function itemIds(): array
-    {
-        return collect((array) $this->option('item'))
-            ->flatMap(fn ($value) => explode(',', (string) $value))
-            ->map(fn ($value) => (int) trim($value))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
     }
 }

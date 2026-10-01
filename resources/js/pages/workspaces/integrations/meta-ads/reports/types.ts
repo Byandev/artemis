@@ -50,7 +50,20 @@ export type DateFilter = {
     value2?: string; // upper bound for 'between'
 };
 
-export type ReportFilter = NameFilter | MetricFilter | DateFilter;
+export type MediaType = 'image' | 'video';
+
+/** Image / video — which creatives the report counts. */
+export type MediaTypeFilter = {
+    field: 'media_type';
+    op: 'is';
+    value: MediaType;
+};
+
+export type ReportFilter =
+    | NameFilter
+    | MetricFilter
+    | DateFilter
+    | MediaTypeFilter;
 
 export const isNameFilter = (f: ReportFilter): f is NameFilter =>
     f.field === 'name';
@@ -58,12 +71,20 @@ export const isNameFilter = (f: ReportFilter): f is NameFilter =>
 export const isDateFilter = (f: ReportFilter): f is DateFilter =>
     f.field === 'created_date' || f.field === 'started_date';
 
+export const isMediaTypeFilter = (f: ReportFilter): f is MediaTypeFilter =>
+    f.field === 'media_type';
+
 /**
  * Positive test rather than "not a name filter" — `MetricFilter.field` is a bare
  * string, so anything unrecognised would otherwise be swept in as a metric.
  */
 export const isMetricFilter = (f: ReportFilter): f is MetricFilter =>
-    !isNameFilter(f) && !isDateFilter(f);
+    !isNameFilter(f) && !isDateFilter(f) && !isMediaTypeFilter(f);
+
+export const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
+    image: 'Image',
+    video: 'Video',
+};
 
 export const DATE_OP_LABELS: Record<DateFilterOp, string> = {
     on: 'is on',
@@ -256,8 +277,46 @@ export interface AdDetail {
         media_type: 'video' | 'image' | null;
         call_to_action: string | null;
     };
-    preview: { src: string | null };
+    preview: {
+        src: string | null;
+        /** The format that actually rendered — may differ from what we asked for. */
+        format: PreviewFormat | null;
+        requested_format: PreviewFormat;
+        /**
+         * Why there is no src. `story_unavailable` means Meta rendered its
+         * "Story Unavailable" page for every format we tried (deleted post, or
+         * the synced Meta user has no role on the owning page);
+         * `no_preview` means Meta returned no iframe at all.
+         */
+        reason: 'story_unavailable' | 'no_preview' | null;
+        /** Stand-in shown when nothing renders. */
+        fallback: {
+            image_url: string | null;
+            title: string | null;
+            body: string | null;
+            /** Public, direct, and outlives the ad being switched off. */
+            instagram_url: string | null;
+            /** Public, but only lists ads that are currently running. */
+            ads_library_url: string | null;
+            ads_manager_url: string;
+        };
+    };
 }
+
+export type PreviewFormat =
+    | 'MOBILE_FEED_STANDARD'
+    | 'INSTAGRAM_STANDARD'
+    | 'INSTAGRAM_STORY'
+    | 'FACEBOOK_STORY_MOBILE'
+    | 'DESKTOP_FEED_STANDARD';
+
+export const PREVIEW_FORMAT_LABELS: Record<PreviewFormat, string> = {
+    MOBILE_FEED_STANDARD: 'Facebook feed',
+    INSTAGRAM_STANDARD: 'Instagram feed',
+    INSTAGRAM_STORY: 'Instagram story',
+    FACEBOOK_STORY_MOBILE: 'Facebook story',
+    DESKTOP_FEED_STANDARD: 'Desktop feed',
+};
 
 /** ISO date (YYYY-MM-DD) for `offset` days before today (0 = today). */
 export function isoDaysAgo(offset: number): string {

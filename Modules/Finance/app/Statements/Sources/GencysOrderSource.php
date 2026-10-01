@@ -6,8 +6,11 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Statements\Contracts\StatementOrderSource;
 use Modules\Finance\Statements\OrderTotals;
+use Modules\Finance\Statements\TransactionTotals;
+use Modules\Finance\Statements\UserProductKey;
 use Modules\GencysERP\Models\Intern;
 use Modules\GencysERP\Support\InternResolver;
 
@@ -30,9 +33,48 @@ final class GencysOrderSource implements StatementOrderSource
 
     private const EXCLUDED_PAGE_LIKE = '%pikutin%';
 
+    public function __construct(private readonly TransactionTotals $transactions) {}
+
     public function label(): string
     {
         return 'gencys orders';
+    }
+
+    public function defaultCodFeeRate(): float
+    {
+        return IncomeStatementSetting::DEFAULT_COD_FEE_RATE;
+    }
+
+    /**
+     * A gencys workspace books its advertising through the finance ledger, so
+     * the figures come from the Ad Spent transactions: the whole month for the
+     * workspace, the product tags per product, and the charge-to shares per
+     * person.
+     */
+    public function workspaceAdSpend(Workspace $workspace, Carbon $from, Carbon $to): float
+    {
+        return $this->transactions->forWorkspace($workspace, $from, $to, TransactionTotals::AD_SPENT);
+    }
+
+    public function adSpendByProduct(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        return $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::AD_SPENT);
+    }
+
+    public function adSpendByUser(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        return $this->transactions->byChargedUser($workspace, $from, $to, TransactionTotals::AD_SPENT);
+    }
+
+    /**
+     * Not available here. A transaction carries product tags and charge-to
+     * shares, but the two are independent taggings of the same amount and
+     * nothing ties a particular product's spend to a particular person, so the
+     * cross grain has to apportion the per-product figure instead.
+     */
+    public function adSpendByUserProduct(Workspace $workspace, Carbon $from, Carbon $to): ?array
+    {
+        return null;
     }
 
     public function workspaceTotals(Workspace $workspace, Carbon $from, Carbon $to): OrderTotals
@@ -158,6 +200,43 @@ final class GencysOrderSource implements StatementOrderSource
     }
 
     /**
+     * Both grains at once: the per-item product split, kept apart by the intern
+     * cell the order carries, with each cell then resolved to a user.
+     *
+     * The cell is grouped in SQL and resolved in PHP for the same reason
+     * totalsByUser() does it — the cell-to-intern match is fuzzy and lives in
+     * InternResolver, not in a join. Several cells can land on one user, so the
+     * rows are folded rather than assigned.
+     */
+    public function totalsByUserProduct(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        $resolve = $this->cellUserResolver($workspace);
+        $totals = [];
+
+        $fold = function (string $key, OrderTotals $add) use (&$totals) {
+            $totals[$key] = ($totals[$key] ?? OrderTotals::empty())->plus($add);
+        };
+
+        foreach ($this->itemRows($this->delivered($workspace, $from, $to), byCell: true) as $row) {
+            $fold(UserProductKey::of($resolve($row->cell), $row->product_id), new OrderTotals(
+                deliveredOrders: (int) $row->orders,
+                deliveredUnits: (int) $row->units,
+                deliveredAmount: round((float) $row->revenue, 2),
+                deliveredCogs: round((float) $row->cog, 2),
+            ));
+        }
+
+        foreach ($this->itemRows($this->shipped($workspace, $from, $to), byCell: true) as $row) {
+            $fold(UserProductKey::of($resolve($row->cell), $row->product_id), new OrderTotals(
+                shippedOrders: (int) $row->orders,
+                shippingFee: round((float) $row->shipping, 2),
+            ));
+        }
+
+        return $totals;
+    }
+
+    /**
      * Per intern cell, delivered and shipped folded together. An order carries
      * one cell, so nothing is split here.
      *
@@ -208,10 +287,12 @@ final class GencysOrderSource implements StatementOrderSource
     }
 
     /**
-     * One row per product (or per sku) off a set of orders, with the order's
-     * money divided between the products it carries by item quantity.
+     * One row per product off a set of orders, with the order's money divided
+     * between the products it carries by item quantity. `$bySku` splits the
+     * rows by unit code as well (for explaining the unresolved bucket) and
+     * `$byCell` by the intern the order was written to.
      */
-    private function itemRows($orders, bool $bySku = false)
+    private function itemRows($orders, bool $bySku = false, bool $byCell = false)
     {
         $quantities = DB::table('gencys_order_items')
             ->selectRaw('order_id, SUM(GREATEST(COALESCE(quantity, 1), 1)) as total_qty')
@@ -226,6 +307,7 @@ final class GencysOrderSource implements StatementOrderSource
             ->selectRaw('gencys_orders.id as order_id')
             ->selectRaw('uc.product_id as product_id')
             ->selectRaw('goi.sku as sku')
+            ->selectRaw("COALESCE(gencys_orders.intern_brands_name, '') as cell")
             ->selectRaw('COALESCE(gencys_orders.price_final, 0) as revenue')
             ->selectRaw('COALESCE(gencys_orders.total_cog, 0) as cog')
             ->selectRaw('COALESCE(gencys_orders.shipping_fee, 0) as shipping_fee')
@@ -233,7 +315,9 @@ final class GencysOrderSource implements StatementOrderSource
             // No items, or a zero quantity, means the whole order is one share.
             ->selectRaw('CASE WHEN COALESCE(q.total_qty, 0) = 0 THEN 1 ELSE GREATEST(COALESCE(goi.quantity, 1), 1) / q.total_qty END as share');
 
-        $group = $bySku ? 'product_id, sku' : 'product_id';
+        $group = 'product_id'
+            .($bySku ? ', sku' : '')
+            .($byCell ? ', cell' : '');
 
         return DB::query()->fromSub($items, 't')
             ->selectRaw($group)

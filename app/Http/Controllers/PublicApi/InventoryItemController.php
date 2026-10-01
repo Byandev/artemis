@@ -9,27 +9,6 @@ use Modules\Inventory\Models\InventoryItem;
 
 class InventoryItemController extends Controller
 {
-    public function keywords(Request $request): JsonResponse
-    {
-        $workspace = $request->attributes->get('workspace');
-
-        $items = InventoryItem::where('workspace_id', $workspace->id)
-            // Parent items are grouping placeholders with no supplier SKU to scrape;
-            // only their children carry real keywords, so keep parents out of n8n.
-            ->where('is_parent', false)
-            ->whereNotNull('sales_keywords')
-            ->where('sales_keywords', '!=', '')
-            ->select(['id', 'sales_keywords', 'transaction_keywords'])
-            ->get()
-            ->map(fn ($item) => [
-                'inventory_item_id' => $item->id,
-                'sales_keywords' => $item->salesKeywordsList(),
-                'transaction_keywords' => $item->transaction_keywords,
-            ]);
-
-        return response()->json($items);
-    }
-
     public function sync(Request $request): JsonResponse
     {
         $workspace = $request->attributes->get('workspace');

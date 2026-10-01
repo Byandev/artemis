@@ -3,7 +3,6 @@
 namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -16,6 +15,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Inventory\Models\InventoryUnitCode;
 use Modules\Inventory\Models\InventoryUnitCodeItem;
+use Modules\Products\Models\Product;
 
 class UnitCodeController extends Controller
 {

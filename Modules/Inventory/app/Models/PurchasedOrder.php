@@ -94,6 +94,23 @@ class PurchasedOrder extends Model
     ];
 
     /**
+     * The status-trail labels each stage timestamp can be read off, keyed by
+     * column, for the stages the ERP does not stamp itself.
+     *
+     * Matched on the label alone, case- and space-normalised: the label is the
+     * stable part of a trail entry, while the free-text `detail` beside it is
+     * whatever the person typed ("approved", "apprpved", "PAID-50%"). Approve
+     * carries two spellings because the ERP has used both.
+     */
+    public const STAGE_LOG_LABELS = [
+        'approved_at' => ['approve', 'approved'],
+        'to_pay_at' => ['to pay'],
+        'paid_at' => [PurchasedOrderStatusLog::PAID],
+        'for_purchase_at' => ['for purchase'],
+        'purchased_at' => ['purchased'],
+    ];
+
+    /**
      * Derived monitoring attributes appended to the serialized model. They read
      * the order's items, so eager-load `items.deliveries` before serializing.
      *
@@ -260,19 +277,70 @@ class PurchasedOrder extends Model
      */
     public function recalculatePaidAt(): void
     {
-        $paidAt = $this->statusLogs()
-            ->paid()
-            ->whereNotNull('logged_at')
-            ->min('logged_at');
+        $this->recalculateStageTimestamps(['paid_at']);
+    }
 
-        if ($this->paid_at?->toDateTimeString() === $paidAt) {
+    /**
+     * Read the stage timestamps back off the status trail.
+     *
+     * The ERP used to stamp these on the order itself; the report the sync now
+     * scrapes carries only the trail, so the columns are derived from it — the
+     * earliest entry for a stage is when the order reached it. $only limits the
+     * work to particular columns (null does the lot, an empty array none), so a
+     * caller can derive exactly the stages the ERP did not send explicitly and
+     * leave the rest alone.
+     *
+     * Written with a bare update so it neither touches `updated_at` nor fires
+     * model events: these are derived columns catching up with their source,
+     * not a change to the order.
+     *
+     * @param  array<int, string>|null  $only
+     */
+    public function recalculateStageTimestamps(?array $only = null): void
+    {
+        if ($only === []) {
             return;
         }
 
-        static::withoutTimestamps(fn () => static::whereKey($this->getKey())->toBase()->update(['paid_at' => $paidAt]));
+        $reached = $this->statusLogs()
+            // The relation sorts the trail for reading; grouping it here is a
+            // different question, and only_full_group_by rejects the leftover
+            // ORDER BY.
+            ->reorder()
+            ->whereNotNull('logged_at')
+            ->selectRaw('LOWER(TRIM(status)) as label, MIN(logged_at) as reached_at')
+            ->groupBy('label')
+            ->pluck('reached_at', 'label');
 
-        $this->paid_at = $paidAt;
-        $this->syncOriginalAttribute('paid_at');
+        $updates = [];
+
+        foreach (self::STAGE_LOG_LABELS as $column => $labels) {
+            if ($only !== null && ! in_array($column, $only, true)) {
+                continue;
+            }
+
+            // Whichever spelling of the stage came first; null once the ERP has
+            // withdrawn the entry the column was standing on.
+            $reachedAt = collect($labels)
+                ->map(fn (string $label) => $reached[$label] ?? null)
+                ->filter()
+                ->min();
+
+            if ($this->{$column}?->toDateTimeString() !== $reachedAt) {
+                $updates[$column] = $reachedAt;
+            }
+        }
+
+        if (! $updates) {
+            return;
+        }
+
+        static::withoutTimestamps(fn () => static::whereKey($this->getKey())->toBase()->update($updates));
+
+        foreach ($updates as $column => $value) {
+            $this->{$column} = $value;
+            $this->syncOriginalAttribute($column);
+        }
     }
 
     /** Total quantity still owed across the order's line items. Requires `items.deliveries`. */

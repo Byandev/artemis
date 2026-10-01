@@ -3,6 +3,7 @@
 namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Page;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\JsonResponse;
@@ -10,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\MetaAds\Models\Ad;
@@ -17,6 +19,7 @@ use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\CustomBreakdown;
+use Modules\MetaAds\Services\AdPreviewResolver;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -58,7 +61,9 @@ class AdsManagerController extends Controller
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
                 'metricFilters' => $this->parseMetricFilters($request),
+                'dateFilters' => $this->parseDateFilters($request),
             ],
+            'objectives' => $this->availableObjectives($allAccountIds),
         ]);
     }
 
@@ -78,6 +83,8 @@ class AdsManagerController extends Controller
         $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
         $metricFilters = $this->parseMetricFilters($request);
         $dateFilters = $this->parseDateFilters($request);
+        $objectives = $this->parseObjectiveFilters($request);
+        $mediaType = $this->parseMediaTypeFilter($request);
 
         $scopeBy = (string) $request->query('scope_by', '');
         $scopeValue = (string) $request->query('scope', '');
@@ -93,7 +100,7 @@ class AdsManagerController extends Controller
         if ($scopeBy === '' && str_starts_with($groupByRaw, 'custom:')) {
             $breakdownId = (int) substr($groupByRaw, 7);
             $rows = $this->aggregateCustomBreakdown(
-                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters, $creatorFilter, $dateFilters
+                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters, $creatorFilter, $dateFilters, $mediaType
             );
 
             return response()->json(['rows' => $rows]);
@@ -101,46 +108,207 @@ class AdsManagerController extends Controller
 
         if ($scopeBy !== '') {
             $groupBy = 'ad';
-            $scope = match ($scopeBy) {
-                'campaign' => fn ($q) => $q->where('meta_ads_ads.meta_ads_campaign_id', $scopeValue),
-                'ad_set' => fn ($q) => $q->where('meta_ads_ads.meta_ads_set_id', $scopeValue),
-                'account' => fn ($q) => $q->where('meta_ads_ads.meta_ads_account_id', $scopeValue),
-                'ad_name' => fn ($q) => $q->where('meta_ads_ads.name', $scopeValue),
-                default => abort(400, 'Unsupported scope_by'),
-            };
+            $scope = $this->scopeFor($scopeBy, $scopeValue);
         } else {
             $groupBy = $this->resolveGroupBy($request);
             $scope = null;
         }
 
-        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter, $dateFilters);
+        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter, $dateFilters, $objectives, $mediaType);
 
         return response()->json(['rows' => $rows]);
     }
 
     /**
-     * Ad-format whitelist for the creative preview (avoid passing arbitrary
-     * values straight to the Graph API).
+     * Narrows an ad-grained query to the ads under one row of a breakdown.
+     * Shared by the drill-down table and the per-row timeline, so a chart always
+     * covers exactly the ads its modal would have listed.
      */
-    private const PREVIEW_FORMATS = [
-        'MOBILE_FEED_STANDARD',
-        'DESKTOP_FEED_STANDARD',
-        'INSTAGRAM_STANDARD',
-        'INSTAGRAM_STORY',
-        'FACEBOOK_STORY_MOBILE',
-    ];
+    private function scopeFor(string $scopeBy, string $scopeValue): callable
+    {
+        return match ($scopeBy) {
+            // A row of the `ad` breakdown is a single ad, charted on its own.
+            'ad' => fn ($q) => $q->where('meta_ads_ads.id', $scopeValue),
+            'campaign' => fn ($q) => $q->where('meta_ads_ads.meta_ads_campaign_id', $scopeValue),
+            'ad_set' => fn ($q) => $q->where('meta_ads_ads.meta_ads_set_id', $scopeValue),
+            'account' => fn ($q) => $q->where('meta_ads_ads.meta_ads_account_id', $scopeValue),
+            'ad_name' => fn ($q) => $q->where('meta_ads_ads.name', $scopeValue),
+            // Ads reach a page through their ad set; "0" is the unassigned
+            // bucket the page breakdown emits for a null meta_page_id.
+            'page' => fn ($q) => $q->whereIn(
+                'meta_ads_ads.meta_ads_set_id',
+                AdSet::query()->select('id')->when(
+                    $scopeValue === '' || $scopeValue === '0',
+                    fn ($sets) => $sets->whereNull('meta_page_id'),
+                    fn ($sets) => $sets->where('meta_page_id', $scopeValue),
+                )
+            ),
+            // Same chain one step further: the ad set's page, then that page's
+            // owner. "0" is the bucket for ads whose ad set promotes no page,
+            // or one that resolves to no owner.
+            'page_owner' => fn ($q) => $q->whereIn(
+                'meta_ads_ads.meta_ads_set_id',
+                AdSet::query()->select('id')->when(
+                    $scopeValue === '' || $scopeValue === '0',
+                    fn ($sets) => $sets->where(fn ($w) => $w
+                        ->whereNull('meta_page_id')
+                        ->orWhereNotIn('meta_page_id', $this->ownedPageIds())),
+                    fn ($sets) => $sets->whereIn('meta_page_id', $this->ownedPageIds($scopeValue)),
+                )
+            ),
+            // The goal lives on the ad set, so a row's ads are those whose set
+            // carries it. "0" is the bucket for ad sets with no goal.
+            'optimization_goal' => fn ($q) => $q->whereIn(
+                'meta_ads_ads.meta_ads_set_id',
+                AdSet::query()->select('id')->when(
+                    $scopeValue === '' || $scopeValue === '0',
+                    fn ($sets) => $sets->whereNull('optimization_goal'),
+                    fn ($sets) => $sets->where('optimization_goal', $scopeValue),
+                )
+            ),
+            // The objective lives on the campaign, which ads reference directly,
+            // so this is one hop rather than the ad-set chain above. "0" is the
+            // bucket for campaigns Meta reported no objective for.
+            'campaign_objective' => fn ($q) => $q->whereIn(
+                'meta_ads_ads.meta_ads_campaign_id',
+                Campaign::query()->select('id')->when(
+                    $scopeValue === '' || $scopeValue === '0',
+                    fn ($campaigns) => $campaigns->whereNull('objective'),
+                    fn ($campaigns) => $campaigns->where('objective', $scopeValue),
+                )
+            ),
+            default => abort(400, 'Unsupported scope_by'),
+        };
+    }
 
     /**
-     * A creative is a video when Meta tags it object_type=VIDEO or it carries a
-     * top-level video_id (a few video creatives have no video_id but are still
-     * VIDEO). Everything else is treated as an image. object_type alone is
-     * unreliable (PHOTO/SHARE/STATUS/PRIVACY_CHECK_FAIL all appear), so both
-     * signals are combined.
+     * Day-by-day metrics for one breakdown row, for the per-row timeline chart.
+     * Returns the same raw insight columns the grid does — one point per day
+     * instead of one row per entity — so the frontend derives computed metrics
+     * (ROAS, CTR, CPM…) per day with the very same formulas the table uses.
+     *
+     * Every day in the range is emitted, including days the ads didn't run, so
+     * the line shows real gaps as zeroes rather than silently compressing time.
      */
-    private const MEDIA_TYPE_SQL = "CASE WHEN meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL THEN 'video' ELSE 'image' END";
+    public function timeseries(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+
+        [$since, $until] = $this->resolveDateRange($request);
+
+        $allAccountIds = $this->accountIdsForWorkspace($workspace, $request->user())->map(fn ($id) => (string) $id);
+        $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
+
+        $scopeBy = (string) $request->query('scope_by', '');
+        $scopeValue = (string) $request->query('scope', '');
+
+        if ($scopeBy === '') {
+            abort(400, 'scope_by is required');
+        }
+
+        $selects = [DB::raw('meta_ads_insights.date AS date')];
+        foreach (self::INSIGHTS_METRICS as $col) {
+            $selects[] = DB::raw("COALESCE(SUM(meta_ads_insights.{$col}), 0) AS {$col}");
+        }
+
+        // Joined to the ads table so the shared scope closures — which all read
+        // meta_ads_ads columns — apply unchanged.
+        $query = DB::table('meta_ads_insights')
+            ->join('meta_ads_ads', 'meta_ads_ads.id', '=', 'meta_ads_insights.meta_ads_ad_id')
+            ->whereBetween('meta_ads_insights.date', [$since, $until])
+            ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds);
+
+        ($this->scopeFor($scopeBy, $scopeValue))($query);
+
+        // Campaign objective — the grid row this chart was opened from is under
+        // the same filter, so the line has to cover the same ads rather than the
+        // whole group. Insights carry their campaign, but the query is already
+        // joined to the ads table, so it constrains on the ad's campaign.
+        $this->constrainByObjectives($query, 'meta_ads_ads.meta_ads_campaign_id', $this->parseObjectiveFilters($request));
+
+        // The grid's row-level date filters narrow which ads count toward a
+        // row, so the chart applies them too or its totals would disagree with
+        // the row that opened it. Always ad-grained here, hence the 'ad' shape.
+        $this->applyDateFilters($query, $this->parseDateFilters($request), 'ad');
+
+        // Same creator filter the grid is under, so the chart matches the row.
+        $creatorFilter = (string) $request->query('creator_id', '');
+        $this->applyCreatorFilter($query, $creatorFilter === '' ? null : $creatorFilter);
+
+        // Image / video — same reason: the row it opened from only counts those ads.
+        $this->constrainByMediaType($query, 'meta_ads_ads.id', $this->parseMediaTypeFilter($request));
+
+        $byDate = $query->select($selects)
+            ->groupBy('meta_ads_insights.date')
+            ->get()
+            ->keyBy(fn ($row) => Carbon::parse($row->date)->toDateString());
+
+        $zero = array_fill_keys(self::INSIGHTS_METRICS, 0);
+        $points = [];
+
+        for ($day = Carbon::parse($since); $day->lte(Carbon::parse($until)); $day->addDay()) {
+            $key = $day->toDateString();
+            $row = $byDate->get($key);
+
+            $points[] = [
+                'date' => $key,
+                ...($row ? array_map(
+                    fn ($col) => (float) ($row->{$col} ?? 0),
+                    array_combine(self::INSIGHTS_METRICS, self::INSIGHTS_METRICS),
+                ) : $zero),
+            ];
+        }
+
+        return response()->json(['points' => $points]);
+    }
+
+    /**
+     * A creative is a video when Meta tags it object_type=VIDEO, it carries a
+     * top-level video_id, or its object_story_spec holds one — video_data for a
+     * single video, or a video card inside a carousel's child_attachments. Many
+     * SHARE / PRIVACY_CHECK_FAIL creatives are videos that only expose the id
+     * there.
+     *
+     * Ads that reuse an existing page post (object_type=STATUS) carry none of
+     * that — no video_id, no spec — so the last check is the thumbnail itself:
+     * Meta serves video frames from the `/v/t15.*` CDN path, never photos.
+     * Everything else is treated as an image.
+     */
+    private const IS_VIDEO_SQL = "(meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL OR meta_ads_creatives.object_story_spec LIKE '%\"video_id\"%' OR meta_ads_creatives.thumbnail_url LIKE '%/v/t15.%')";
+
+    private const MEDIA_TYPE_SQL = 'CASE WHEN '.self::IS_VIDEO_SQL." THEN 'video' ELSE 'image' END";
 
     /** Same split as MEDIA_TYPE_SQL, but with the human label used as a group name. */
-    private const AD_TYPE_LABEL_SQL = "CASE WHEN meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL THEN 'Video' ELSE 'Image' END";
+    private const AD_TYPE_LABEL_SQL = 'CASE WHEN '.self::IS_VIDEO_SQL." THEN 'Video' ELSE 'Image' END";
+
+    /**
+     * Group name for the page breakdown. Ad sets whose promoted_object carried
+     * no page id — and pages that were deleted on our side — collect in one
+     * bucket rather than showing as a blank row.
+     */
+    private const PAGE_LABEL_SQL = "COALESCE(pages.name, 'Unassigned page')";
+
+    /**
+     * Group name for the page-owner breakdown. Ads whose page is unknown — no
+     * promoted page, a page deleted on our side, or an owner with no user row —
+     * share one bucket instead of showing as blank rows.
+     */
+    private const PAGE_OWNER_LABEL_SQL = "COALESCE(users.name, 'Unassigned owner')";
+
+    /**
+     * Group name for the optimization-goal breakdown. The raw Meta enum is kept
+     * verbatim (that's how the creative drawer already shows it); ad sets Meta
+     * reported no goal for share one bucket instead of showing as blank rows.
+     */
+    private const OPTIMIZATION_GOAL_LABEL_SQL = "COALESCE(meta_ads_sets.optimization_goal, 'Unassigned goal')";
+
+    /**
+     * Group name for the campaign-objective breakdown. Same treatment as the
+     * optimization goal: Meta's raw enum verbatim (OUTCOME_SALES,
+     * OUTCOME_ENGAGEMENT, ...), with campaigns Meta reported no objective for
+     * sharing one bucket instead of showing as blank rows.
+     */
+    private const CAMPAIGN_OBJECTIVE_LABEL_SQL = "COALESCE(meta_ads_campaigns.objective, 'Unassigned objective')";
 
     /**
      * Returns Meta's signed ad-preview iframe src for a single ad. The raw video
@@ -148,7 +316,7 @@ class AdsManagerController extends Controller
      * watched (it also renders image ads). The `d=` token is short-lived, so we
      * resolve it on demand rather than storing it.
      */
-    public function adPreview(Request $request, Workspace $workspace, string $ad): JsonResponse
+    public function adPreview(Request $request, Workspace $workspace, string $ad, AdPreviewResolver $previews): JsonResponse
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
@@ -156,16 +324,16 @@ class AdsManagerController extends Controller
         $adModel = Ad::whereIn('meta_ads_account_id', $accountIds)->findOrFail($ad);
         $account = AdAccount::findOrFail($adModel->meta_ads_account_id);
 
-        return response()->json([
-            'src' => $this->resolvePreviewSrc($account, $adModel->id, $this->resolveFormat($request)),
-        ]);
+        return response()->json(
+            $previews->resolve($account, $adModel->id, $this->resolveFormat($request, $previews))
+        );
     }
 
     /**
      * Creative detail for the drawer: the dimensions panel and the preview
      * iframe src.
      */
-    public function adDetail(Request $request, Workspace $workspace, string $ad): JsonResponse
+    public function adDetail(Request $request, Workspace $workspace, string $ad, AdPreviewResolver $previews): JsonResponse
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
@@ -190,6 +358,15 @@ class AdsManagerController extends Controller
                 DB::raw('meta_ads_accounts.name AS account_name'),
                 DB::raw(self::MEDIA_TYPE_SQL.' AS media_type'),
                 DB::raw('meta_ads_creatives.call_to_action_type AS call_to_action'),
+                // Stand-ins for when Meta won't render the creative at all.
+                DB::raw('meta_ads_creatives.thumbnail_url AS thumbnail_url'),
+                DB::raw('meta_ads_creatives.image_url AS image_url'),
+                DB::raw('meta_ads_creatives.title AS creative_title'),
+                DB::raw('meta_ads_creatives.body AS creative_body'),
+                DB::raw('meta_ads_creatives.instagram_permalink_url AS instagram_permalink_url'),
+                // The creative's own page is the more specific of the two; the
+                // ad set's is the fallback when the creative carried no spec.
+                DB::raw('COALESCE(meta_ads_creatives.meta_page_id, meta_ads_sets.meta_page_id) AS meta_page_id'),
             ])
             ->firstOrFail();
 
@@ -209,41 +386,87 @@ class AdsManagerController extends Controller
                 'call_to_action' => $row->call_to_action,
             ],
             'preview' => [
-                'src' => $this->resolvePreviewSrc($account, $row->id, $this->resolveFormat($request)),
+                ...$previews->resolve($account, $row->id, $this->resolveFormat($request, $previews)),
+                // Shown in place of the frame when nothing renders, so the
+                // drawer still says something about the creative.
+                'fallback' => [
+                    'image_url' => $row->thumbnail_url ?: $row->image_url,
+                    'title' => $row->creative_title,
+                    'body' => $row->creative_body,
+                    ...$this->previewFallbackLinks($row),
+                ],
             ],
         ]);
     }
 
-    private function resolveFormat(Request $request): string
+    /**
+     * Where else this ad can be looked at when Meta won't render the preview.
+     *
+     * The Instagram permalink is the good one — public, direct, and it survives
+     * the ad being switched off. The Ads Library needs no login either and does
+     * list stopped ads (`active_status=all`), but its Library IDs are not the
+     * ad ids we hold and there's no public mapping between them, so the best we
+     * can do is scope it to the page and narrow by the ad's own copy. Ads
+     * Manager always has the ad, for anyone with access to the account.
+     */
+    private function previewFallbackLinks(object $row): array
     {
-        $format = (string) $request->query('format', 'MOBILE_FEED_STANDARD');
-
-        return in_array($format, self::PREVIEW_FORMATS, true) ? $format : 'MOBILE_FEED_STANDARD';
+        return [
+            'instagram_url' => $row->instagram_permalink_url ?: null,
+            'ads_library_url' => $row->meta_page_id
+                ? 'https://www.facebook.com/ads/library/?'.http_build_query(array_filter([
+                    'active_status' => 'all',
+                    'ad_type' => 'all',
+                    'country' => 'ALL',
+                    'media_type' => 'all',
+                    'search_type' => 'page',
+                    'view_all_page_id' => $row->meta_page_id,
+                    'q' => $this->adsLibraryKeyword($row),
+                ]))
+                : null,
+            'ads_manager_url' => sprintf(
+                'https://adsmanager.facebook.com/adsmanager/manage/ads?act=%s&selected_ad_ids=%s',
+                $row->meta_ads_account_id,
+                $row->id,
+            ),
+        ];
     }
 
     /**
-     * Pull Meta's signed preview iframe src out of the /previews response. The
-     * raw video source is permission-restricted, so this iframe is how video
-     * creatives are watched (it renders image ads too). The `d=` token is
-     * short-lived, so callers resolve it on demand rather than storing it.
+     * A short phrase from the ad's own copy to pre-filter the Ads Library with.
+     * The library matches keywords unordered, so a long phrase over-constrains
+     * and lands on an empty page — a few words cuts a big advertiser's list to
+     * a handful while still matching. The keyword sits in a clearable box in
+     * Meta's UI, so an unlucky one costs the user a single click.
      */
-    private function resolvePreviewSrc(AdAccount $account, int|string $adId, string $format): ?string
+    private function adsLibraryKeyword(object $row): ?string
     {
-        $response = $account->graphClient()->get($adId.'/previews', ['ad_format' => $format]);
-        $body = $response['data'][0]['body'] ?? null;
+        $copy = trim((string) ($row->creative_body ?: $row->creative_title));
 
-        if ($body && preg_match('/src="([^"]+)"/', $body, $matches)) {
-            return html_entity_decode($matches[1]);
+        if ($copy === '') {
+            return null;
         }
 
-        return null;
+        $words = preg_split('/\s+/', $copy, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return Str::limit(implode(' ', array_slice($words, 0, 6)), 60, '');
+    }
+
+    private function resolveFormat(Request $request, AdPreviewResolver $previews): string
+    {
+        $format = $request->query('format');
+
+        return $previews->sanitizeFormat(is_string($format) ? $format : null);
     }
 
     /**
      * Allowed group-by dimensions. Keys are the public `group_by` values; the
      * default is `ad_name`.
      */
-    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type'];
+    /** Filter-builder field id for the campaign-objective dimension row. */
+    private const OBJECTIVE_FILTER_FIELD = 'campaign_objective';
+
+    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type', 'page', 'page_owner', 'optimization_goal', 'campaign_objective'];
 
     private function resolveGroupBy(Request $request): string
     {
@@ -424,14 +647,130 @@ class AdsManagerController extends Controller
                 'search' => 'meta_ads_ads.name',
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
+            // Buckets ads by the Facebook page their ad set promotes. Ad-grained
+            // like ad_name: the page id lives on meta_ads_sets, and a Pancake
+            // page's primary key IS that FB page id, so `pages` joins directly.
+            'page' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id')
+                    // A raw join skips the model's SoftDeletes, so deleted pages
+                    // are excluded here and fall into the unassigned bucket.
+                    ->leftJoin('pages', function ($join) {
+                        $join->on('pages.id', '=', 'meta_ads_sets.meta_page_id')
+                            ->whereNull('pages.deleted_at');
+                    }),
+                'selects' => [
+                    // 0, not null, so the unassigned row survives the string
+                    // cast and can be passed back as a scope value.
+                    DB::raw('COALESCE(meta_ads_sets.meta_page_id, 0) AS id'),
+                    DB::raw(self::PAGE_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => ['meta_ads_sets.meta_page_id', 'pages.name'],
+                // Searches real page names; the unassigned bucket has none.
+                'search' => 'pages.name',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
+            ],
+            // Buckets ads by the workspace member who owns the Facebook page
+            // their ad set promotes. Same ad-grained chain as `page`, one join
+            // further: ad -> ad set -> page -> owning user.
+            'page_owner' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id')
+                    // A raw join skips the model's SoftDeletes, so deleted pages
+                    // are excluded here and fall into the unassigned bucket.
+                    ->leftJoin('pages', function ($join) {
+                        $join->on('pages.id', '=', 'meta_ads_sets.meta_page_id')
+                            ->whereNull('pages.deleted_at');
+                    })
+                    ->leftJoin('users', 'users.id', '=', 'pages.owner_id'),
+                'selects' => [
+                    // Keyed off the joined user, not pages.owner_id, so an owner
+                    // whose user row is gone lands in the unassigned bucket (id
+                    // 0) rather than in a nameless row of its own.
+                    DB::raw('COALESCE(users.id, 0) AS id'),
+                    DB::raw(self::PAGE_OWNER_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => ['users.id', 'users.name'],
+                // Searches real owner names; the unassigned bucket has none.
+                'search' => 'users.name',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
+            ],
+            // Buckets ads by the optimization goal of the ad set they run under
+            // (MESSAGING_PURCHASE_CONVERSION, CONVERSATIONS, VALUE, ...).
+            // Ad-grained like `page`: the goal lives on meta_ads_sets, so the
+            // ad set is joined and the metrics stay summed over ads.
+            'optimization_goal' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id'),
+                'selects' => [
+                    // '0', not null, so the unassigned row survives the string
+                    // cast and can be passed back as a scope value. No real Meta
+                    // goal is '0', so the sentinel can't collide with one.
+                    DB::raw("COALESCE(meta_ads_sets.optimization_goal, '0') AS id"),
+                    DB::raw(self::OPTIMIZATION_GOAL_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => ['meta_ads_sets.optimization_goal'],
+                // Searches real goals; the unassigned bucket has none.
+                'search' => 'meta_ads_sets.optimization_goal',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
+            ],
+            // Buckets ads by the objective of the campaign they run under
+            // (OUTCOME_SALES, OUTCOME_ENGAGEMENT, ...). Ad-grained like
+            // `optimization_goal`, but the objective lives on the campaign and
+            // ads carry meta_ads_campaign_id directly, so this joins campaigns
+            // in one hop rather than going through the ad set.
+            'campaign_objective' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_campaigns', 'meta_ads_campaigns.id', '=', 'meta_ads_ads.meta_ads_campaign_id'),
+                'selects' => [
+                    // '0', not null, so the unassigned row survives the string
+                    // cast and can be passed back as a scope value. No real Meta
+                    // objective is '0', so the sentinel can't collide with one.
+                    DB::raw("COALESCE(meta_ads_campaigns.objective, '0') AS id"),
+                    DB::raw(self::CAMPAIGN_OBJECTIVE_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => ['meta_ads_campaigns.objective'],
+                // Searches real objectives; the unassigned bucket has none.
+                'search' => 'meta_ads_campaigns.objective',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
+            ],
         };
     }
 
-    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null, array $dateFilters = []): array
+    /**
+     * Page ids that resolve to a real owner, optionally a single one. Mirrors
+     * the page_owner breakdown's joins — soft-deleted pages and owners with no
+     * user row drop out — so a drill-down buckets ads exactly as the grid did.
+     */
+    private function ownedPageIds(?string $ownerId = null)
+    {
+        return Page::query()
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->when($ownerId !== null, fn ($q) => $q->where('users.id', $ownerId))
+            ->select('pages.id');
+    }
+
+    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null, array $dateFilters = [], array $objectives = [], ?string $mediaType = null): array
     {
         $config = $this->groupByConfig($groupBy);
 
-        $insights = $this->insightsSubquery($config['insightKey'], $since, $until);
+        $insights = $this->insightsSubquery($config['insightKey'], $since, $until, $objectives, $mediaType);
 
         $base = $config['model']::query();
 
@@ -455,6 +794,14 @@ class AdsManagerController extends Controller
         // Row-level lifecycle dates — a WHERE, so it runs before aggregation.
         $this->applyDateFilters($base, $dateFilters, $groupBy);
 
+        // Campaign objective — narrows which rows survive; the insights
+        // subquery above already narrowed what they're allowed to sum.
+        $this->applyObjectiveFilter($base, $config, $objectives);
+
+        // Image / video — keeps only rows that ran at least one ad of that type.
+        // The insights subquery already limits their metrics to those ads.
+        $this->applyMediaTypeFilter($base, $config, $mediaType);
+
         // Number of ads in each group — shown for every dimension except `ad`
         // (where each row is already a single ad). `ad_name` counts distinct ads
         // sharing the name; the rest join a per-entity ad count subquery.
@@ -465,7 +812,7 @@ class AdsManagerController extends Controller
             $selects[] = DB::raw($config['adsCountExpr'].' AS ads_count');
             $hasAdsCount = true;
         } elseif (isset($config['adsCount'])) {
-            $adsCount = $this->adsCountSubquery($config['adsCount']['key']);
+            $adsCount = $this->adsCountSubquery($config['adsCount']['key'], $mediaType);
             $base->leftJoinSub($adsCount, 'ac', 'ac.'.$config['adsCount']['key'], '=', $config['adsCount']['joinOn']);
             $selects[] = DB::raw('COALESCE(MAX(ac.ads_count), 0) AS ads_count');
             $hasAdsCount = true;
@@ -537,7 +884,8 @@ class AdsManagerController extends Controller
         int $breakdownId,
         array $metricFilters = [],
         ?string $creatorFilter = null,
-        array $dateFilters = []
+        array $dateFilters = [],
+        ?string $mediaType = null
     ): array {
         $breakdown = CustomBreakdown::where('workspace_id', $workspace->id)->findOrFail($breakdownId);
 
@@ -548,13 +896,14 @@ class AdsManagerController extends Controller
             return (new LengthAwarePaginator([], 0, $perPage, 1))->toArray();
         }
 
-        $insights = $this->insightsSubquery('meta_ads_ad_id', $since, $until);
+        $insights = $this->insightsSubquery('meta_ads_ad_id', $since, $until, [], $mediaType);
 
         $base = Ad::query()
             ->leftJoinSub($insights, 'i', 'i.meta_ads_ad_id', '=', 'meta_ads_ads.id')
             ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds)
             ->whereRaw("({$case}) IS NOT NULL")
             ->tap(fn ($q) => $this->applyCreatorFilter($q, $creatorFilter))
+            ->tap(fn ($q) => $this->constrainByMediaType($q, 'meta_ads_ads.id', $mediaType))
             ->select(array_merge(
                 [
                     DB::raw("({$case}) AS name"),
@@ -649,9 +998,10 @@ class AdsManagerController extends Controller
      * One row per entity key with the count of ads belonging to it. LEFT JOINed
      * as `ac` so the count never fans out the per-entity insight aggregates.
      */
-    private function adsCountSubquery(string $keyColumn)
+    private function adsCountSubquery(string $keyColumn, ?string $mediaType = null)
     {
         return DB::table('meta_ads_ads')
+            ->tap(fn ($q) => $this->constrainByMediaType($q, 'meta_ads_ads.id', $mediaType))
             ->select($keyColumn, DB::raw('COUNT(*) AS ads_count'))
             ->groupBy($keyColumn);
     }
@@ -879,6 +1229,26 @@ class AdsManagerController extends Controller
     }
 
     /**
+     * The started_date filter alone, shaped for the Ads Manager's start-time
+     * control (which offers that one field), so a refresh or a shared link
+     * restores it. Null when no valid one was sent.
+     *
+     * @return array{op: string, value: string, value2?: string}|null
+     */
+    private function startTimeFilter(Request $request): ?array
+    {
+        foreach ($this->parseDateFilters($request) as $filter) {
+            if ($filter['field'] === 'started_date') {
+                unset($filter['field']);
+
+                return $filter;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * A `Y-m-d` string, or null when the input isn't one.
      */
     private function asDate($value): ?string
@@ -906,14 +1276,17 @@ class AdsManagerController extends Controller
             return match ($groupBy) {
                 'campaign' => 'meta_ads_campaigns.created_time',
                 'ad_set' => 'meta_ads_sets.created_time',
-                'ad', 'ad_name', 'ad_type' => 'meta_ads_ads.created_time',
+                'ad', 'ad_name', 'ad_type', 'page', 'page_owner', 'optimization_goal', 'campaign_objective' => 'meta_ads_ads.created_time',
                 default => null,
             };
         }
 
         return match ($groupBy) {
-            'campaign' => 'meta_ads_campaigns.start_time',
-            'ad_set' => 'meta_ads_sets.start_time',
+            // campaign_objective joins the campaign too, so it reads the same column.
+            'campaign', 'campaign_objective' => 'meta_ads_campaigns.start_time',
+            // The page breakdowns already join the ad set, so they read the
+            // column directly instead of the subquery fallback below.
+            'ad_set', 'page', 'page_owner', 'optimization_goal' => 'meta_ads_sets.start_time',
             default => null,
         };
     }
@@ -1083,7 +1456,7 @@ class AdsManagerController extends Controller
      * account id) for the date range. LEFT JOINed onto the entity base as `i`,
      * so entities with no insights in the window simply get NULL → 0 metrics.
      */
-    private function insightsSubquery(string $keyColumn, string $since, string $until)
+    private function insightsSubquery(string $keyColumn, string $since, string $until, array $objectives = [], ?string $mediaType = null)
     {
         $selects = [$keyColumn];
         foreach (self::INSIGHTS_METRICS as $col) {
@@ -1092,8 +1465,218 @@ class AdsManagerController extends Controller
 
         return DB::table('meta_ads_insights')
             ->whereBetween('date', [$since, $until])
+            // Insight rows carry their campaign, so the objective filter is
+            // applied here too, not just to the grouped entity. Without this an
+            // account row would keep summing spend from campaigns the filter
+            // excluded, and report a total the filter says you're not looking at.
+            ->tap(fn ($q) => $this->constrainByObjectives($q, 'meta_ads_campaign_id', $objectives))
+            // Insights are ad-level, so an image/video filter narrows the sums
+            // for every breakdown — a campaign row totals only its video ads.
+            ->tap(fn ($q) => $this->constrainByMediaType($q, 'meta_ads_ad_id', $mediaType))
             ->select($selects)
             ->groupBy($keyColumn);
+    }
+
+    /**
+     * Campaigns carrying one objective. The "0" sentinel is the unassigned
+     * bucket the campaign_objective breakdown emits, so it maps back to
+     * campaigns Meta reported no objective for.
+     */
+    private function campaignIdsForObjective(string $objective)
+    {
+        return Campaign::query()
+            ->select('id')
+            ->when(
+                $objective === '0',
+                fn ($q) => $q->whereNull('objective'),
+                fn ($q) => $q->where('objective', $objective),
+            );
+    }
+
+    /**
+     * Applies each objective row to a query, on the column that reaches the
+     * campaign from that table. "is" keeps matching campaigns, "is not" drops
+     * them; several rows AND together, as everywhere else in the builder.
+     */
+    private function constrainByObjectives($query, string $campaignColumn, array $filters): void
+    {
+        foreach ($filters as $f) {
+            $ids = $this->campaignIdsForObjective($f['value']);
+
+            $f['op'] === 'is_not'
+                ? $query->whereNotIn($campaignColumn, $ids)
+                : $query->whereIn($campaignColumn, $ids);
+        }
+    }
+
+    /**
+     * Narrows a breakdown to ads/campaigns carrying the selected objectives.
+     * Applied per base model, since each grouping reaches the campaign from a
+     * different table — mirroring how dateFilterColumn resolves per grouping.
+     */
+    private function applyObjectiveFilter($query, array $config, array $objectives): void
+    {
+        if ($objectives === []) {
+            return;
+        }
+
+        $column = match ($config['model']) {
+            Ad::class => 'meta_ads_ads.meta_ads_campaign_id',
+            AdSet::class => 'meta_ads_sets.meta_ads_campaign_id',
+            Campaign::class => 'meta_ads_campaigns.id',
+            default => null,
+        };
+
+        if ($column !== null) {
+            $this->constrainByObjectives($query, $column, $objectives);
+
+            return;
+        }
+
+        // An account has no objective of its own, so it is kept when it ran at
+        // least one campaign the rows allow. Its metrics are already limited to
+        // those campaigns by the insights subquery.
+        if ($config['model'] === AdAccount::class) {
+            $query->whereIn('meta_ads_accounts.id', function ($sub) use ($objectives) {
+                $sub->select('meta_ads_account_id')->from('meta_ads_campaigns');
+                $this->constrainByObjectives($sub, 'id', $objectives);
+            });
+        }
+    }
+
+    /**
+     * Image / video filter (`media_type`). Anything else means no constraint.
+     */
+    private function parseMediaTypeFilter(Request $request): ?string
+    {
+        $value = (string) $request->query('media_type', '');
+
+        return in_array($value, ['image', 'video'], true) ? $value : null;
+    }
+
+    /**
+     * Ids of video ads, split exactly like MEDIA_TYPE_SQL. Every other ad —
+     * including one with no synced creative — counts as an image.
+     */
+    private function videoAdIds()
+    {
+        return DB::table('meta_ads_ads')
+            ->join('meta_ads_creatives', 'meta_ads_creatives.id', '=', 'meta_ads_ads.meta_ads_creative_id')
+            ->whereRaw(self::IS_VIDEO_SQL)
+            ->select('meta_ads_ads.id');
+    }
+
+    /** Constrains a column holding an ad id to image or video ads. */
+    private function constrainByMediaType($query, string $adIdColumn, ?string $mediaType): void
+    {
+        if ($mediaType === null) {
+            return;
+        }
+
+        $mediaType === 'video'
+            ? $query->whereIn($adIdColumn, $this->videoAdIds())
+            : $query->whereNotIn($adIdColumn, $this->videoAdIds());
+    }
+
+    /**
+     * Narrows a breakdown to rows that carry ads of the given media type. Ad-
+     * grained groupings filter the ads themselves; the rest keep an entity
+     * when at least one of its ads matches.
+     */
+    private function applyMediaTypeFilter($query, array $config, ?string $mediaType): void
+    {
+        if ($mediaType === null) {
+            return;
+        }
+
+        if ($config['model'] === Ad::class) {
+            $this->constrainByMediaType($query, 'meta_ads_ads.id', $mediaType);
+
+            return;
+        }
+
+        $column = match ($config['model']) {
+            AdSet::class => ['meta_ads_sets.id', 'meta_ads_set_id'],
+            Campaign::class => ['meta_ads_campaigns.id', 'meta_ads_campaign_id'],
+            AdAccount::class => ['meta_ads_accounts.id', 'meta_ads_account_id'],
+            default => null,
+        };
+
+        if ($column === null) {
+            return;
+        }
+
+        [$entityColumn, $adColumn] = $column;
+        $query->whereIn($entityColumn, function ($sub) use ($adColumn, $mediaType) {
+            $sub->select($adColumn)->from('meta_ads_ads');
+            $this->constrainByMediaType($sub, 'meta_ads_ads.id', $mediaType);
+        });
+    }
+
+    /**
+     * Campaign-objective rows from the filter builder. They ride in the same
+     * `metric_filters` payload as the numeric filters but are dimensions, not
+     * aggregates, so they become WHERE clauses here instead of the HAVING
+     * clauses parseMetricFilters() builds — which ignores them, since
+     * metricSqlExpression() has no expression for the field.
+     *
+     * @return array<int, array{op: string, value: string}>
+     */
+    private function parseObjectiveFilters(Request $request): array
+    {
+        $raw = $request->query('metric_filters');
+        if (! $raw) {
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 5, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $filters = [];
+        foreach ($decoded as $f) {
+            if (($f['field'] ?? null) !== self::OBJECTIVE_FILTER_FIELD) {
+                continue;
+            }
+
+            $value = $f['value'] ?? null;
+            $op = $f['op'] ?? 'is';
+
+            if (! is_string($value) || $value === '' || ! in_array($op, ['is', 'is_not'], true)) {
+                continue;
+            }
+
+            $filters[] = ['op' => $op, 'value' => $value];
+        }
+
+        return $filters;
+    }
+
+    /**
+     * Distinct campaign objectives across the workspace's accounts, for the
+     * filter picker. Campaigns with none collapse to the same "0" sentinel the
+     * breakdown uses, so picker and grid agree on the unassigned bucket.
+     */
+    private function availableObjectives($accountIds): array
+    {
+        return Campaign::query()
+            ->whereIn('meta_ads_account_id', $accountIds)
+            ->select('objective')
+            ->distinct()
+            ->orderByRaw('objective IS NULL, objective')
+            ->pluck('objective')
+            ->map(fn ($o) => [
+                'value' => $o ?? '0',
+                'label' => $o ?? 'Unassigned objective',
+            ])
+            ->values()
+            ->all();
     }
 
     /**

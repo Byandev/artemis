@@ -153,16 +153,30 @@ final class InventoryStockColumns
         return "(COALESCE($current, 0) + COALESCE($waiting, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
     }
 
+    /**
+     * The daily rate the reorder figures are worked from: the stored average
+     * rounded up.
+     *
+     * Rounded because that is the rate the list displays — 3-Day Avg renders as
+     * a whole unit — and a buffer worked out from the exact 5.87 behind a
+     * displayed 6 gives 58.7 where the reader multiplies to 60. Up rather than
+     * to nearest, because half a unit a day still needs a unit on the shelf.
+     */
+    private static function ceiledAverage(): string
+    {
+        return 'CEIL(COALESCE(inventory_items.three_days_average, 0))';
+    }
+
     /** The safety buffer alone: days_of_coverage extra days of expected demand. */
     public static function coverageBuffer(): string
     {
-        return '(COALESCE(inventory_items.days_of_coverage, 0) * COALESCE(inventory_items.three_days_average, 0))';
+        return '(COALESCE(inventory_items.days_of_coverage, 0) * '.self::ceiledAverage().')';
     }
 
     /** Expected demand across the lead-time window. */
     public static function stocksNeededForLeadTime(): string
     {
-        return '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
+        return '(COALESCE(inventory_items.lead_time, 0) * '.self::ceiledAverage().')';
     }
 
     /**

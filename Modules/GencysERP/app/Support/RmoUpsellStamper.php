@@ -48,11 +48,12 @@ class RmoUpsellStamper
             return false;
         }
 
+        $row->loadMissing('order');
+
         // The relation is not workspace-scoped by design — see the docblock on
         // OrderForDelivery::gencysOrder(). Waybills are only unique per workspace.
-        $gencys = $row->gencysOrder()
-            ->where('gencys_orders.workspace_id', $row->workspace_id)
-            ->first(['gencys_orders.date_added', 'gencys_orders.price_upsell', 'gencys_orders.order_details']);
+        $gencys = GencysDailySalesOrder::where('tracking_number', $row->order->tracking_code)
+            ->first();
 
         if (! $gencys) {
             return false;

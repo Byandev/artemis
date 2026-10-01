@@ -3,19 +3,24 @@
 namespace App\Console\Commands;
 
 use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use App\Models\PageDailyRecord;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Modules\MetaAds\Models\Insight;
 use Modules\Pancake\Models\Order;
 
 /**
  * Build Artemis-source page performance rows, one per Pancake page per day,
  * combining:
- *   - Meta Ads:   ad spend + purchase value (= sales), attributed via
- *                 ad set → meta_page_id → page.
- *   - Pancake POS: orders + delivered/returned (count + amount), via page_id.
+ *   - Meta Ads:   ad spend + purchases (count) + purchase value (= ad_sales),
+ *                 attributed via ad set → meta_page_id → page.
+ *   - Pancake POS: orders + units + cost of goods + delivered/returned/returning
+ *                 (count + amount), via page_id.
+ *   - Budget:     the page's planned daily ad spend, so a day carries what it
+ *                 was measured against alongside what it actually spent.
  *
  * Only non-Gencys-partner workspaces (they default to the Artemis source).
  * Writes to the unified page_daily_records table (source=artemis, page=Page).
@@ -23,6 +28,9 @@ use Modules\Pancake\Models\Order;
  */
 class BuildDailyPagePerformanceCommand extends Command
 {
+    /** The trailing window behind rts_rate_30d. Mirrors the ROAS tracker's. */
+    private const RTS_WINDOW_DAYS = 30;
+
     protected $signature = 'build-page-daily-performance
         {--date= : Build a single date (YYYY-MM-DD)}
         {--days=3 : Trailing window ending today when no --date (default 3)}';
@@ -34,8 +42,7 @@ class BuildDailyPagePerformanceCommand extends Command
         $dates = $this->resolveDates();
         $total = 0;
 
-        Workspace::where('is_gencys_partner', false)
-            ->with('pages')
+        Workspace::with('pages')
             ->get()
             ->each(function (Workspace $workspace) use ($dates, &$total) {
                 foreach ($dates as $date) {
@@ -73,18 +80,66 @@ class BuildDailyPagePerformanceCommand extends Command
         $sales = Order::where('page_id', $pageId)
             ->whereDate('confirmed_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $orders = Order::where('page_id', $pageId)
             ->whereDate('confirmed_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->count('*');
 
-        $ad_spent = Insight::whereHas('adSet', fn ($query) => $query->whereHas('page', fn ($query) => $query->whereKey($pageId)))
-            ->where('date', $date)
-            ->sum('spend');
+        // The same orders, opened up to their lines: how many units they sold and
+        // what those goods cost. One pass, since both come off the same join.
+        //
+        // The cost stays null when no line carries one — a day nobody has costed
+        // is not a day whose goods were free — while the quantity is a plain
+        // count and reads as 0.
+        $items = DB::table('pancake_order_items as poi')
+            ->join('pancake_orders as po', 'po.id', '=', 'poi.order_id')
+            ->where('po.page_id', $pageId)
+            ->whereDate('po.confirmed_at', $date)
+            ->whereNotIn('po.status', [6, 7])
+            ->selectRaw('COALESCE(SUM(poi.quantity), 0) as quantity_sum, SUM(poi.cogs) as cogs_sum')
+            ->first();
 
-        $roas = $ad_spent ? $sales / $ad_spent : 0;
+        $item_quantity = (int) ($items->quantity_sum ?? 0);
+        $order_cogs = ($items->cogs_sum ?? null) === null ? null : (float) $items->cogs_sum;
+
+        // One pass over the insights — spend, purchases and purchase value all
+        // come from the same rows. Aliased away from the column names so the
+        // model's decimal casts don't reshape the aggregates.
+        $ads = Insight::whereHas('adSet', fn ($query) => $query->whereHas('page', fn ($query) => $query->whereKey($pageId)))
+            ->where('date', $date)
+            ->selectRaw('COALESCE(SUM(spend), 0) as spend_sum')
+            ->selectRaw('COALESCE(SUM(purchases), 0) as purchases_sum')
+            ->selectRaw('COALESCE(SUM(purchase_value), 0) as purchase_value_sum')
+            ->first();
+
+        $ad_spent = (float) ($ads->spend_sum ?? 0);
+        $ad_purchases = (int) ($ads->purchases_sum ?? 0);
+        $ad_sales = (float) ($ads->purchase_value_sum ?? 0);
+
+        // What the page was budgeted for that day: its latest budget recorded on
+        // or before $date, since a budget carries forward until it's changed.
+        // Snapshotted here rather than joined at read time so a budget edited
+        // next week doesn't rewrite what last week was judged against.
+        //
+        // Null when the page has no budget on record yet — a page nobody has
+        // budgeted is not a page budgeted at zero, and can be neither under nor
+        // over it.
+        $ad_spend_budget = PageDailyBudgetRecord::where('workspace_id', $workspace->id)
+            ->where('page_id', $pageId)
+            ->where('date', '<=', $date)
+            ->orderByDesc('date')
+            ->value('budget');
+
+        $ad_spend_budget = $ad_spend_budget === null ? null : (float) $ad_spend_budget;
+
+        $roas = $ad_spent > 0 ? $sales / $ad_spent : 0;
+        $ad_roas = $ad_spent > 0 ? $ad_sales / $ad_spent : 0;
+
+        // Cost per purchase, against Meta's count and Pancake's.
+        $ad_cpp = $ad_purchases > 0 ? ($ad_spent / $ad_purchases) : 0;
+        $cpp = $orders > 0 ? ($ad_spent / $orders) : 0;
 
         $delivered = Order::where('page_id', $pageId)
             ->whereDate('delivered_at', $date)
@@ -94,7 +149,7 @@ class BuildDailyPagePerformanceCommand extends Command
         $delivered_amount = Order::where('page_id', $pageId)
             ->whereDate('delivered_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $returned = Order::where('page_id', $pageId)
             ->whereDate('returned_at', $date)
@@ -104,7 +159,43 @@ class BuildDailyPagePerformanceCommand extends Command
         $returned_amount = Order::where('page_id', $pageId)
             ->whereDate('returned_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
+
+        // Parcels that started their way back on $date — a single day's events,
+        // like delivered and returned above.
+        $returning_amount = Order::where('page_id', $pageId)
+            ->whereDate('returning_at', $date)
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->sum('final_amount');
+
+        $overall_returning = $returning_amount;
+
+        $rts_rate = $overall_returning ? $overall_returning / ($overall_returning + $delivered_amount) * 100 : 0;
+
+        // The same blend over the 30 days ending on this one, which is what the
+        // ROAS tracker's margin estimate discounts the day's revenue by.
+        //
+        // The 29 days behind come from the stored rows; today's own figures are
+        // added here rather than read back, because this row has not been
+        // written yet and reading it would use the previous run's numbers.
+        $window = DB::table('page_daily_records')
+            ->where('workspace_id', $workspace->id)
+            ->where('page_type', $page->getMorphClass())
+            ->where('page_id', $pageId)
+            ->whereBetween('date', [
+                Carbon::parse($date)->subDays(self::RTS_WINDOW_DAYS - 1)->toDateString(),
+                Carbon::parse($date)->subDay()->toDateString(),
+            ])
+            ->selectRaw('COALESCE(SUM(returning_amount), 0) as returning_sum, COALESCE(SUM(delivered_amount), 0) as delivered_sum')
+            ->first();
+
+        $window_returning = (float) ($window->returning_sum ?? 0) + (float) $returning_amount;
+        $window_moved = $window_returning + (float) ($window->delivered_sum ?? 0) + (float) $delivered_amount;
+
+        // Null, not zero: a window in which nothing moved has no rate to report,
+        // and the tracker falls back to its default rather than reading a page
+        // with no deliveries as one that never gets anything returned.
+        $rts_rate_30d = $window_moved > 0 ? $window_returning / $window_moved * 100 : null;
 
         PageDailyRecord::updateOrCreate(
             [
@@ -116,13 +207,24 @@ class BuildDailyPagePerformanceCommand extends Command
             ],
             [
                 'orders' => $orders,
+                'item_quantity' => $item_quantity,
+                'order_cogs' => $order_cogs,
                 'sales' => $sales,
                 'delivered' => $delivered,
                 'delivered_amount' => $delivered_amount,
                 'returned' => $returned,
                 'returned_amount' => $returned_amount,
+                'returning_amount' => $returning_amount,
+                'rts_rate' => $rts_rate,
+                'rts_rate_30d' => $rts_rate_30d,
                 'ad_spent' => $ad_spent,
+                'ad_spend_budget' => $ad_spend_budget,
+                'ad_sales' => $ad_sales,
+                'ad_purchases' => $ad_purchases,
                 'roas' => $roas,
+                'ad_roas' => $ad_roas,
+                'ad_cpp' => $ad_cpp,
+                'cpp' => $cpp,
             ],
         );
 

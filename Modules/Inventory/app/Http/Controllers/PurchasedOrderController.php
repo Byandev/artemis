@@ -170,6 +170,29 @@ class PurchasedOrderController extends Controller
             ->with('success', 'Purchased order created successfully.');
     }
 
+    /**
+     * Where to send the user after a save. The form may pass a `return_to` path
+     * — the list URL the edit screen was opened from, filters and page included
+     * — otherwise land on the plain purchased-orders list.
+     */
+    private function redirectAfterSave(Request $request, Workspace $workspace)
+    {
+        return redirect($this->safeReturnTo($request, $workspace)
+            ?? route('workspaces.inventory.purchased-orders.index', $workspace->slug));
+    }
+
+    /**
+     * A `return_to` path from the request, but only when it points inside this
+     * workspace (guards against an open redirect). Null otherwise.
+     */
+    private function safeReturnTo(Request $request, Workspace $workspace): ?string
+    {
+        $returnTo = $request->input('return_to');
+        $prefix = "/workspaces/{$workspace->slug}/";
+
+        return (is_string($returnTo) && str_starts_with($returnTo, $prefix)) ? $returnTo : null;
+    }
+
     public function edit(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
         $this->authorize('Edit Purchased Orders', $workspace);
@@ -177,6 +200,7 @@ class PurchasedOrderController extends Controller
         return Inertia::render('workspaces/inventory/purchased-orders/edit', [
             'workspace' => $workspace,
             'order' => $purchasedOrder->load('items.inventoryItem.product'),
+            'returnTo' => $this->safeReturnTo($request, $workspace),
             'items' => InventoryItem::where('workspace_id', $workspace->id)
                 ->visibleTo($request->user(), $workspace)
                 ->with('product')
@@ -225,7 +249,7 @@ class PurchasedOrderController extends Controller
             $purchasedOrder->items()->create($item);
         }
 
-        return redirect()->route('workspaces.inventory.purchased-orders.index', $workspace->slug)
+        return $this->redirectAfterSave($request, $workspace)
             ->with('success', 'Purchased order updated successfully.');
     }
 

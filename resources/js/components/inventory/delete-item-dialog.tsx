@@ -17,8 +17,6 @@ interface Item {
     id: number;
     sku: string;
     product_id: number;
-    sales_keywords: string;
-    transaction_keywords: string;
     product?: {
         id: number;
         name: string;
@@ -63,11 +61,11 @@ export function DeleteItemDialog({ item, workspace, onClose }: Props) {
                         <span className="font-medium text-gray-900 dark:text-gray-200">
                             {item?.product?.name || 'this product'}
                         </span>{' '}
-                        on{' '}
+                        (
                         <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                            {item?.transaction_keywords}
+                            {item?.sku}
                         </span>
-                        ? This action cannot be undone.
+                        )? This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 

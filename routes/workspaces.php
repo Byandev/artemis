@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminClientReportController;
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminInvoiceController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
@@ -18,15 +19,16 @@ use App\Http\Controllers\Workspaces\DepartmentController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
-use App\Http\Controllers\Workspaces\Product\AnalyticsController;
-use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
 use App\Http\Controllers\Workspaces\RolePermissionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
+use App\Http\Controllers\Workspaces\RTS\CallLogController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
+use App\Http\Controllers\Workspaces\RTS\HeatMapController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DailyReportController;
+use App\Http\Controllers\Workspaces\SalesMarketing\DashboardController as SalesMarketingDashboardController;
 use App\Http\Controllers\Workspaces\SalesMarketing\NewCreativesTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\PageRoasTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\SalesTargetController;
@@ -38,6 +40,7 @@ use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
 use App\Http\Controllers\Workspaces\TeamShopController;
 use App\Http\Controllers\Workspaces\VideoEditorDashboardController;
+use App\Http\Controllers\Workspaces\WelleController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
@@ -59,6 +62,8 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
 use Modules\Finance\Http\Controllers\IncomeStatementController as FinanceIncomeStatementController;
+use Modules\Finance\Http\Controllers\ManagementController as FinanceManagementController;
+use Modules\Finance\Http\Controllers\PurchasedOrderLookupController as FinancePurchasedOrderLookupController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
@@ -91,6 +96,11 @@ use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use Modules\Pancake\Http\Controllers\OrderController;
+use Modules\Products\Http\Controllers\AnalyticsController;
+use Modules\Products\Http\Controllers\FormController as ProductFormController;
+use Modules\Products\Http\Controllers\ProductController;
+use Modules\Products\Http\Controllers\ProductResearchController;
+use Modules\Products\Http\Controllers\TargetMarketController;
 use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
 use Modules\SimGateway\Http\Controllers\SmsController;
 
@@ -116,18 +126,22 @@ Route::get('/public/workspaces/{workspace}/sales-targets/{salesTarget}', [Public
     ->whereNumber('salesTarget')
     ->name('public-page.sales-targets.show');
 
-Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/stats', [ForDeliveryController::class, 'publicStats'])->name('public-page.rmo-management.stats');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-status', [ForDeliveryController::class, 'publicBulkUpdateStatus'])->name('public-page.rmo-management.bulkUpdateStatus');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
-Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('public-page.rmo-management.callLogs');
-Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('public-page.rmo-management.callLogs.export');
+// Public RMO management is shut off entirely once the workspace's subscription lapses.
+Route::middleware('public.subscription')->group(function () {
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/stats', [ForDeliveryController::class, 'publicStats'])->name('public-page.rmo-management.stats');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-status', [ForDeliveryController::class, 'publicBulkUpdateStatus'])->name('public-page.rmo-management.bulkUpdateStatus');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('public-page.rmo-management.callLogs');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('public-page.rmo-management.callLogs.export');
+    Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('public-page.rmo-management.callLogs.breakdown');
+});
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
@@ -160,12 +174,14 @@ Route::middleware(['auth'])->group(function () {
 
     // Role-specific dashboards (scaffold — gated by granular permissions)
     //
-    // Sales & Marketing is five sibling pages, each with its own URL and its own
+    // Sales & Marketing is a group of sibling pages, each with its own URL and its own
     // entry in the sidebar's "Sales & Marketing" group. It used to be a single
     // tabbed dashboard at .../dashboard/{tab}; the redirects at the end of this
     // group keep those URLs — and the three legacy entry points further down
     // this file — landing in the right place.
     Route::prefix('/workspaces/{workspace}/sales-marketing')->name('workspaces.sales-marketing.')->group(function () {
+        Route::get('/dashboard', [SalesMarketingDashboardController::class, 'index'])->name('dashboard');
+
         Route::get('/daily-report', [DailyReportController::class, 'index'])->name('daily-report');
         // JSON the Daily Report page fetches when the date changes.
         Route::get('/daily-report/data', [DailyReportController::class, 'data'])->name('daily-report.data');
@@ -191,17 +207,18 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/sales-targets/{salesTarget}', [SalesTargetController::class, 'update'])->name('sales-targets.update');
         Route::delete('/sales-targets/{salesTarget}', [SalesTargetController::class, 'destroy'])->name('sales-targets.destroy');
 
-        // The tabbed dashboard's old URLs. `{tab?}` is last or it swallows the
-        // more specific redirect above it.
+        // The tabbed dashboard's old tab URLs. `{tab}` is last or it swallows
+        // the more specific redirect above it. `/dashboard` itself is no longer
+        // a redirect — it is the group's own page, declared at the top.
         Route::permanentRedirect('/dashboard/data', '/workspaces/{workspace}/sales-marketing/daily-report/data');
-        Route::get('/dashboard/{tab?}', function (Workspace $workspace, ?string $tab = null) {
+        Route::get('/dashboard/{tab}', function (Workspace $workspace, string $tab) {
             $moved = ['page-roas-tracker', 'ad-spend-goals', 'ad-spent-summary', 'sales-targets'];
 
             return redirect()->route(
                 'workspaces.sales-marketing.'.(in_array($tab, $moved, true) ? $tab : 'daily-report'),
                 $workspace,
             );
-        })->name('dashboard');
+        })->name('dashboard.legacy-tab');
     });
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
@@ -272,6 +289,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-pages', [ShopController::class, 'refreshPages'])->name('workspaces.shops.refresh-pages');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-orders', [ShopController::class, 'refreshOrders'])->name('workspaces.shops.refresh-orders');
+    Route::get('/workspaces/{workspace}/shops/{shop}/order-tags', [ShopController::class, 'orderTags'])->name('workspaces.shops.order-tags');
+    Route::post('/workspaces/{workspace}/shops/{shop}/order-tags/presets', [ShopController::class, 'createPresetOrderTags'])->name('workspaces.shops.order-tag-presets');
     Route::delete('/workspaces/{workspace}/shops/{shop}', [ShopController::class, 'destroy'])->name('workspaces.shops.destroy');
 
     // Moved to the S&M dashboard's "Page ROAS Tracker" tab — keep the old URL
@@ -285,6 +304,36 @@ Route::middleware(['auth'])->group(function () {
     })->name('workspaces.products');
     Route::get('/workspaces/{workspace}/products/list', [ProductController::class, 'index'])->name('workspaces.products.index');
     Route::get('/workspaces/{workspace}/products/analytics', [AnalyticsController::class, 'index'])->name('workspaces.products.analytics');
+    Route::get('/workspaces/{workspace}/products/forms', [ProductFormController::class, 'index'])->name('workspaces.products.forms.index');
+    Route::post('/workspaces/{workspace}/products/forms', [ProductFormController::class, 'store'])->name('workspaces.products.forms.store');
+    // Declared before the {productForm} routes so "variants" is never taken as
+    // a form id.
+    Route::get('/workspaces/{workspace}/products/forms/variants/{variant}/image/{media}', [ProductFormController::class, 'showVariantImage'])->name('workspaces.products.forms.variant-image');
+    Route::put('/workspaces/{workspace}/products/forms/{productForm}', [ProductFormController::class, 'update'])->name('workspaces.products.forms.update');
+    Route::delete('/workspaces/{workspace}/products/forms/{productForm}', [ProductFormController::class, 'destroy'])->name('workspaces.products.forms.destroy');
+    Route::get('/workspaces/{workspace}/products/target-markets', [TargetMarketController::class, 'index'])->name('workspaces.products.target-markets.index');
+    Route::post('/workspaces/{workspace}/products/target-markets', [TargetMarketController::class, 'store'])->name('workspaces.products.target-markets.store');
+    Route::put('/workspaces/{workspace}/products/target-markets/{targetMarket}', [TargetMarketController::class, 'update'])->name('workspaces.products.target-markets.update');
+    Route::delete('/workspaces/{workspace}/products/target-markets/{targetMarket}', [TargetMarketController::class, 'destroy'])->name('workspaces.products.target-markets.destroy');
+    Route::get('/workspaces/{workspace}/products/product-research', [ProductResearchController::class, 'index'])->name('workspaces.products.product-research.index');
+    Route::get('/workspaces/{workspace}/products/product-research/create', [ProductResearchController::class, 'create'])->name('workspaces.products.product-research.create');
+    // Declared before the {productResearch} routes so "suggest-names" is never read as an
+    // id. Throttled because each call is a paid one — see the product-research-suggestions
+    // limiter in AppServiceProvider.
+    Route::post('/workspaces/{workspace}/products/product-research/suggest-names', [ProductResearchController::class, 'suggestNames'])
+        ->middleware('throttle:product-research-suggestions')
+        ->name('workspaces.products.product-research.suggest-names');
+    Route::post('/workspaces/{workspace}/products/product-research', [ProductResearchController::class, 'store'])->name('workspaces.products.product-research.store');
+    Route::get('/workspaces/{workspace}/products/product-research/{productResearch}/edit', [ProductResearchController::class, 'edit'])->name('workspaces.products.product-research.edit');
+    // No {productResearch}: a draft that has not been filed yet is saved on the way
+    // through, so Step 3 does not have to wait on Save to RDPs.
+    Route::post('/workspaces/{workspace}/products/product-research/packshots', [ProductResearchController::class, 'generatePackshots'])
+        ->middleware('throttle:product-research-suggestions')
+        ->name('workspaces.products.product-research.packshots');
+    Route::post('/workspaces/{workspace}/products/product-research/packshot', [ProductResearchController::class, 'uploadPackshot'])->name('workspaces.products.product-research.packshot-upload');
+    Route::post('/workspaces/{workspace}/products/product-research/{productResearch}/packshot/select', [ProductResearchController::class, 'selectPackshot'])->name('workspaces.products.product-research.packshot-select');
+    Route::get('/workspaces/{workspace}/products/product-research/{productResearch}/packshot/{media}', [ProductResearchController::class, 'showPackshotImage'])->name('workspaces.products.product-research.packshot-image');
+    Route::put('/workspaces/{workspace}/products/product-research/{productResearch}', [ProductResearchController::class, 'update'])->name('workspaces.products.product-research.update');
     Route::get('/workspaces/{workspace}/products/analytics/metrics', [AnalyticsController::class, 'metrics'])->name('workspaces-workspace.products.analytics.metrics');
     Route::get('/workspaces/{workspace}/products/create', [ProductController::class, 'create'])->name('workspaces.products.create');
     Route::post('/workspaces/{workspace}/products', [ProductController::class, 'store'])->name('workspaces.products.store');
@@ -298,6 +347,7 @@ Route::middleware(['auth'])->group(function () {
         return redirect()->route('workspaces.rts.analytics', $workspace);
     })->name('workspaces.rts');
     Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
+    Route::get('/workspaces/{workspace}/rts/call-logs', [CallLogController::class, 'index'])->name('workspaces.rts.call-logs');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/order-item', [AnalyticController::class, 'groupByOrderItem'])->name('workspaces.rts.analytics.group-by-order-item');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/price', [AnalyticController::class, 'groupByPrice'])->name('workspaces.rts.analytics.group-by-price');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cx-rts', [AnalyticController::class, 'groupByCxRts'])->name('workspaces.rts.analytics.group-by-cx-rts');
@@ -309,6 +359,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/rider', [AnalyticController::class, 'groupByRider'])->name('workspaces.rts.analytics.group-by-rider');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/provinces', [AnalyticController::class, 'groupByProvinces'])->name('workspaces.rts.analytics.group-by-provinces');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cities', [AnalyticController::class, 'groupByCities'])->name('workspaces.rts.analytics.group-by-cities');
+    Route::get('/workspaces/{workspace}/rts/heat-map', [HeatMapController::class, 'index'])->name('workspaces.rts.heat-map');
+    Route::get('/workspaces/{workspace}/rts/heat-map/data', [HeatMapController::class, 'data'])->name('workspaces.rts.heat-map.data');
     Route::get('/workspaces/{workspace}/rts/parcel-journeys', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journeys');
     Route::get('/workspaces/{workspace}/rts/parcel-update-notification', [ParcelUpdateNotificationController::class, 'index'])->name('workspaces.rts.parcel-update-notification');
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
@@ -326,6 +378,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/data', [AdsManagerController::class, 'data'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.data');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/timeseries', [AdsManagerController::class, 'timeseries'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-manager.timeseries');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/preview', [AdsManagerController::class, 'adPreview'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.preview');
@@ -456,6 +511,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/csr/dashboard', [CSRController::class, 'dashboard'])->name('workspaces.csr.dashboard');
     Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
     Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
+    Route::get('/workspaces/{workspace}/csr/analytics/export', [CSRController::class, 'analyticsExport'])->name('workspaces.csr.analytics.export');
+    // The pancake logins behind the CSR dashboard's figures. Same gate as the
+    // dashboard — see CSRController::pancakeUsers().
+    Route::get('/workspaces/{workspace}/csr/pancake-users', [CSRController::class, 'pancakeUsers'])->name('workspaces.csr.pancake-users');
+    Route::get('/workspaces/{workspace}/csr/call-logs', [CSRController::class, 'callLogs'])->name('workspaces.csr.call-logs');
 
     // CSR RMO Management (authenticated)
     Route::get('/workspaces/{workspace}/csr/rmo-management', [ForDeliveryController::class, 'csrRmoManagement'])->name('workspaces.csr.rmo-management');
@@ -466,12 +526,19 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('workspaces.csr.rmo-management.updatePhones');
     Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('workspaces.csr.rmo-management.callLogs');
     Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('workspaces.csr.rmo-management.callLogs.export');
+    Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('workspaces.csr.rmo-management.callLogs.breakdown');
+
+    // Welle — the signed-in user's own record, behind the workspace's Welle
+    // module toggle. See WelleController.
+    Route::get('/workspaces/{workspace}/welle/my-esc', [WelleController::class, 'myEsc'])->name('workspaces.welle.my-esc');
 
     // Checklist routes
     Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');
     Route::post('/workspaces/{workspace}/checklist', [ChecklistController::class, 'store'])->name('workspaces.checklist.store');
     Route::put('/workspaces/{workspace}/checklist/{checklist}', [ChecklistController::class, 'update'])->name('workspaces.checklist.update');
     Route::delete('/workspaces/{workspace}/checklist/{checklist}', [ChecklistController::class, 'destroy'])->name('workspaces.checklist.destroy');
+    // Registered before the {target} wildcard below, which would otherwise swallow "proof".
+    Route::get('/workspaces/{workspace}/checklist/progress/proof/{completion}', [ChecklistProgressController::class, 'showProof'])->name('workspaces.checklist.progress.proof.show');
     Route::get('/workspaces/{workspace}/checklist/progress/{target}/{targetId}', [ChecklistProgressController::class, 'index'])->name('workspaces.checklist.progress.index');
     Route::post('/workspaces/{workspace}/checklist/progress/{target}/{targetId}', [ChecklistProgressController::class, 'store'])->name('workspaces.checklist.progress.store');
     Route::delete('/workspaces/{workspace}/checklist/progress/{target}/{targetId}', [ChecklistProgressController::class, 'destroy'])->name('workspaces.checklist.progress.destroy');
@@ -536,8 +603,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
     });
 
-    Route::get('/workspaces/{workspace}/pancake/orders', [OrderController::class, 'index'])
-        ->name('workspaces.pancake.orders.index');
+    Route::prefix('/workspaces/{workspace}/pancake/orders')->name('workspaces.pancake.orders.')->group(function () {
+        Route::get('/', [OrderController::class, 'index'])->name('index');
+        Route::post('/shipping-fees/import', [OrderController::class, 'importShippingFees'])->name('shipping-fees.import');
+        Route::get('/shipping-fees/import/status', [OrderController::class, 'shippingFeeImportStatus'])->name('shipping-fees.status');
+    });
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
@@ -628,9 +698,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
         Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
         Route::put('/transactions/bulk-update-type', [FinanceTransactionController::class, 'bulkUpdateType'])->name('transactions.bulk-update-type');
-        Route::put('/transactions/bulk-update-sub-category', [FinanceTransactionController::class, 'bulkUpdateSubCategory'])->name('transactions.bulk-update-sub-category');
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
+
+        // XHR lookup behind the transaction form's delivery-fee PO picker.
+        Route::get('/purchased-orders', FinancePurchasedOrderLookupController::class)->name('purchased-orders.index');
 
         Route::get('/income-statements', [FinanceIncomeStatementController::class, 'index'])->name('income-statements.index');
         Route::get('/income-statements/preview', [FinanceIncomeStatementController::class, 'preview'])->name('income-statements.preview');
@@ -638,10 +710,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'show'])->name('income-statements.show');
         Route::get('/income-statements/{incomeStatement}/export', [FinanceIncomeStatementController::class, 'export'])->name('income-statements.export');
         Route::post('/income-statements/{incomeStatement}/regenerate', [FinanceIncomeStatementController::class, 'regenerate'])->name('income-statements.regenerate');
+        Route::post('/income-statements/{incomeStatement}/lock', [FinanceIncomeStatementController::class, 'lock'])->name('income-statements.lock');
+        Route::delete('/income-statements/{incomeStatement}/lock', [FinanceIncomeStatementController::class, 'unlock'])->name('income-statements.unlock');
         Route::delete('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'destroy'])->name('income-statements.destroy');
 
         Route::get('/income-statements/{incomeStatement}/products', [FinanceUserIncomeStatementController::class, 'productIndex'])->name('income-statements.products.index');
         Route::get('/income-statements/{incomeStatement}/users', [FinanceUserIncomeStatementController::class, 'index'])->name('income-statements.users.index');
+        Route::get('/income-statements/{incomeStatement}/user-products', [FinanceUserIncomeStatementController::class, 'userProductIndex'])->name('income-statements.user-products.index');
+        Route::post('/income-statements/{incomeStatement}/loss-carryovers', [FinanceUserIncomeStatementController::class, 'storeLossCarryover'])->name('income-statements.loss-carryovers.store');
+        Route::get('/income-statements/{incomeStatement}/users/{user}', [FinanceUserIncomeStatementController::class, 'userShow'])->name('income-statements.users.show');
 
         Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
         Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');
@@ -658,10 +735,21 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
 
         Route::get('/request-funds', [FinanceFundRequestController::class, 'index'])->name('request-funds.index');
+        Route::get('/request-funds/create', [FinanceFundRequestController::class, 'create'])->name('request-funds.create');
+        Route::get('/request-funds/{requestFund}/edit', [FinanceFundRequestController::class, 'edit'])->name('request-funds.edit');
+        Route::get('/request-funds/{requestFund}/attachments/{attachment}', [FinanceFundRequestController::class, 'downloadAttachment'])->name('request-funds.attachments.show');
         Route::post('/request-funds', [FinanceFundRequestController::class, 'store'])->name('request-funds.store');
         Route::put('/request-funds/{requestFund}/status', [FinanceFundRequestController::class, 'updateStatus'])->name('request-funds.status');
         Route::put('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'update'])->name('request-funds.update');
         Route::delete('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'destroy'])->name('request-funds.destroy');
+
+        Route::get('/management', [FinanceManagementController::class, 'index'])->name('management.index');
+        Route::post('/management/{kind}', [FinanceManagementController::class, 'store'])->whereIn('kind', ['attachments', 'checklists'])->name('management.requirements.store');
+        Route::put('/management/{kind}/{id}', [FinanceManagementController::class, 'update'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.update');
+        Route::delete('/management/{kind}/{id}', [FinanceManagementController::class, 'destroy'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.destroy');
+        Route::put('/management/transaction-types/{transactionType}', [FinanceManagementController::class, 'sync'])->name('management.requirements.sync');
+        Route::put('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'link'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.link');
+        Route::delete('/management/transaction-types/{transactionType}/{kind}/{id}', [FinanceManagementController::class, 'unlink'])->whereIn('kind', ['attachments', 'checklists'])->whereNumber('id')->name('management.requirements.unlink');
     });
 
     Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {
@@ -761,10 +849,13 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
 });
 
 // Admin Routes //
-Route::middleware(['auth', 'verified', 'admin'])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])
+            ->name('dashboard');
+
         // Workspace Management
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
@@ -779,6 +870,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-modules');
         Route::put('/workspaces/{workspace}/max-shops', [AdminWorkspaceController::class, 'updateMaxShops'])
             ->name('workspaces.update-max-shops');
+        Route::put('/workspaces/{workspace}/contact', [AdminWorkspaceController::class, 'updateContact'])
+            ->name('workspaces.update-contact');
 
         // User Management
         Route::get('/users', [AdminUserController::class, 'index'])

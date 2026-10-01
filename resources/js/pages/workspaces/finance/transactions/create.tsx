@@ -15,6 +15,7 @@ interface Props {
     workspace: Workspace;
     accounts: AccountOpt[];
     transactionTypes: TransactionTypeItem[];
+    cogsDeliveryTypeIds: number[];
     users: UserOpt[];
     products: string[];
     fundRequests: FundRequestOption[];
@@ -27,6 +28,7 @@ export default function TransactionCreate({
     workspace,
     accounts,
     transactionTypes,
+    cogsDeliveryTypeIds,
     users,
     products,
     fundRequests,
@@ -57,6 +59,7 @@ export default function TransactionCreate({
                     <TransactionForm
                         accounts={accounts}
                         transactionTypes={transactionTypes}
+                        cogsDeliveryTypeIds={cogsDeliveryTypeIds}
                         users={users}
                         products={products}
                         fundRequests={fundRequests}

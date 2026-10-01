@@ -3,10 +3,10 @@
 namespace Modules\Inventory\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Products\Models\Product;
 
 /**
  * A frozen daily copy of an inventory item — every stored column plus the computed

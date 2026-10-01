@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Workspaces;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\VideoEditorDashboardRequest;
-use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
@@ -13,6 +12,7 @@ use App\Support\TeamVisibility;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Products\Models\Product;
 
 class VideoEditorDashboardController extends Controller
 {

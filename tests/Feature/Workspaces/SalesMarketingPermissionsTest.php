@@ -10,11 +10,11 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Sales & Marketing used to be one tabbed dashboard behind one grant. Now that
- * it is five sibling pages, each page checks its own — so a role can be given
- * the Daily Report without also being handed everyone's sales targets.
+ * it is a group of sibling pages, each page checks its own — so a role can be
+ * given the Daily Report without also being handed everyone's sales targets.
  *
  * These pin that the gates are actually independent, in both directions: the
- * page you were granted opens, and the four you weren't do not.
+ * page you were granted opens, and the others you weren't do not.
  */
 
 /** A workspace with the S&M pages switched on, plus a team to target. */
@@ -61,6 +61,7 @@ function smMemberWith(Workspace $workspace, array $permissions): User
 
 /** Each page, with the one permission that opens it. */
 dataset('sm_pages', [
+    'dashboard' => ['dashboard', PermissionEnum::ViewSalesMarketingDashboard],
     'daily report' => ['daily-report', PermissionEnum::ViewSalesMarketingDailyReport],
     'page roas tracker' => ['page-roas-tracker', PermissionEnum::ViewPageRoasTracker],
     'ad spend goals' => ['ad-spend-goals', PermissionEnum::ViewAdSpendGoals],
@@ -82,6 +83,7 @@ test('that permission opens no other page in the group', function (string $path,
     $user = smMemberWith($workspace, [$permission]);
 
     $others = collect([
+        'dashboard',
         'daily-report',
         'page-roas-tracker',
         'ad-spend-goals',
@@ -104,6 +106,7 @@ test('a member with none of them is refused everywhere', function (string $path)
         ->get("/workspaces/{$workspace->slug}/sales-marketing/{$path}")
         ->assertForbidden();
 })->with([
+    'dashboard',
     'daily-report',
     'page-roas-tracker',
     'ad-spend-goals',
@@ -123,6 +126,7 @@ test('the module switch hides every grant in the group from the role editor', fu
     $workspace->update(['sales_marketing_dashboard_module_enabled' => false]);
 
     expect($workspace->fresh()->hiddenPermissionNames())->toContain(
+        PermissionEnum::ViewSalesMarketingDashboard->value,
         PermissionEnum::ViewSalesMarketingDailyReport->value,
         PermissionEnum::ViewPageRoasTracker->value,
         PermissionEnum::ViewSalesTargets->value,

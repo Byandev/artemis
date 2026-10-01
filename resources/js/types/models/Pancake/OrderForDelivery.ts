@@ -140,11 +140,15 @@ export interface OrderForDelivery {
     upsell_date: string | null; // ISO date
     upsell_price: string | null; // decimal(12,2)
     order_details: string | null;
+    rmo_by_external_team: boolean;
     customer_call_logs_count: number;
     rider_call_logs_count: number;
     customer_call_duration: number | null;
     rider_call_duration: number | null;
     rider_rts_rate: number | null;
+    // Shop's rolling RTS rate over the previous 14 days, snapshotted onto
+    // shops.rts_snapshot by `sync:shop-rts-snapshot`. Fraction (0-1).
+    shop_rts_rate: number | null;
     caller_id: string | null;
     conferrer_id: string | null;
     delivery_date: string; // ISO date

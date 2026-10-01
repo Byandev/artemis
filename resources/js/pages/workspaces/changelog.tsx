@@ -12,6 +12,601 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.39.0',
+        date: '2026-09-30',
+        sections: [
+            {
+                title: 'Finance — Fund Requests',
+                items: [
+                    'Raising or editing a fund request now opens a full page instead of a pop-up. What the money is for goes under Particulars, one line each with a quantity and unit price, and the amount requested is their total, so it can’t drift from the breakdown. A request saved before this release opens with a single line carrying its old amount, ready for you to name',
+                    'Payment Method asks how the funds are released — Online Banking, E-Wallet, Cheque or Cash — and bank transfers and e-wallets also ask for the bank, account name and account number, so the person releasing the money has everything on the request. Tick Liquidation required and set a deadline when the requester has to account for what they spend',
+                    'Each transaction type can ask for its own attachments and checklist, and a request can’t be saved until every attachment that type needs has a file. Scans, photos (iPhone photos included), PDFs and Word or Excel files up to 10 MB are accepted, and they’re kept private, opened through a download link that expires',
+                    'A transaction type now has to be switched to Fund requestable on the Transaction Types page before the fund request form offers it — new types start switched off, so an admin needs to switch on the ones you raise requests against. Switch on Per product as well and each particular picks a product, with the request split across products by their lines instead of by hand',
+                    'The statuses are now For Approval, Approved, For Liquidation and Hold, replacing Pending, Released and Cancelled. A transaction filled in from a request now also carries over who requested it and who approved it',
+                ],
+            },
+            {
+                title: 'Finance — RF Requirements (New)',
+                items: [
+                    'RF Requirements, under Finance in the menu, keeps one list of the attachments and checklist items your fund requests can ask for, on separate tabs, with a count of how many transaction types use each',
+                    'Manage Requirements on a transaction type’s menu is where you tick which of those the type asks for. You can also add, rename or delete a requirement from there, and a rename or delete applies to every type that uses it, which is why the dialog shows the other types first',
+                ],
+            },
+            {
+                title: 'Meta Ads — Ads Manager, Reports and Optimization History',
+                items: [
+                    'Ads Manager has a start time filter that narrows the rows to ads that started running on, before, after or between dates you pick. This is separate from the date range, which still picks which days’ results get added up. The filter stays when you refresh or share the link, and a row’s timeline chart follows it so its totals match the row',
+                    'Two new ways to group Ads Manager: Campaign Objective (Sales, Engagement and so on) and Optimization Goal. You can also filter any grouping by objective, and a row’s spend then counts only the campaigns the filter keeps. Campaigns or ad sets that Meta reports no objective or goal for are grouped together in one row instead of showing as blank rows',
+                    'Reports can be filtered to image ads or video ads, and every figure on the report then counts only ads of that type. Videos posted from an existing page post were often counted as images before; they’re now picked up as videos',
+                    'Optimization History can be filtered by ad account and by page. Each dropdown lists only accounts and pages that have logged history, so a filter never comes back empty',
+                ],
+            },
+            {
+                title: 'Sales & Marketing — Page ROAS Tracker',
+                items: [
+                    'New Ad Spend Budget, Variance and Pace columns set each day’s spend against what the page was budgeted for that day. The budget is recorded day by day, so raising it next week doesn’t change how last week is judged, and a page with no budget shows blank rather than looking like it overspent',
+                    'Item Quantities and Order COGS show how many units the page’s orders sold and what those goods cost. The cost comes from each product variation’s latest import price in Pancake, and a day where no item had a cost shows blank rather than looking like the goods were free',
+                    'An estimated margin runs from delivered sales down to net profit and commission, taking off COD fees, VAT, cost of goods, shipping and a share of operating costs. Returns are estimated from the page’s own RTS rate over the last 30 days, and hovering over a page shows the rate used. It’s a quick estimate using flat rates, not the income statement',
+                ],
+            },
+            {
+                title: 'Shops — Order Tags (New)',
+                items: [
+                    'Order Tags on the shops page shows the tags a shop has in Pancake right now, with their colours',
+                    'Create preset tags adds the standard set to the shop in one click — High RTS, Cancel by Customer, Has Returned Orders, Troll, Reserved, Incomplete Details and With Issue — each limited to the order status it belongs to, so you don’t have to type them into Pancake shop by shop. Tags the shop already has are skipped, so pressing it again is safe',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Creating, editing or deleting sales targets now needs its own Manage Sales Targets permission instead of Edit Teams. No role has it yet, so an admin needs to grant it on the roles screen to anyone who manages targets',
+                    'The public RMO Management link stops working once the workspace’s subscription has expired, been cancelled or is past due. Anyone opening it sees a subscription-expired page, and exports and updates from that link stop too',
+                    'New creatives get a 10-character Code you can copy with one click. Letters and numbers that look alike are left out, so the code is easy to read out or retype. Creatives made before this release don’t have one',
+                    'Team members now see the products of shops linked to their teams even if those products aren’t tied to one of their pages. Before, those products were hidden from them',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.38.0',
+        date: '2026-09-25',
+        sections: [
+            {
+                title: 'Products — RDP Builder (New)',
+                items: [
+                    'The RDP Builder walks you through briefing a new product for the lab in four steps — Brief, Name, Product Image and More Information — and Save to RDPs files it on the RDPs list, where every brief shows its Product Name, Form, Target Market, date and who created it, ready to open and pick up again',
+                    'Once you’ve picked a product form and a market, Suggest names comes back with a set of candidate names, each with a one-line reason for it, plus a positioning line for the product — click a card to use that name, or type your own. Configure prompt lets you change the voice and how many names you get (up to 20), and Reset to default puts the standard wording back',
+                    'With a name chosen, the Product Image step generates packshot options drawn from the product form’s own description — pick the one you want, or drop in your own render instead. Each image is a paid call, so the count tops out at eight, and a brief that hasn’t been saved yet is filed as a draft on the way through so its images have somewhere to live',
+                    'More Information takes the claims, benefits and effects, the target active ingredients, and anything else the lab needs, one per line, and Download CSV hands you the whole brief as it stands on screen, unsaved edits included',
+                ],
+            },
+            {
+                title: 'Products — Product Forms (New)',
+                items: [
+                    'Product Forms is where you list the formats your catalog ships in — Oil, Spray, Patch, Capsule — each with its sizes or variants underneath, and every size carries its own picture. iPhone photos are accepted as they come, and removing a size or a form clears its pictures out with it',
+                    'Each form has an optional description of what it physically looks like, which is what the RDP Builder draws when it makes product images — leave it blank and the standard look for that form is used, or spell it out if your balm comes in a sachet rather than a tin',
+                    'A product can now be filed under a form from the create and edit screens, with No form as the default',
+                ],
+            },
+            {
+                title: 'Products — Target Market (New)',
+                items: [
+                    'Target Market holds the markets your catalog is sold into as categories with sub categories under them — Cardiovascular, with Hypertension beneath it — which is what the RDP Builder’s Target market and Sub category pickers offer',
+                    'Search finds sub categories as well as categories and brings up the category a match sits in, so looking up Hypertension doesn’t come back empty just because it’s filed under Cardiovascular. Expand all and Collapse all open or fold the whole tree at once',
+                    'Rename a row with the pencil or delete it — deleting a category takes its sub categories with it. The same name can’t be used twice under one category, but can repeat under different ones',
+                ],
+            },
+            {
+                title: 'Products — Menu and Product List',
+                items: [
+                    'Products is now a Product group in the menu, holding Manage (the product list you already know), Product Forms, Target Market and RDP Builder. Each page has its own view and manage grants on the roles screen, so people only see the pages their role opens',
+                    'The product list opens with four tiles — Total, Scaling, Testing and Inactive products — and tabs across the top narrow the table to one stage, each with its count beside it. The counts follow your search, so the tiles, the tabs and the table always describe the same set of products',
+                    'Status badges on the list are coloured by stage rather than showing everything but Active in the same grey',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'A rejected call is recorded with no talk time. The phone had been reporting the seconds it spent ringing as the call’s length, which added to talk-time totals and could push a call past the three seconds that count it as connected. This applies to calls synced from now on; calls already recorded keep their old length',
+                    'The Assign User picker on the CSR employee dialog is now a search box that matches on name or email, so you no longer have to scroll through the whole workspace to find one person — it opens on whoever is already assigned, so pressing Enter straight away won’t unassign them',
+                    'Refreshing a shop’s users now finishes before the page reloads, so the list is current the moment you see Users refreshed. A shop with no POS token, or a POS that can’t be reached, now tells you so instead of reporting success',
+                    'The Sales & Marketing team comparison lists every member who has a figure for the window, not just the top eight. It shows eight at a time and scrolls to the rest, and the average line is worked out across everyone',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.37.5',
+        date: '2026-09-28',
+        sections: [
+            {
+                title: 'Orders — Pancake Sync',
+                items: [
+                    'An order that comes back from Pancake exactly as it was last time is now passed over rather than written out again — the hourly sync and the shipped-order pulls re-read thousands of orders that haven’t moved, and rewriting every one of them was the bulk of the load on the database',
+                    'Anything that has changed still syncs in full as before: a new status, a new tracking update, an edited item or address all come through on the next pass, and delivery updates still go out to customers as they did',
+                    'Calls that arrive after their order are still matched to it, and today’s RMO rows still pick up their upsell figures, even when the order itself is passed over — both depend on other feeds, not on the order changing',
+                    'The first sync after this release still rewrites every order once; the saving starts from the pass after that',
+                ],
+            },
+            {
+                title: 'RTS — Call Logs',
+                items: [
+                    'A rejected call is now stored with no talk time — the phone reports the seconds it spent ringing as if they were a conversation, which padded every talk-time total and could count a call nobody picked up as connected',
+                    'This applies to calls synced from now on; rejected calls already on record keep the duration they arrived with',
+                ],
+            },
+            {
+                title: 'Shops — Refresh Users',
+                items: [
+                    'Refresh users now updates the shop’s user list there and then, so the list is current the moment the confirmation appears — it used to be queued and could take a while to show up',
+                    'A shop with no POS token, or a POS that can’t be reached, now tells you so straight away rather than reporting a refresh that was never going to happen',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The CSR daily records and call records now refresh every two hours as intended — the schedule they were on wasn’t a valid time, so the regular refresh wasn’t happening',
+                    'The 12pm, 2pm, 5pm and 7pm Gencys ERP passes now sync everything the 9am pass does, rather than only transaction history, purchase orders and the daily sales tracker',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.37.4',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Sales & Marketing — Product Panels',
+                items: [
+                    'Product comparison and Product breakdown list every product in the window — the Others bar and the Others row are gone, and with them the decision about which products were worth naming. Both panels rest at eight and scroll to the rest, with the next one cut off at the fold to show it carries on and a line beneath saying how many products there are in all',
+                    'Nothing you scroll to is second-class: the dashed average rule, the scale the bars are drawn against, and the sub-total under the table are all taken across every product rather than the eight at rest, so the same figure reads the same wherever it sits in the list',
+                    'The breakdown table keeps its column headings and its sub-total pinned while the rows move, so a figure halfway down still has its heading above it and the total below it',
+                    'Past the eighth product the colours start over rather than turning grey — the swatch is only there to tie a row to its bar, and both panels rank by sales, so a product is the same colour on each',
+                ],
+            },
+            {
+                title: 'Settings — ERP Credentials',
+                items: [
+                    'Setting and clearing the ERP login is behind a grant of its own now, Manage ERP Credentials, where it used to be open to every member of the workspace. Anyone who looks after those credentials will need it added to their role — until it is, the page is out of reach for them',
+                    'The page, and the Automation Configuration group it sits in, only appear on workspaces running Gencys ERP, which is the only thing that ever logs in with them — everywhere else the link is gone rather than leading to a form with nothing behind it',
+                    'The grant sits in the Settings category on the roles screen, and is offered only on the workspaces it can mean anything on',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.37.3',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Welle — My ESC',
+                items: [
+                    'Connecting your Welle account fills in the last two months of your record there and then — the month in progress and the one before it, which is as far back as the month picker reaches — so My ESC opens on your own history rather than on a blank month',
+                    'That gap was worth closing because the overnight fetch can only ask Welle about the week containing today: connecting on a Monday left you looking at zeros until the next morning, and the weeks behind that one were never going to arrive at all',
+                    'The months are fetched one after another, oldest first, and the month in progress stops at today rather than counting days that haven’t happened yet',
+                ],
+            },
+            {
+                title: 'Settings — Integrations',
+                items: [
+                    'While that first fetch is still running, the Welle panel says your recent records are being fetched, so the zeros My ESC shows in the meantime read as work in flight rather than as two months of missed days',
+                    'Reconnecting fetches those two months again, which is usually what you want — a token that had quietly stopped working leaves a gap behind it, and re-reading a stretch corrects the days inside it rather than doubling them up',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.37.2',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Gencys ERP — Sync Batches',
+                items: [
+                    'A batch you raise from Sync Batches, and a failed run you send again, goes out the moment it is queued. It had been left sitting on Queued until something else happened to nudge the queue along — and with nothing else in flight, that nudge was the hourly sweep, so work asked for just after the hour could wait the best part of one before its first call reached the ERP',
+                    'The five scheduled passes were in the same position and are back on the hour they say, so the 9am figures arrive in the morning rather than whenever the sweep next came round',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.37.1',
+        date: '2026-09-18',
+        sections: [
+            {
+                title: 'Sales & Marketing — Intern Figures',
+                items: [
+                    'Each intern’s day — sales, orders, ad spend and ROAS, and the returns behind them — is pulled from the ERP on the morning sync again, so Quick Data View (Sales/ROAS) on the Dashboard and the Daily Report fills itself in. The intern pull had been left out of the scheduled sync entirely, and those rows only moved when someone went and asked for them by hand',
+                    'This is for workspaces that read their advertisers from Gencys; everywhere else the same table is built from your own users and nothing about it changes',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Sync Schedule',
+                items: [
+                    'The intern figures are fetched on the 9am pass only. That pull asks the ERP once per intern per day and waits for each answer before the next goes out, so a roster of a dozen is a long queue on its own — the midday, 2pm, 5pm and 7pm passes now carry transactions, purchase orders and the daily sales tracker alone rather than queueing the whole roster again behind them',
+                    'Nothing else about the five passes changes, and a day’s intern figures can still be re-fetched from Sync Batches whenever you need them before tomorrow morning',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Sync Batches',
+                items: [
+                    'An intern’s figures close their own run the moment they land, with the rows that came back and the rows that were written recorded against it, and the batch moves on to the next intern straight away. Until now nothing ever closed those runs: each one sat on Pending until it timed out, was retried, and timed out again, so a roster that had already reported in full still took hours to walk through and finished marked as failures',
+                    'An intern who had nothing that day closes their run just the same, rather than leaving an open run that reads exactly like the ERP never answering',
+                    'Rows that come back without a date are counted as skipped rather than saved — they have nothing to file them under and are dropped, and the run’s saved figure now says so instead of counting them in',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.37.0',
+        date: '2026-09-17',
+        sections: [
+            {
+                title: 'CSR Dashboard (New)',
+                items: [
+                    'The CSR Dashboard is the analytics page read from your own side rather than the page that said metrics would be added soon: the same twelve headline figures — Sales, RTS, Calls Placed and Call Time, RMO Called, RMO Call Time, RMO Real Conversations and Hit Rate, Confirmed Risky Orders and Total Verified Orders — each narrowed to the Pancake logins linked to you and measured against the equally long stretch ending the day before your range, which opens on the last seven days',
+                    'A table underneath lists your own days one by one, carrying every column of both nightly reports, each sortable, with a columns menu that remembers what you left showing and the date pinned to the left so a row two dozen figures wide still says which day it is',
+                    'Two charts sit between them: your calls day by day across the range, and the same calls folded into one round of the clock, so the shape that shows is your own working day rather than the workspace’s',
+                    'Total Verified Orders can read over 100% and that is the reading, not a fault — an order you verified that someone else confirmed counts on both of your cards, on opposite sides of the division, which is exactly what says who is doing the chasing',
+                    'Days you did nothing are left out of the table rather than listed as a row of zeros; the charts are where a quiet day still shows, because a gap in a chart is the reading and a gap in a table is noise',
+                ],
+            },
+            {
+                title: 'CSR — My Calls and My Pancake Users (New)',
+                items: [
+                    'My Calls is every call the mobile app has synced under your Pancake logins — newest first, with the number, whether it was RMO Customer, RMO Rider or Order Verification, the type, how long it ran and the order it was about. Search takes a phone number or an order id, the date, persona and call type narrow the list, and the totals above it count every row the filters left rather than the page on screen',
+                    'My Pancake Users says who this workspace thinks you are on Pancake’s side: each linked login, the shops it works and the last day either nightly report recorded anything against it. The dashboard sums those logins without ever naming them, so a figure you don’t recognise can now be traced to a second login folded in — or to the one you expected never having been linked',
+                    'Calls placed from the older build of the handset app are filed under a different id from the newer one, and both are matched here, so your register doesn’t quietly end at whichever build you were on when it changed',
+                    'Both pages sit under CSR Dashboard in the menu and open to anyone the dashboard already opens to',
+                ],
+            },
+            {
+                title: 'Welle — My ESC (New)',
+                items: [
+                    'My ESC is your own Extreme Self Care record from Welle, a month at a time: ESC Rate for the month and the days you had Movement, Meditation and Learning as four cards, the three pillars against each other, a calendar shaded by how many pillars each day carried — all three being an ESC day — and a day-by-day log with a tick per pillar, so you can see which pillar it was that gave way rather than only that the day fell short',
+                    'Every rate is counted over the days of the month that have actually happened, the 1st through today, and a day nothing was logged on is still a row in the log and still counted in the denominator — a month with two good days in it reads as two days out of sixteen rather than as a perfect record',
+                    'Connect from Settings → Integrations: your Welle email and password are sent to Welle once, exchanged for a token, and the password discarded rather than stored. The account is yours and not the workspace’s, so everyone connects their own, and until you do, My ESC is the setup prompt rather than a screen of empty figures',
+                    'Your days are fetched each morning at 6am, and each run re-states the whole week behind it so anything logged late is corrected. One gap worth knowing: Welle only answers for the week containing today, so a Monday run cannot reach the Sunday just gone',
+                    'Welle is a module a super admin switches on per workspace, and the Integrations section of Settings appears with it — a workspace without it has neither the page nor the setting. A failed overnight fetch is reported on that page with what went wrong, and saving your password again clears it',
+                ],
+            },
+            {
+                title: 'CSR Analytics — Export',
+                items: [
+                    'An Export button beside the columns menu downloads the breakdown as a spreadsheet — the date range, search and sort the table is under, the columns you have left showing, and every CSR they match rather than the page in front of you',
+                    'Money comes out as plain numbers and call times as whole seconds so the sheet can be summed, with the seconds columns saying so in their heading, and every column is sized to its contents so the long headings are readable the moment it opens',
+                ],
+            },
+            {
+                title: 'Orders — Customer Orders',
+                items: [
+                    'A Customer orders filter narrows the list by how many orders the customer has placed in total — greater than, less than, equal to or between the figures you type — read off that phone number’s own Pancake report, which covers every page and shop Pancake knows about rather than only what has been synced here',
+                    'The same count is available as a column, sortable, and off by default in the columns menu: the list is already wide, and the number is mostly asked for through the filter rather than read row by row',
+                    'A customer with no report behind their number is left out of every comparison rather than treated as a customer with none — an unknown history is not a history of zero orders, and first-time buyers are the no report answer on the Customer RTS filter beside it',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The CSR sales and call reports are rebuilt every two hours rather than once at 3am, so today’s figures on CSR Analytics and the CSR Dashboard fill in through the day instead of waiting until tomorrow morning. Each pass re-states the last three days rather than the last one or two weeks, and runs on its own queue so the rebuild doesn’t sit behind other work',
+                    'Editing a CSR’s status saves again for anyone whose row was written before the column settled on ACTIVE and INACTIVE — the dialog opened blank on those, and saving was then refused on the CSR’s own stored value',
+                    'A call the handset reports with no number against it is skipped and the rest of the batch still syncs; one such entry used to turn back the whole upload, and there was nothing to match it to an order or a delivery on anyway',
+                    'Calls Placed on CSR Analytics now says how many distinct orders those calls reached, so the count reads as breadth or as repeat ringing rather than as a number on its own',
+                    'Parcels already on their way are re-checked at 10am as well, closing one more gap in the working morning',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.36.2',
+        date: '2026-09-11',
+        sections: [
+            {
+                title: 'CSR Analytics — Confirmed Risky Orders',
+                items: [
+                    'Total Order needs Verification is now Confirmed Risky Orders, and what it counts has moved with the name: a customer nobody has any record of, or one with six or more past orders who has sent back 40% or more of them. The old rule asked for a 55% return rate with no floor under it at all, so one parcel refused by a first-time buyer read as a customer who returns everything, while a steady 45% returner over a dozen orders did not register',
+                    'The figure is read off the nightly breakdown of each day’s orders rather than worked out from scratch on every load, and two things follow that are worth knowing: the history a customer is judged on is the one their number carried when the order came in, so last Tuesday’s figure reads the same today as it did on Tuesday instead of drifting as records change; and cancelled orders have dropped out of it, because an order that never shipped never needed the call',
+                    'The footnote still splits the two reasons and now says the rule out loud — so many with no report, so many at 40%+ RTS over 6+ orders — because a batch of unknown numbers and a batch of known bad ones are different problems and the split is what tells you which you are looking at',
+                    'That nightly breakdown has to have been built over a range before the card can report on it. A stretch it hasn’t reached reads as no risky orders rather than as an error, so the first build after this goes out needs to cover as far back as people actually look',
+                ],
+            },
+            {
+                title: 'Order Verification — Which Calls Count',
+                items: [
+                    'A call counts as order verification when it was placed on the day the order came in as well as the day it was confirmed. The ringing happens either side of the confirming, and an order that is never confirmed at all has no confirmation day to be rung on — read on the confirmed date alone, calls about those orders matched nothing and were counted nowhere',
+                    'Calls that read as Unmatched on Call Logs for that reason now carry the Order Verification label, and Total Verification Called on CSR Analytics rises to take them in. The calls were always there; they had nothing to attach themselves to',
+                    'An order that syncs in after its calls were placed still claims them the moment it lands, now on either of its two days rather than only on the day it was confirmed',
+                    'Calls already synced keep whatever label they were given until that day is matched again, so the figures for past days move when their day is re-run rather than on their own',
+                ],
+            },
+            {
+                title: 'Call Logs — Team Scoping',
+                items: [
+                    'Call Logs follows the viewing as team switcher now, the way the rest of the app already does — pick a team and the register narrows to the calls on that team’s orders, where before it listed every call the workspace had synced no matter who was looking or what they were scoped to',
+                    'Unmatched drops out of the persona filter while you’re scoped to a team: a call that matched no order belongs to no team either, so the rows it selects are exactly the ones the scope has already taken out and the filter could only ever have come back empty',
+                    'Someone restricted to a team who hasn’t been put in one sees an empty register rather than the whole of it, which is the way the rest of the app treats the same situation',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Parcels already on their way have their status re-checked on every scheduled pass again — the pass meant to go and fetch them was asking for orders changed in the last day or so instead, so anything shipped further back than that stopped being picked up and sat on whatever status it last had until something else went and touched it',
+                    'That same check now runs at 11am as well as 9am, midday, 3pm, 6pm and 9pm, closing the longest gap of the working morning',
+                    'Total Verified Orders is read against the card beside it, so its footnote counts against risky orders now rather than orders needing verification, and a period with none of them says so instead of reporting a rate of nothing',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.36.1',
+        date: '2026-09-10',
+        sections: [
+            {
+                title: 'CSR Analytics — RMO Call Figures',
+                items: [
+                    'RMO Answered, RMO Real Conversations and Longest RMO Call now exist on every workspace, including the ones whose call report was set up before those three figures were added — there the breakdown had nothing to read and the page came up in error rather than simply short a few columns',
+                    'Days already stored read zero on the three until their rollup is re-run, which the nightly pass does over the trailing fortnight — so a range inside the last two weeks fills itself in by the next morning, and anything older needs its own re-run to show the calls it actually carried',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.36.0',
+        date: '2026-09-10',
+        sections: [
+            {
+                title: 'RTS — Heat Map (New)',
+                items: [
+                    'A map of the Philippines now sits under RTS with every province shaded by its RTS rate — the share of shipped value that came back rather than the share of parcels, so a ₱5,000 return doesn’t read as the equal of a ₱200 one — and the period’s rate, parcels returned, orders and sales are stated above it',
+                    'Two ways to colour it: RTS on its own, on bands that are fixed rather than taken from the range, so a province is the same colour in June as in August and can be read against itself; or RTS + Orders, which sorts each province into one of the four CSR monitoring groups and prints the handling that group calls for — double confirm, strict validation, strong address and COD confirmation, or ship as normal — beside the areas in it',
+                    'Region rolls the same figures up to island groups. The CSR groups rank provinces against one another, which means nothing across five island groups, so that colouring is offered on the province view only and says so when it isn’t',
+                    'It opens on the last 30 days rather than the current month — on the 1st there is almost nothing delivered or returned yet, and a map that opens blank reads as broken — and it takes the same team, page and shop filters as the rest of RTS, remembered per workspace',
+                    'Destinations the map can’t place are counted as unplaced beside the province count and still added into the totals, so the headline figures cover the whole period rather than only the part that could be drawn',
+                ],
+            },
+            {
+                title: 'Call Logs (New)',
+                items: [
+                    'Every call the phones have synced is now a page of its own under Orders — newest first, with who placed it, the number, the type, how long it ran and the order it was about; the same rows the RMO breakdown showed one day at a time, listed whole',
+                    'Each call is labelled RMO Customer, RMO Rider or Order Verification. A number that was on no delivery and on no order confirmed that day reads as Unmatched rather than being filed under a kind of call it wasn’t',
+                    'Order verification is new as a kind of call: a CSR ringing a customer on the day their order was confirmed, before the parcel is ever loaded for delivery. An order that syncs in after the call was placed claims the calls that were waiting for it, so a number rung minutes before its order landed doesn’t stay unmatched',
+                    'Search takes a phone number or an order id, and the date, persona and call type narrow the list; the order id on a row opens the orders list on that one order rather than searching for the digits',
+                    'The page needs the new View Call Logs permission, so someone with role access has to hand it out before it appears in the menu',
+                ],
+            },
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'RMO calls and order-verification calls are counted apart throughout, and the headline row is twelve figures rather than eight: RMO Called, RMO Call Time, RMO Real Conversation and Hit Rate cover the parcel chasing, Total Verification Called, Total Verification Call Time, Total Order needs Verification and Total Verified Orders cover the confirming, and each is still measured against the equally long stretch ending the day before your range',
+                    'The breakdown table now carries every column of both nightly reports instead of eleven of them — RMO Answered, RMO Real Conversations, the customer and rider splits, every verification figure, the longest call and the report’s own totals, each sortable — with a columns menu that groups them into the sales report and the call report and remembers what you left showing',
+                    'The comparison panel plots any one of those figures, picked from a dropdown, rather than the four it used to tab between; it fetches only the metric you asked for, and a link made back when they were tabs still opens on the metric it named',
+                    'A second chart folds the period’s calls into one round of the clock, so the shape that shows is the working day itself — when the dialling starts, where it peaks, and the hours where the calls go out but nobody picks up. Both charts split into All calls, RMO and Verification, and either can be read as a table of figures instead of bars',
+                    'CSRs who did nothing in the range are no longer listed. The roster is everyone attached to a workspace shop whether they worked or not, so a live week put 110 rows in the breakdown for the 22 people with figures and pushed them onto page two, and filled the comparison with 0.0% rates that dragged the average line down with them',
+                ],
+            },
+            {
+                title: 'Meta Ads Manager',
+                items: [
+                    'Two more groupings: Optimization Goal, from the ad set, and Campaign Objective, from the campaign — campaigns Meta reported no objective for land in an unassigned row rather than dropping out of the totals',
+                    'The filter builder takes more than metric thresholds now: Created Date and Start Date, compared on / before / after / between, and Campaign Objective is / is not, picked from the objectives actually running in your accounts. A date is only offered where the breakdown you are on carries it — an ad account has neither, so a filter that could only be ignored isn’t listed',
+                    'The day-by-day timeline that opens from a row now honours the filters the grid is under, so an objective filter narrows the chart to the same ads it narrowed the row to instead of plotting all of them',
+                    'When Meta renders nothing for a creative preview, other placements are tried and then the account’s other linked logins — a colleague with a role on the page renders the same ad fine — and the drawer says which placement it settled on; a post that has been deleted falls back to the creative we synced, with links out to Ads Manager and the Ad Library',
+                ],
+            },
+            {
+                title: 'Orders',
+                items: [
+                    'The date range can be pointed at any of the order’s own dates — Created (Pancake), Confirmed, Shipped, Delivered, Returning or Returned — instead of always filtering on the Pancake created date, and which date it applies to sits beside the picker, because moving a range from the confirmed date to the delivered one is a change to the filter rather than a setting somewhere else',
+                    'Every row carries the customer’s RTS risk — Low, Medium, High or No report, read off that phone number’s own return history, the same rate the CSR verification card ranks on — and the column sorts, so the riskiest customers in a batch come to the top',
+                    'A Customer RTS filter narrows the list to customers with a return history or without one, and to a rate greater than, less than, equal to or between the figures you type. No report is its own answer rather than a low one: an unknown customer is exactly the case the verification call exists for',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Leaving the team schedule with unsaved shifts now asks first — the week arrows, the sidebar, the browser’s Back and closing the tab all stop and offer to save on the way out, where before the edits simply went',
+                    'The RMO call cards and the daily Discord report count RMO calls only — the customer and the rider on that day’s deliveries — and are named Total RMO Calls and Total RMO Call Duration to say so; counting every call synced put the total above the sum of its own parts in the breakdown beside it',
+                    'A call now counts as connected at 3 seconds rather than 5, on the cards, in the nightly reports and in the Discord post alike',
+                    'CSR Analytics follows the viewing as team switcher: both nightly reports are written per shop now, so picking a team leaves only that team’s shops on every figure on the page',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.35.0',
+        date: '2026-09-03',
+        sections: [
+            {
+                title: 'Sales & Marketing — Dashboard (New)',
+                items: [
+                    'A Dashboard page now opens the Sales & Marketing group with four headline tiles — Sales, Ad Spend, Blended ROAS and RTS Rate — each loading and refreshing on its own, so a slow figure never holds up the rest of the row, and the window you pick is remembered per workspace',
+                    'Blended ROAS carries the attributed figure beside it: what the ad platform credits to the ads, against every peso of sales over every peso of spend — the gap between the two is the sales your ads were never credited with, which is the whole reason both are shown',
+                    '“Leaders for the period” names who spent the most, who sold the most, whose ads worked hardest and whose parcels came back least, each with their share of the workspace total so a big number reads as a standout rather than just a big team',
+                    'Team and product comparison charts sit below, each with a breakdown table beneath it stating exactly what the chart plots, and you can switch between Sales, Ad spend, ROAS and RTS without the page fetching anything again',
+                    'The old tabbed dashboard is now five sibling pages in the menu — Dashboard, Daily Report, Ad Spent Summary, Sales Targets, and the trackers beneath them — with the previous links redirecting, and every role that could open the old dashboard can still open all five',
+                ],
+            },
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'Eight figures now head the page — sales, RTS rate, RMO called %, total call time, calls placed, real conversations, reach rate and the longest call — each measured against the equally long stretch ending the day before your range, so the arrow beside it tells you whether the period actually moved',
+                    'A comparison panel plots the whole field on whichever of four metrics you pick, every CSR against the period’s average and against their own previous figure; each person keeps the same colour as you switch tabs, and the tab you were reading survives a reload or a shared link',
+                    'A daily chart sets calls placed against the ones that became real conversations, with a table beneath it splitting each day into never answered, answered and conversations plus that day’s hit rate — where the two bars sit furthest apart is effort spent without return',
+                    '“Leaders for the period” names the CSR with the highest sales, the lowest RTS, the most RMO calls and the most time on the phone',
+                    'The breakdown table keeps its header and the CSR name in place as you scroll across the eleven columns of figures, so a row of numbers is never stranded from the person it belongs to',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Orders you tick stay ticked as you page through, sort, search and narrow by assignee or confirmee, with a count of how many are selected on pages you can’t see; only changing the delivery date clears the selection, because that is the one change that makes the old set meaningless',
+                    'Every shop now carries an RTS snapshot — its value-weighted return rate over the previous 14 days, refreshed twice daily — so you can tell at a glance whether a parcel comes from a shop that usually lands',
+                    'A new Upsell filter picks out the orders carrying an upsell, or leaves them out, on the table and in the export alike',
+                    'A day’s calls open as a breakdown from the row itself, so you can see how they went without leaving the list',
+                    'Changing the date range no longer drops the other filters you had set',
+                ],
+            },
+            {
+                title: 'Finance — Income Statements',
+                items: [
+                    'A month can now be locked once it is settled: regenerating, overwriting and deleting are all refused until someone deliberately unlocks it, so a statement you have already reported on or paid against cannot quietly change when a late order lands — and the lock records who closed the month, and when',
+                    'A new per-seller-per-product statement answers “how did this person do on this product”, which neither of the existing views could — one adds a person’s products together, the other adds a product’s sellers together — and each seller’s figures now open on a page of their own',
+                    'OPEX is broken down by transaction type, one line per type with outflow that month, and every row keeps the share of the pool it was given beside the amount it produced, so a saved statement can still say what split it actually used after a later sync moves the counts underneath it',
+                    'A deficit can be carried into a month against a seller and a product, and it survives a regenerate — the figure you typed is kept apart from the snapshots that get rebuilt on every save, and can be entered before the month has ever been closed',
+                ],
+            },
+            {
+                title: 'Meta Ads Manager',
+                items: [
+                    'Two new groupings, Page and Page Owner, bucket ads by the Facebook page their ad set promotes and by the workspace member who owns that page; ads whose page has been deleted, or whose owner no longer has an account, land in an unassigned row rather than vanishing from the totals',
+                    'Any row in the breakdown opens a timeline of its day-by-day figures, with every day in the range drawn even where the ads did not run, so a quiet stretch reads as a gap instead of closing up',
+                    'Each ad account now lists the people who can reach it, refreshed from Business Manager once a day',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Gencys partners no longer see the Page ROAS Tracker, or the Ad spend and ROAS tabs on the product comparison — those are tracked in Gencys itself and the ad spend isn’t attributed per product on our side, so figures that could only be half stated have come out rather than sitting there as sums nobody can act on',
+                    'Shipping fees can be imported onto orders from a spreadsheet, straight from the orders page',
+                    'Checking off a checklist item now takes a proof file and a note alongside it',
+                    'Intern daily records are now part of the Gencys batch sync rather than a separate pass',
+                    'Parcel journey has its own stat cards and a per-shop table, each loading and refreshing on its own, and the CSR menu group is now called Operations',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.34.0',
+        date: '2026-08-30',
+        sections: [
+            {
+                title: 'Gencys ERP — How the Sync Runs',
+                items: [
+                    'Transaction history and purchase orders are now fetched a whole day — or a whole date range — at a time instead of one product at a time, so a pass that used to open an ERP session for every item on your list opens one and brings the entire report back',
+                    'Because the report is taken whole, a day’s movements are no longer limited to the products you had registered here: everything the ERP lists comes back, including items nobody has set up in Artemis yet',
+                    'Sync Batches reads differently as a result — a run is now a date, or a purchase order’s date range, rather than a product — so a pass that used to be hundreds of rows to scroll through is a handful you can actually follow, and there is only ever one of them out at the ERP at a time',
+                ],
+            },
+            {
+                title: 'Inventory — Items & Purchase Orders from the ERP',
+                items: [
+                    'An item the ERP names that we don’t recognise is now created here rather than dropped — it is matched first on its SKU, then on its transaction keywords, and created switched off if neither hits, so a day’s stock movements are never quietly short a product just because the two systems spell it differently; worth looking over the inactive items after a sync and merging or keywording anything that should have matched',
+                    'A purchase order’s lines are now written to exactly what the ERP reports rather than added to, so an order whose product resolves somewhere new carries one line instead of both — left to accumulate, the same goods would have been counted twice against the stock the order shows as owed',
+                    'Approved, To Pay, Paid, For Purchase and Purchased dates are filled in on every purchase order from its own status trail now that the ERP has stopped sending them as separate fields — so when an order reached each stage is still on record rather than going blank from here on',
+                ],
+            },
+            {
+                title: 'Admin — Workspaces',
+                items: [
+                    'A workspace whose subscription is past due or expired no longer throws its subscription dialog open the moment the list loads — it was interrupting whatever you came to the page to do, and the same dialog is still a click away on the row',
+                    'The arrow that drops you straight into a client workspace now shows only for the primary admin account; everyone else works from the admin panel, where the workspace’s figures are already on screen',
+                    'A super admin going to the dashboard now lands in the admin panel rather than being sent into a workspace, which is where signing in already put them — the two disagreed, so the link out of a workspace bounced you somewhere you had not asked for',
+                    'A Finance admin account is created on every environment, verified and ready to sign in, so the finance side no longer has to share the main admin login',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Saying who you are in the Logged in as picker no longer narrows the five RMO call cards — that is who you are, not a filter, so the page opens on the whole workspace’s day and only My Assignee Only or a name in the assignee picker cuts the cards down; last release had identifying yourself filtering them too, which left the cards describing one person while the list beside them described everyone',
+                    'A delivery the ERP logs with no quantity against it — a settlement note rather than a receipt — no longer lands on the purchase order as a delivery of nothing',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.33.1',
+        date: '2026-08-28',
+        sections: [
+            {
+                title: 'RTS — RMO Call Cards',
+                items: [
+                    'The five call cards now report the calls one person actually placed rather than the whole workspace’s day — they follow the assignee you have picked, or failing that whoever the Logged in as picker says you are, so “my call logs” means the calls you made; left on All Assignees with no identity set they still cover the workspace’s whole day, as before',
+                    'They follow the page and shop filters too, so the cards describe the rows on screen; previously they reported every call logged that day whatever you had narrowed the list to, which is what made them look stuck',
+                    'The cut is by whoever dialled, not by whose orders the numbers belonged to — a CSR rings plenty of numbers that are not on the orders assigned to them, and counting against their order list was the wrong question and the reason the figures read as though the filters were being ignored',
+                ],
+            },
+            {
+                title: 'RTS — RMO Management',
+                items: [
+                    'The stat cards load on their own now instead of holding the page up: sorting, turning a page and typing in the search box no longer pay for six day-wide aggregates each time, and the cards only re-ask the server when something they actually depend on changes',
+                    'The filter bar has an All Assignees picker, so you can read someone else’s day by name rather than only your own through My Assignee Only — the toggle still wins while it is on, and the picker greys out with a note saying so instead of being quietly ignored',
+                    'While a figure is on its way the card shows a placeholder bar at its usual height rather than the previous number, so nothing reflows underneath you and a stale figure can’t be misread as the fresh one — and nothing is fetched at all while the cards are collapsed, which is how they start',
+                    'Changing who you are logged in as now re-runs the table and the cards, instead of leaving both sitting on the previous person’s orders until you happened to touch a filter',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Editing a course now saves — previously the form submitted as though it were creating a new one, so the update was rejected and the change never landed',
+                    'Avg Call Duration and Hit Rate are worked out in one place shared with the daily RMO Discord report, so the card and the report cannot drift apart on what a hit rate means',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.33.0',
+        date: '2026-08-28',
+        sections: [
+            {
+                title: 'Courses (New)',
+                items: [
+                    'Courses is now its own admin-toggled module: a workspace switched onto it gets a Courses catalogue in the sidebar, where a course is built as modules with lessons inside them, each lesson carrying a video, and published only when you are ready — a draft is visible to the people who can edit courses and to nobody else, so half-built material never turns up in front of a learner',
+                    'A learner opens a course into a player — the lesson list down one side, the video beside it, Mark complete and Next underneath — and Start becomes Continue afterwards, dropping them back at the lesson they left off on rather than at the beginning',
+                    'Lesson videos upload straight from the browser to storage rather than through Artemis, so a large file no longer has to survive the trip through the app, and each lesson’s length is read off the file as it goes up — the outline shows a duration per lesson and the course header the total',
+                    'The catalogue shows each person what is theirs to see: someone who can edit courses gets the whole catalogue including drafts, how many people enrolled and the average completion across them, while everyone else gets the published courses and their own progress through the ones they picked up',
+                    'A completion leaderboard ranks the ten members who have finished most of the workspace’s material, and each course carries a How The Team Is Doing panel listing everyone who started it and how far through they are — a course’s completion rate counts only the people actually enrolled, so material nobody opened cannot drag the figure down',
+                    'Courses has its own permissions — view, create, edit and delete are each separate — so nobody but a workspace owner sees it until a role has been granted them; check your roles after this release if your team is meant to have it',
+                ],
+            },
+            {
+                title: 'Finance — Income Statements Rebuilt',
+                items: [
+                    'A statement now reads as one column of figures, from delivered orders and revenue down through shipping, ad spend, the COD fee and its VAT to gross profit and the advisory share — and the same figures, in the same words, carry across the workspace statement and its per-product and per-user tables, so a number can be followed through all three instead of each page having its own shape',
+                    'Cost of goods can be read two ways and you switch between them: Delivered COGS charges what actually shipped, which is the truer margin on the month’s sales, while Bought COGS charges what was purchased into stock plus the freight on it, which is what the month cost in cash — they answer different questions, so neither is picked for you',
+                    'The advisory share is now struck two ways — a percentage of gross profit, or a percentage of delivered revenue — and the lower of the two is what is charged, with the statement naming which basis applied that month; a loss-making month owes nothing rather than earning a rebate',
+                    'Income statements are no longer Gencys-only: a workspace that is not a Gencys partner now takes its delivered revenue, shipped parcels and courier fees from its Pancake orders and gets a statement in exactly the same shape',
+                    'Saving now includes every line rather than only the ones you ticked — the cost-of-sales and OPEX checklist has gone from the statement page, and the Expenses and Net Profit columns on the statements list have been replaced by Orders and Gross Profit',
+                ],
+            },
+            {
+                title: 'Finance — Per-Product & Per-User Statements',
+                items: [
+                    'Both tables have been rebuilt onto the figures above: every product, and every intern, with delivered orders and revenue, shipping, ad spend, the COD fee and its VAT, cost of goods on whichever basis you are reading, gross profit and the advisory share taken off it',
+                    'Net profit per intern, the per-intern drill-down page and the per-product commission rates it carried have gone with the rebuild — the per-user table now stops at gross profit after the advisory share, the same place the product table and the workspace statement stop',
+                    'The header row and the first column stay put as you scroll, so a figure ten columns to the right still says which product or which person it belongs to, and every column carries a question mark spelling out what it counts and how it was worked out',
+                    'Shipping counts parcels by the day they went out and counts them whatever became of them — you pay the courier for a return too — so a row’s shipped and delivered counts are not meant to agree, and the column note says as much rather than leaving it to look like an error',
+                    'Ad spend is counted only where it was actually tagged to a product; spend nobody attributed stays out of the per-product figures rather than being spread around on an assumption',
+                ],
+            },
+            {
+                title: 'RTS — RMO Call Statistics',
+                items: [
+                    'RMO Management carries five more cards alongside the delivery counts — Total Call Logs Synced, Total Call Duration, Connected Calls (5s+), Avg Call Duration and Hit Rate — so the day’s calling effort reads beside what it produced instead of only the orders it touched',
+                    'A call has to last five seconds before it counts as connected; anything shorter is the dial tone and a hang-up, and keeping those out of the numerator is what makes a hit rate worth reading',
+                    'The call cards report every call the workspace logged for that delivery date, whoever placed it and whatever number it reached, so they stay still when you narrow the list underneath rather than moving for reasons the cards don’t explain',
+                    'Total talk time on the call KPI now counts every call a person made that day; previously it counted only calls whose number matched an order due for delivery that day, so time spent on anything else quietly vanished from the figure',
+                    'CX CALL ENDED and RIDER CALL ENDED have been added as RMO statuses, each with its own badge',
+                ],
+            },
+            {
+                title: 'RTS — Daily RMO Discord Report (New)',
+                items: [
+                    'The day’s RMO numbers can now be posted to Discord once a day — for delivery, called, delivered, returning and problematic, plus the five call figures — covering the whole workspace across all users, and quoting the same figures the RMO page shows so the report and the page cannot disagree',
+                    'Set it up on the RMO management settings page: switch it on, paste your webhook and pick the hour it should send, whole hours only',
+                    'It sits behind its own Manage RMO Notifications permission on top of the one that opens the settings page, so nobody sees the webhook field until a role has been granted it, and it is off by default — an existing workspace will not start posting because it was upgraded',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The Inventory Items table now pins its header row and the SKU column as you scroll — with thirty-odd report columns running well past the fold, a figure ten columns right was unreadable when you could no longer see which item or which measure it belonged to',
+                    'Unit Codes has a No product switch that narrows the list to codes with nothing linked yet, so the mapping still left to do is one toggle away rather than a page-by-page hunt',
+                    'An OPEX transaction type now records which company metric its shared cost should be split across products by — Delivered parcels, Total orders or Delivered revenue — shown as a Split by column on the Transaction Types list, because a CSR’s salary tracks every order taken while warehouse costs track only the parcels that actually went out',
+                    'The ERP sync now runs five times a day rather than four, and the inventory snapshot passes have been retimed alongside it, spreading both further across the working day',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.32.0',
         date: '2026-08-25',
         sections: [

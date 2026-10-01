@@ -3,12 +3,12 @@
 namespace Modules\Inventory\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
-use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Modules\Products\Models\Product;
 
 class InventoryItem extends Model
 {
@@ -23,8 +23,6 @@ class InventoryItem extends Model
         'is_parent',
         'sku',
         'is_active',
-        'sales_keywords',
-        'transaction_keywords',
         'lead_time',
         'days_of_coverage',
         'unfulfilled_count',
@@ -39,20 +37,6 @@ class InventoryItem extends Model
         'is_active' => 'boolean',
         'is_parent' => 'boolean',
     ];
-
-    /**
-     * Sales keywords stored as a comma-separated string, exposed as a clean array.
-     *
-     * @return string[]
-     */
-    public function salesKeywordsList(): array
-    {
-        return collect(preg_split('/[,\n]+/', (string) $this->sales_keywords))
-            ->map(fn ($keyword) => trim($keyword))
-            ->filter()
-            ->values()
-            ->all();
-    }
 
     /**
      * Team visibility flows through the item's product and that product's shops:

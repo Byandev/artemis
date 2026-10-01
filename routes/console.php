@@ -12,6 +12,17 @@ Schedule::command('subscriptions:send-due-reminders')->dailyAt('08:00')->without
 Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00')->withoutOverlapping();
 // Same Pancake/Meta data, aggregated per page instead of per advertiser.
 Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
+// Destination rollup behind the RTS heat map. A 7-day window, because an order's
+// delivered/returning timestamp can land well after it was placed and a status
+// correction moves it between days.
+Schedule::command('build-order-location-daily-records --days=7')->dailyAt('01:30')->withoutOverlapping();
+// Breakdown of each day's orders by the customer history they arrived with
+// (the 'initial' phone-number report). A 7-day window, matching the location
+// rollup above: orders are bucketed on confirmed_at and cancelled ones are
+// dropped, so a settled day still changes when an order is cancelled days after
+// it was confirmed. Fans out one job per (workspace, day) onto the analytics
+// queue, so the scheduler returns immediately and the rebuild parallelises.
+Schedule::command('build-page-order-report-breakdown-daily-records --days=7')->dailyAt('01:45')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
@@ -39,8 +50,21 @@ Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapp
 // Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
 // Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
 
-Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
-Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
+// Welle ESC records, one job per connected user.
+//
+// 06:00 catches yesterday once it has settled. The command always writes the
+// whole elapsed week rather than a single day, so each run also re-states the
+// days before it — which is free, and corrects anything logged late.
+//
+// Caveat worth knowing: Welle's progress endpoint only ever answers for the
+// week containing today. On a Monday the week has already rolled over, so the
+// Sunday just gone is not in the response and this run cannot capture it.
+Schedule::command('welle:fetch-daily-records')->dailyAt('06:00')->withoutOverlapping();
+
+Schedule::command('sync:csr-daily-records')->everyTwoHours();
+Schedule::command('sync:csr-daily-call-records')->everyTwoHours();
+
+Schedule::command('sync:shop-rts-snapshot')->dailyAt('02:30')->withoutOverlapping();
 
 // Pull RMO statuses in line with the courier's parcel status for workspaces
 // that opted in. Runs once at midnight, which lands on the default two-day
@@ -48,6 +72,14 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 // only just ended gets closed out, including parcels whose final status the
 // courier reported late in the evening.
 Schedule::command('rmo:apply-auto-tag')->dailyAt('00:00')->withoutOverlapping();
+
+// Pull the external RMO team's Google Sheet (via n8n) for today and auto-tag
+// the rows they've confirmed / delivered / returned. Runs for every workspace
+// that switched it on in Settings → RMO management; a no-op without a webhook.
+Schedule::command('rmo:trigger-external-team-sync')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->when(fn () => filled(config('services.n8n.rmo_external_team_webhook_url')));
 
 // ── RMO (Discord) ───────────────────────────────────────────────────────
 // Checked hourly; posts only for workspaces whose configured send time matches
@@ -66,6 +98,11 @@ Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapp
 // Ad accounts rarely change; a light refresh every 30 min keeps new accounts
 // and status changes visible.
 // Schedule::command('metaads:sync-ad-accounts')->everyThirtyMinutes()->withoutOverlapping();
+
+// Who has access to each ad account (Business Manager People list). Access
+// changes are rare and the call is one request per account — daily is plenty.
+Schedule::command('metaads:sync-ad-accounts')->hourly()->withoutOverlapping();
+Schedule::command('metaads:sync-ad-account-people')->dailyAt('02:00')->withoutOverlapping();
 
 // Entity tree (campaigns → ad sets → ads → creatives) changes when advertisers
 // edit Ads Manager — refresh every 6 hours.

@@ -5,6 +5,11 @@ interface Props {
     description?: string;
     children?: ReactNode;
     stackActionsOnMobile?: boolean;
+    /**
+     * The rule under the header. On by default — turn it off where whatever
+     * follows already reads as a separate block, such as a row of stat cards.
+     */
+    divider?: boolean;
 }
 
 export default function PageHeader({
@@ -12,10 +17,14 @@ export default function PageHeader({
     description,
     children,
     stackActionsOnMobile = false,
+    divider = true,
 }: Props) {
+    const rule = divider
+        ? ' pb-5 border-b border-black/6 dark:border-white/6'
+        : '';
     const wrapperClass = stackActionsOnMobile
-        ? 'flex flex-col gap-3 pb-5 mb-6 border-b border-black/6 dark:border-white/6 sm:flex-row sm:items-center sm:justify-between'
-        : 'flex items-start justify-between gap-4 pb-5 mb-6 border-b border-black/6 dark:border-white/6 sm:items-center';
+        ? `flex flex-col gap-3 mb-6${rule} sm:flex-row sm:items-center sm:justify-between`
+        : `flex items-start justify-between gap-4 mb-6${rule} sm:items-center`;
     const titleClass = stackActionsOnMobile
         ? 'min-w-0 sm:flex-1'
         : 'min-w-0 flex-1';
