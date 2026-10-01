@@ -2022,13 +2022,22 @@ function RmoManagement({
                                 yesterdayParcelStatus === 'delivered'));
 
                     return (
-                        <RmoStatusPicker
-                            currentStatus={row.original.status as OrderStatus}
-                            onChangeStatus={(status) =>
-                                handleChangeStatus(status, row.original.id)
-                            }
-                            disabled={!canEditStatus}
-                        />
+                        <div>
+                            <RmoStatusPicker
+                                currentStatus={
+                                    row.original.status as OrderStatus
+                                }
+                                onChangeStatus={(status) =>
+                                    handleChangeStatus(status, row.original.id)
+                                }
+                                disabled={!canEditStatus}
+                            />
+                            {row.original.rmo_by_external_team && (
+                                <p className="mt-1 text-[10px] text-gray-400 italic dark:text-gray-500">
+                                    Handled by external team
+                                </p>
+                            )}
+                        </div>
                     );
                 },
             },
@@ -2400,18 +2409,47 @@ function RmoManagement({
                         </select>
 
                         {enable_external_team_sync && (
-                            <select
-                                value={currentExternalTeam}
-                                onChange={(e) =>
-                                    handleExternalTeamChange(e.target.value)
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    handleExternalTeamChange(
+                                        currentExternalTeam === 'external'
+                                            ? ''
+                                            : 'external',
+                                    )
                                 }
-                                title="Show only orders RMO'd by an external team, or by the internal team"
-                                className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
+                                title="Show only orders handled by the external RMO team"
+                                className={`inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12px]! font-medium transition-all ${
+                                    currentExternalTeam === 'external'
+                                        ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                        : 'border-black/6 bg-stone-100 text-gray-500 hover:border-black/12 hover:text-gray-700 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400 dark:hover:text-gray-200'
+                                }`}
                             >
-                                <option value="">All Teams</option>
-                                <option value="external">External Team</option>
-                                <option value="internal">Internal Team</option>
-                            </select>
+                                <span
+                                    className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                                        currentExternalTeam === 'external'
+                                            ? 'border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                    }`}
+                                >
+                                    {currentExternalTeam === 'external' && (
+                                        <svg
+                                            className="h-2.5 w-2.5 text-white"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                            strokeWidth={3}
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M5 13l4 4L19 7"
+                                            />
+                                        </svg>
+                                    )}
+                                </span>
+                                RMO by External Team
+                            </button>
                         )}
 
                         <select
