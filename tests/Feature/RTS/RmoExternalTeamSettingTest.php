@@ -36,6 +36,7 @@ function externalTeamSettingsManager(Workspace $workspace): User
 beforeEach(function () {
     $this->owner = User::factory()->create();
     $this->workspace = Workspace::factory()->create(['owner_id' => $this->owner->id]);
+    subscribeWorkspace($this->workspace);
     $this->manager = externalTeamSettingsManager($this->workspace);
     $this->settingsUrl = route('rmo-settings.update', ['workspace' => $this->workspace->slug]);
 });
