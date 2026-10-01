@@ -504,6 +504,19 @@ class Workspace extends Model
         return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_auto_tag_status;
     }
 
+    /**
+     * Whether the external RMO team's Google Sheet is synced into this
+     * workspace — n8n reads the sheet and auto-tags the rows it lists. Needs
+     * both the switch and a sheet link; off by default. Also gates the
+     * "External Team" filter on the RMO page.
+     */
+    public function rmoExternalTeamSyncEnabled(): bool
+    {
+        $setting = $this->loadMissing('rmoSetting')->rmoSetting;
+
+        return (bool) $setting?->enable_external_team_sync && filled($setting?->external_team_sheet_url);
+    }
+
     public function allowedMetrics(): array
     {
         return $this->metricSetting
