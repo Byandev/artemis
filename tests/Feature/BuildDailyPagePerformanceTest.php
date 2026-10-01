@@ -260,3 +260,30 @@ test('it counts the day it is building in that day own window', function () {
     // Everything that moved that day went back.
     expect((float) $row->rts_rate_30d)->toBe(100.0);
 });
+
+test('it rates a day by the RTS of the 7 days ending on it', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+
+    $history = fn (string $date, float $returning, float $delivered) => PageDailyRecord::create([
+        'workspace_id' => $workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => $page->getMorphClass(),
+        'page_id' => $page->id,
+        'date' => $date,
+        'returning_amount' => $returning,
+        'delivered_amount' => $delivered,
+    ]);
+
+    // Inside the 7-day window: ₱100 back against ₱900 out.
+    $history('2026-03-04', 100, 900);
+    // 7 days before the build date — one day too old to count.
+    $history('2026-03-03', 9000, 0);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $row = PageDailyRecord::where('page_id', $page->id)->where('date', '2026-03-10')->first();
+
+    expect((float) $row->previous_7_days_rts)->toBe(10.0);
+});
