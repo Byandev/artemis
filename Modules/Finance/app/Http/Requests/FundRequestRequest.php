@@ -124,7 +124,7 @@ class FundRequestRequest extends FormRequest
             // chosen type calls for is checked in after(), since the keys
             // aren't values a rule can see.
             'attachments' => ['nullable', 'array'],
-            'attachments.*' => ['nullable','file', 'mimes:'.implode(',', self::ATTACHMENT_MIMES), 'max:10240'],
+            'attachments.*' => ['nullable', 'file', 'mimes:'.implode(',', self::ATTACHMENT_MIMES), 'max:10240'],
             // Attachment requirement ids whose file should be removed (edit only).
             'remove_attachments' => ['nullable', 'array'],
             'remove_attachments.*' => ['integer'],
