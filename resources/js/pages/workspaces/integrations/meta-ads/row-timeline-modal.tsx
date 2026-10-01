@@ -470,7 +470,6 @@ function OverlayPanel({
     );
 }
 
-/** Multi-select over the same metric columns the grid offers. */
 /**
  * A checkbox row. Deliberately NOT the shared Checkbox primitive: the whole row
  * is the click target, and a Radix checkbox inside that button would nest one
@@ -499,12 +498,18 @@ function CheckMark({ checked }: { checked: boolean }) {
  * rather than only marking the handful already picked — and with 90-odd metrics
  * across five categories, it filters.
  */
-function MetricPicker({
+export function MetricPicker({
     selected,
     onChange,
+    options = INSIGHTS_OPTIONS,
+    defaults = DEFAULT_METRICS,
 }: {
     selected: string[];
     onChange: (next: string[]) => void;
+    /** The metrics on offer — the full grid list unless a page narrows it. */
+    options?: typeof INSIGHTS_OPTIONS;
+    /** What "Reset" returns to. */
+    defaults?: string[];
 }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -523,16 +528,16 @@ function MetricPicker({
     const categories = useMemo(() => {
         const term = search.trim().toLowerCase();
 
-        return INSIGHTS_OPTIONS.filter(
-            (o) => !term || o.label.toLowerCase().includes(term),
-        ).reduce<Record<string, typeof INSIGHTS_OPTIONS>>((acc, o) => {
-            // category is optional on ColumnOption; ungrouped metrics collect
-            // under one heading rather than vanishing.
-            (acc[o.category ?? 'Other'] ??= []).push(o);
+        return options
+            .filter((o) => !term || o.label.toLowerCase().includes(term))
+            .reduce<Record<string, typeof INSIGHTS_OPTIONS>>((acc, o) => {
+                // category is optional on ColumnOption; ungrouped metrics collect
+                // under one heading rather than vanishing.
+                (acc[o.category ?? 'Other'] ??= []).push(o);
 
-            return acc;
-        }, {});
-    }, [search]);
+                return acc;
+            }, {});
+    }, [search, options]);
 
     const matches = Object.values(categories).reduce(
         (n, list) => n + list.length,
@@ -586,7 +591,7 @@ function MetricPicker({
                         {selected.length > 1 && (
                             <button
                                 type="button"
-                                onClick={() => onChange(DEFAULT_METRICS)}
+                                onClick={() => onChange(defaults)}
                                 className="text-[10px] text-gray-400 transition-colors hover:text-emerald-600 dark:hover:text-emerald-400"
                             >
                                 Reset

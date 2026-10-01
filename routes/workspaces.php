@@ -88,6 +88,7 @@ use Modules\MetaAds\Http\Controllers\AdSpentSummaryController;
 use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
 use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
+use Modules\MetaAds\Http\Controllers\LaunchComparisonController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
 use Modules\MetaAds\Http\Controllers\RemoveFbAccountController;
@@ -384,6 +385,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ads-calendar', [AdsCalendarController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-calendar');
+    Route::get('/workspaces/{workspace}/integrations/meta/launch-comparison', [LaunchComparisonController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.launch-comparison');
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.health');

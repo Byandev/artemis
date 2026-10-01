@@ -1423,9 +1423,9 @@ class AdsManagerController extends Controller
 
     /**
      * Full list of meta_ads_insights metric columns we aggregate. Adding a new
-     * metric here surfaces it to the Ads Manager automatically.
+     * metric here surfaces it to the Ads Manager (and Launch Comparison) automatically.
      */
-    private const INSIGHTS_METRICS = [
+    public const INSIGHTS_METRICS = [
         // Delivery & Traffic
         'spend', 'impressions', 'reach', 'clicks',
         'link_clicks', 'outbound_clicks', 'estimated_ad_recallers',

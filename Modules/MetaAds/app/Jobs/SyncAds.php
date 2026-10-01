@@ -68,6 +68,7 @@ class SyncAds implements ShouldQueue
             $page = $client->getPage("{$this->adAccount->graphAccountId()}/ads", $query);
 
             $count = $this->runningCount;
+            $syncedIds = [];
 
             foreach ($page['data'] ?? [] as $row) {
                 if (! ($row['campaign_id'] ?? null) || ! ($row['adset_id'] ?? null)) {
@@ -90,6 +91,7 @@ class SyncAds implements ShouldQueue
                         'last_synced_at' => Carbon::now(),
                     ],
                 );
+                $syncedIds[] = $row['id'];
 
                 // Capture the creative's thumbnail and media type straight from
                 // the ad so the Ads Manager always has an image to show — and
@@ -113,6 +115,12 @@ class SyncAds implements ShouldQueue
                 }
 
                 $count++;
+            }
+
+            // Ad sets sync ahead of ads in the chain, so their start_time is
+            // already here to derive each ad's own start from.
+            if ($syncedIds !== []) {
+                Ad::refreshStartTimes(fn ($q) => $q->whereIn('meta_ads_ads.id', $syncedIds));
             }
 
             // `paging.cursors.after` is present on every page (even the last);

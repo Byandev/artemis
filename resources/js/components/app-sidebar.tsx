@@ -32,6 +32,7 @@ import {
     ExternalLink,
     Facebook,
     FileText,
+    GitCompareArrows,
     Goal,
     GraduationCap,
     Headset,
@@ -449,6 +450,12 @@ export function AppSidebar() {
                               title: 'Ads Calendar',
                               href: `/workspaces/${slug}/integrations/meta/ads-calendar`,
                               icon: CalendarDays,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Launch Comparison',
+                              href: `/workspaces/${slug}/integrations/meta/launch-comparison`,
+                              icon: GitCompareArrows,
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
