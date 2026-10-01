@@ -140,6 +140,7 @@ export interface OrderForDelivery {
     upsell_date: string | null; // ISO date
     upsell_price: string | null; // decimal(12,2)
     order_details: string | null;
+    rmo_by_external_team: boolean;
     customer_call_logs_count: number;
     rider_call_logs_count: number;
     customer_call_duration: number | null;

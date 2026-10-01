@@ -149,6 +149,10 @@ class Workspace extends Model
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDailyReport->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewPageRoasTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesTargets->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewNewCreativesTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::CreateNewCreativesTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::EditNewCreativesTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::DeleteNewCreativesTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewAdSpentSummary->value,
             $this->sales_marketing_dashboard_module_enabled && $this->ad_spend_goals_module_enabled
                 ? null
@@ -502,6 +506,19 @@ class Workspace extends Model
     public function rmoAutoTagStatusEnabled(): bool
     {
         return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_auto_tag_status;
+    }
+
+    /**
+     * Whether the external RMO team's Google Sheet is synced into this
+     * workspace — n8n reads the sheet and auto-tags the rows it lists. Needs
+     * both the switch and a sheet link; off by default. Also gates the
+     * "External Team" filter on the RMO page.
+     */
+    public function rmoExternalTeamSyncEnabled(): bool
+    {
+        $setting = $this->loadMissing('rmoSetting')->rmoSetting;
+
+        return (bool) $setting?->enable_external_team_sync && filled($setting?->external_team_sheet_url);
     }
 
     public function allowedMetrics(): array

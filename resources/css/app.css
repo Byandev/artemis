@@ -429,6 +429,36 @@
     }
 }
 
+/*
+ * A roomier scrollbar for wide data grids. `custom-scrollbar` is 4px, which is
+ * right for a short list but too fine to grab when a table is dragged sideways
+ * across dozens of columns. The thumb darkens on hover so it is findable
+ * without being a permanent fixture.
+ */
+@utility grid-scrollbar {
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+        @apply size-2.5;
+    }
+
+    &::-webkit-scrollbar-track {
+        @apply bg-transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        @apply rounded-full border-2 border-solid border-transparent bg-black/15 bg-clip-content dark:bg-white/15;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        @apply bg-black/30 dark:bg-white/30;
+    }
+
+    &::-webkit-scrollbar-corner {
+        @apply bg-transparent;
+    }
+}
+
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
     background-color: #344054;
 }
