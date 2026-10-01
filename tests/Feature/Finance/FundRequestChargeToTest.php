@@ -131,12 +131,12 @@ test('shares that do not add up to the amount are rejected', function () {
     expect(FundRequest::count())->toBe(0);
 });
 
-test('a request must be charged to at least one member', function () {
+test('a request can be charged to no one yet', function () {
     $this->actingAs($this->user)
         ->post($this->url, fundRequestPayload(['charge_to' => []]))
-        ->assertSessionHasErrors('charge_to');
+        ->assertSessionHasNoErrors();
 
-    expect(FundRequest::count())->toBe(0);
+    expect(FundRequest::sole()->chargeToUsers)->toBeEmpty();
 });
 
 test('a non-member cannot be charged', function () {

@@ -22,13 +22,22 @@ function paymentPayload(array $payment): array
 
 $account = ['bank_name' => 'BDO', 'account_name' => 'Juan dela Cruz', 'account_number' => '001234567890'];
 
-test('a request needs a known payment method', function (?string $method) {
+test('a request needs a known payment method', function () {
     $this->actingAs($this->user)
-        ->post($this->url, paymentPayload(['payment_method' => $method]))
+        ->post($this->url, paymentPayload(['payment_method' => 'bitcoin']))
         ->assertSessionHasErrors('payment_method');
 
     expect(FundRequest::count())->toBe(0);
-})->with([null, 'bitcoin']);
+});
+
+test('the payment method can be left for later', function () {
+    $this->actingAs($this->user)
+        ->post($this->url, paymentPayload(['payment_method' => null]))
+        ->assertSessionHasNoErrors();
+
+    expect(FundRequest::sole()->only(['payment_method', 'bank_name']))
+        ->toBe(['payment_method' => null, 'bank_name' => null]);
+});
 
 test('online banking and e-wallets need the account details', function (string $method) {
     $this->actingAs($this->user)
@@ -75,8 +84,12 @@ test('the form carries the payment methods, and the edit page the saved account'
         ->get("{$this->url}/{$request->id}/edit")
         ->assertInertia(fn ($p) => $p
             ->has('paymentMethods', 4)
-            ->where('paymentMethods.0', ['value' => 'online_banking', 'label' => 'Online Banking', 'needs_account' => true])
+            ->where('paymentMethods.0.value', 'online_banking')
+            ->where('paymentMethods.0.needs_account', true)
+            ->where('paymentMethods.0.providers.0', 'BDO')
+            ->where('paymentMethods.1.providers.0', 'GCash')
             ->where('paymentMethods.3.needs_account', false)
+            ->where('paymentMethods.3.providers', [])
             ->where('requestFund.payment_method', 'e_wallet')
             ->where('requestFund.account_number', '001234567890'));
 });
