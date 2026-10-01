@@ -116,8 +116,6 @@ it('404s when the billing module is switched off', function () {
     $this->actingAs($this->owner)->get($this->url)->assertNotFound();
 });
 
-
-
 it('filters by status', function () {
     workspaceInvoice($this->workspace, ['status' => Invoice::STATUS_PAID]);
     workspaceInvoice($this->workspace, ['status' => Invoice::STATUS_SENT]);
