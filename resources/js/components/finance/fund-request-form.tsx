@@ -65,12 +65,25 @@ export interface RequestFundProduct {
 export const fundRequestStatusLabel = (status: string) =>
     status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-/** A way the funds can be released; `needs_account` ones go to an account. */
+/**
+ * A way the funds can be released; `needs_account` ones go to an account, at
+ * one of `providers` (the popular banks / e-wallets, most popular first).
+ */
 export interface PaymentMethodOption {
     value: string;
     label: string;
     needs_account: boolean;
+    providers: string[];
 }
+
+/**
+ * Whether every attachment the type calls for needs a file before saving.
+ * Mirrors FundRequestRequest::ATTACHMENTS_REQUIRED — optional for now.
+ */
+const ATTACHMENTS_REQUIRED = false;
+
+/** The bank select's value for "type one that isn't listed". */
+const OTHER_PROVIDER = '__other__';
 
 /** A line item of a request; `amount` is quantity × unit price. */
 export interface FundRequestParticular {
@@ -393,7 +406,7 @@ export function FundRequestForm({
             return;
         }
 
-        if (missingAttachments.length > 0) {
+        if (ATTACHMENTS_REQUIRED && missingAttachments.length > 0) {
             setShowAttachmentErrors(true);
             attachmentsRef.current?.scrollIntoView({
                 behavior: 'smooth',
@@ -415,10 +428,29 @@ export function FundRequestForm({
         });
     };
 
-    const needsAccount = !!paymentMethods.find(
-        (m) => m.value === data.payment_method,
-    )?.needs_account;
+    const method = paymentMethods.find((m) => m.value === data.payment_method);
+    const needsAccount = !!method?.needs_account;
     const isEWallet = data.payment_method === 'e_wallet';
+    const providers = method?.providers ?? [];
+    // A saved bank that isn't on the list (or "Other" picked) is typed in.
+    const [otherProvider, setOtherProvider] = useState(
+        !!requestFund?.bank_name && !providers.includes(requestFund.bank_name),
+    );
+
+    // Switching method preselects its most popular bank / e-wallet, unless the
+    // one already picked is offered under the new method too.
+    const changePaymentMethod = (value: string) => {
+        const next = paymentMethods.find((m) => m.value === value);
+        const nextProviders = next?.providers ?? [];
+        const keep = nextProviders.includes(data.bank_name);
+
+        setData((d) => ({
+            ...d,
+            payment_method: value,
+            bank_name: keep ? d.bank_name : (nextProviders[0] ?? ''),
+        }));
+        setOtherProvider(false);
+    };
 
     const checklists = type?.checklists ?? [];
     const managementUrl = `/workspaces/${workspaceSlug}/finance/management`;
@@ -509,39 +541,27 @@ export function FundRequestForm({
 
                 <Section
                     title="Payment"
-                    hint="How the funds are to be released. Online banking and e-wallets need the account to send them to."
+                    hint="How the funds are to be released, if known yet. Online banking and e-wallets need the account to send them to."
                 >
                     <Wide>
                         <Field
                             label="Payment Method"
-                            required
                             error={errors.payment_method}
                         >
-                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                {paymentMethods.map((m) => {
-                                    const active =
-                                        data.payment_method === m.value;
-                                    return (
-                                        <button
-                                            key={m.value}
-                                            type="button"
-                                            onClick={() =>
-                                                setData(
-                                                    'payment_method',
-                                                    m.value,
-                                                )
-                                            }
-                                            className={`h-10 rounded-[10px] border font-mono text-[12px] transition-all ${
-                                                active
-                                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                                    : 'border-black/6 bg-stone-50 text-gray-500 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400'
-                                            }`}
-                                        >
-                                            {m.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <select
+                                value={data.payment_method}
+                                onChange={(e) =>
+                                    changePaymentMethod(e.target.value)
+                                }
+                                className={inputCls}
+                            >
+                                <option value="">Not set yet</option>
+                                {paymentMethods.map((m) => (
+                                    <option key={m.value} value={m.value}>
+                                        {m.label}
+                                    </option>
+                                ))}
+                            </select>
                         </Field>
                     </Wide>
 
@@ -557,22 +577,59 @@ export function FundRequestForm({
                                         required
                                         error={errors.bank_name}
                                     >
-                                        <input
-                                            type="text"
-                                            value={data.bank_name}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'bank_name',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder={
-                                                isEWallet
-                                                    ? 'e.g. GCash'
-                                                    : 'e.g. BDO'
-                                            }
-                                            className={inputCls}
-                                        />
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            <select
+                                                value={
+                                                    otherProvider
+                                                        ? OTHER_PROVIDER
+                                                        : data.bank_name
+                                                }
+                                                onChange={(e) => {
+                                                    const other =
+                                                        e.target.value ===
+                                                        OTHER_PROVIDER;
+                                                    setOtherProvider(other);
+                                                    setData(
+                                                        'bank_name',
+                                                        other
+                                                            ? ''
+                                                            : e.target.value,
+                                                    );
+                                                }}
+                                                className={inputCls}
+                                            >
+                                                <option value="">
+                                                    Select…
+                                                </option>
+                                                {providers.map((p) => (
+                                                    <option key={p} value={p}>
+                                                        {p}
+                                                    </option>
+                                                ))}
+                                                <option value={OTHER_PROVIDER}>
+                                                    Other…
+                                                </option>
+                                            </select>
+                                            {otherProvider && (
+                                                <input
+                                                    type="text"
+                                                    value={data.bank_name}
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            'bank_name',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder={
+                                                        isEWallet
+                                                            ? 'Name of the e-wallet'
+                                                            : 'Name of the bank'
+                                                    }
+                                                    className={inputCls}
+                                                    autoFocus
+                                                />
+                                            )}
+                                        </div>
                                     </Field>
                                 </div>
                                 <Field
@@ -706,7 +763,7 @@ export function FundRequestForm({
                             }
                             autoSplit={autoSplit}
                             onAutoSplitChange={setAutoSplit}
-                            hint="Required. Charged to several people? Edit a share to divide it your way — the shares have to add up to the amount; “Split equally” divides it back evenly."
+                            hint="Optional. Charged to several people? Edit a share to divide it your way — the shares have to add up to the amount; “Split equally” divides it back evenly."
                         />
                     </Wide>
 
@@ -749,7 +806,7 @@ export function FundRequestForm({
 
                 <Section
                     title="Attachments"
-                    hint="Required — upload every document this type of request calls for before saving. Images, PDF, Word, Excel or CSV, up to 10 MB each."
+                    hint={`${ATTACHMENTS_REQUIRED ? 'Required — upload every document this type of request calls for before saving.' : 'Optional — upload the documents this type of request calls for, now or on a later edit.'} Images, PDF, Word, Excel or CSV, up to 10 MB each.`}
                 >
                     <Wide ref={attachmentsRef}>
                         {attachments.length === 0 ? (
