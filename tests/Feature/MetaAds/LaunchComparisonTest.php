@@ -383,12 +383,13 @@ function launchSyncAccount(array $sets): AdAccount
     return $account;
 }
 
-function launchAdRow(string $id, string $setId, ?string $created): array
+function launchAdRow(string $id, string $setId, ?string $created, ?string $setStart = null): array
 {
     return array_filter([
         'id' => $id,
         'name' => "Ad {$id}",
         'adset_id' => $setId,
+        'adset' => array_filter(['id' => $setId, 'start_time' => $setStart], fn ($v) => $v !== null),
         'campaign_id' => '111',
         'status' => 'ACTIVE',
         'effective_status' => 'ACTIVE',
@@ -397,19 +398,19 @@ function launchAdRow(string $id, string $setId, ?string $created): array
 }
 
 describe('ad start time', function () {
-    it('is the later of the ad created time and its ad set start time', function () {
-        $account = launchSyncAccount([
-            222 => '2026-09-01 08:00:00',
-            333 => '2026-09-06 08:00:00', // scheduled after the ad was made
-            444 => null,                  // ad set with no start time
-        ]);
+    it('is the later of the ad created time and its ad set start time from the API', function () {
+        // The local ad sets have no start time yet: it has to come from the
+        // ad's own `adset{start_time}` in the /ads response.
+        $account = launchSyncAccount([222 => null, 333 => null, 444 => null]);
 
         launchFakeGraph([
-            launchAdRow('900001', '222', '2026-09-03 10:00:00'),
-            launchAdRow('900002', '333', '2026-09-03 10:00:00'),
+            launchAdRow('900001', '222', '2026-09-03 10:00:00', '2026-09-01 08:00:00'),
+            // Ad set scheduled after the ad was made.
+            launchAdRow('900002', '333', '2026-09-03 10:00:00', '2026-09-06 08:00:00'),
+            // Ad set with no start time.
             launchAdRow('900003', '444', '2026-09-04 10:00:00'),
             // No created time: falls back to the ad set's start.
-            launchAdRow('900004', '222', null),
+            launchAdRow('900004', '222', null, '2026-09-01 08:00:00'),
         ]);
 
         (new SyncAds($account))->handle();
@@ -424,7 +425,7 @@ describe('ad start time', function () {
         $account = launchSyncAccount([222 => '2026-09-01 08:00:00']);
 
         launchFakeGraph(
-            [launchAdRow('900001', '222', '2026-09-03 10:00:00')],
+            [launchAdRow('900001', '222', '2026-09-03 10:00:00', '2026-09-01 08:00:00')],
             [['id' => '222', 'campaign_id' => '111', 'name' => 'Set 222', 'start_time' => '2026-09-08 00:00:00']],
         );
 

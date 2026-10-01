@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class Ad extends Model
@@ -56,6 +57,22 @@ class Ad extends Model
     public function insights(): HasMany
     {
         return $this->hasMany(Insight::class, 'meta_ads_ad_id');
+    }
+
+    /**
+     * An ad's start time from the values Meta returns for it: the later of its
+     * created_time and its ad set's start_time (Meta has no ad-level start
+     * time — see refreshStartTimes). Both are in the account's timezone.
+     */
+    public static function deriveStartTime(?string $createdTime, ?string $adSetStartTime): ?string
+    {
+        if ($createdTime === null || $adSetStartTime === null) {
+            return $createdTime ?? $adSetStartTime;
+        }
+
+        return Carbon::parse($adSetStartTime)->greaterThan(Carbon::parse($createdTime))
+            ? $adSetStartTime
+            : $createdTime;
     }
 
     /**
