@@ -31,6 +31,9 @@ class BuildDailyPagePerformanceCommand extends Command
     /** The trailing window behind rts_rate_30d. Mirrors the ROAS tracker's. */
     private const RTS_WINDOW_DAYS = 30;
 
+    /** The trailing window behind previous_7_days_rts. */
+    private const RTS_TREND_DAYS = 7;
+
     protected $signature = 'build-page-daily-performance
         {--date= : Build a single date (YYYY-MM-DD)}
         {--days=3 : Trailing window ending today when no --date (default 3)}';
@@ -197,6 +200,24 @@ class BuildDailyPagePerformanceCommand extends Command
         // with no deliveries as one that never gets anything returned.
         $rts_rate_30d = $window_moved > 0 ? $window_returning / $window_moved * 100 : null;
 
+        // The same blend over the 7 days ending on this one — the tracker's
+        // day-cell RTS.
+        $trend = DB::table('page_daily_records')
+            ->where('workspace_id', $workspace->id)
+            ->where('page_type', $page->getMorphClass())
+            ->where('page_id', $pageId)
+            ->whereBetween('date', [
+                Carbon::parse($date)->subDays(self::RTS_TREND_DAYS - 1)->toDateString(),
+                Carbon::parse($date)->subDay()->toDateString(),
+            ])
+            ->selectRaw('COALESCE(SUM(returning_amount), 0) as returning_sum, COALESCE(SUM(delivered_amount), 0) as delivered_sum')
+            ->first();
+
+        $trend_returning = (float) ($trend->returning_sum ?? 0) + (float) $returning_amount;
+        $trend_moved = $trend_returning + (float) ($trend->delivered_sum ?? 0) + (float) $delivered_amount;
+
+        $previous_7_days_rts = $trend_moved > 0 ? $trend_returning / $trend_moved * 100 : null;
+
         PageDailyRecord::updateOrCreate(
             [
                 'workspace_id' => $workspace->id,
@@ -217,6 +238,7 @@ class BuildDailyPagePerformanceCommand extends Command
                 'returning_amount' => $returning_amount,
                 'rts_rate' => $rts_rate,
                 'rts_rate_30d' => $rts_rate_30d,
+                'previous_7_days_rts' => $previous_7_days_rts,
                 'ad_spent' => $ad_spent,
                 'ad_spend_budget' => $ad_spend_budget,
                 'ad_sales' => $ad_sales,

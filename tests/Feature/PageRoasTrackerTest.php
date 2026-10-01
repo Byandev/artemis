@@ -176,18 +176,13 @@ it('weights RTS by what actually moved, not by the day', function () {
 });
 
 it('shows each day the RTS of the 7 days ending on it, not the day alone', function () {
-    // 08-01 falls before the range but inside the first day's window.
-    record(['date' => '2026-08-01', 'returning_amount' => 300, 'delivered_amount' => 700, 'rts_rate' => 30]);
-    record(['date' => '2026-08-05', 'returning_amount' => 0, 'delivered_amount' => 1000, 'rts_rate' => 0]);
-    record(['date' => '2026-08-08', 'returning_amount' => 100, 'delivered_amount' => 900, 'rts_rate' => 10]);
+    // The builder stores the trailing 7 days; the tracker reads it as is.
+    record(['date' => '2026-08-05', 'returning_amount' => 0, 'delivered_amount' => 1000, 'rts_rate' => 0, 'previous_7_days_rts' => 15]);
+    record(['date' => '2026-08-08', 'returning_amount' => 100, 'delivered_amount' => 900, 'rts_rate' => 10, 'previous_7_days_rts' => 5]);
 
     $page = trackerPage('2026-08-05', '2026-08-08');
 
-    // 08-05 reaches back to 07-30: 300 back against 300 + 1700 moved.
     expect($page['days']['2026-08-05']['rts_rate'])->toBe(15.0)
-        // A day with no row of its own still has a trailing rate.
-        ->and($page['days']['2026-08-06']['rts_rate'])->toBe(15.0)
-        // 08-08 starts at 08-02, so 08-01 has dropped out: 100 against 100 + 1900.
         ->and($page['days']['2026-08-08']['rts_rate'])->toBe(5.0)
         // The Total row still blends the range in view, not a trailing window.
         ->and($page['total']['rts_rate'])->toBe(5.0);

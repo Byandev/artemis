@@ -82,7 +82,7 @@ class PageRoasTrackerController extends Controller
         'orders', 'item_quantity', 'order_cogs',
         'sales', 'ad_spent', 'ad_spend_budget', 'ad_sales', 'ad_purchases',
         'delivered_amount', 'returning_amount',
-        'roas', 'ad_roas', 'ad_cpp', 'cpp', 'rts_rate',
+        'roas', 'ad_roas', 'ad_cpp', 'cpp', 'previous_7_days_rts AS rts_rate',
     ];
 
     /**
@@ -209,7 +209,7 @@ class PageRoasTrackerController extends Controller
      * — one per grain — so nothing is added up in PHP.
      *
      * @param  list<string>  $dates
-     * @param  array{pages: array<string, array<string, float|null>>, overall: array<string, float|null>}  $trend
+     * @param  array<string, float|null>  $trend
      * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>|null}
      */
     private function build(Builder $base, array $dates, array $trend): array
@@ -254,10 +254,7 @@ class PageRoasTrackerController extends Controller
 
             $days = [];
             foreach ($dates as $date) {
-                $days[$date] = [
-                    ...$this->cell($byDate->get($date)),
-                    'rts_rate' => $trend['pages'][$key][$date] ?? null,
-                ];
+                $days[$date] = $this->cell($byDate->get($date));
             }
 
             $totals = $perPage->get($key);
@@ -287,7 +284,7 @@ class PageRoasTrackerController extends Controller
             'days' => collect($dates)
                 ->mapWithKeys(fn (string $d) => [$d => [
                     ...$this->cell($perDate->get($d)),
-                    'rts_rate' => $trend['overall'][$d] ?? null,
+                    'rts_rate' => $trend[$d] ?? null,
                 ]])
                 ->all(),
             'total' => $this->cell($grand),
@@ -296,8 +293,9 @@ class PageRoasTrackerController extends Controller
     }
 
     /**
-     * Each day's RTS over the RTS_TREND_DAYS ending on it, per page and across
-     * all of them.
+     * Each day's RTS over the RTS_TREND_DAYS ending on it, across all pages.
+     * Per page it is stored by the builder as previous_7_days_rts; a blend
+     * across pages can't be read off their stored rates, so it is rolled here.
      *
      * Blended like every other RTS here — what went back over what moved, across
      * the window — so a quiet day with two parcels cannot outvote a busy one.
@@ -309,13 +307,13 @@ class PageRoasTrackerController extends Controller
      * only returns the rows that exist.
      *
      * @param  list<string>  $dates
-     * @return array{pages: array<string, array<string, float|null>>, overall: array<string, float|null>}
+     * @return array<string, float|null>
      */
     private function trailingRts(Builder $window, array $dates): array
     {
         $rows = (clone $window)
-            ->selectRaw('page_type, page_id, date, SUM(returning_amount) AS returning_amount, SUM(delivered_amount) AS delivered_amount')
-            ->groupBy('page_type', 'page_id', 'date')
+            ->selectRaw('date, SUM(returning_amount) AS returning_amount, SUM(delivered_amount) AS delivered_amount')
+            ->groupBy('date')
             ->get();
 
         // [returning, delivered] per date.
@@ -343,13 +341,7 @@ class PageRoasTrackerController extends Controller
             return $rates;
         };
 
-        return [
-            'pages' => $rows
-                ->groupBy(fn ($r) => $r->page_type.'|'.$r->page_id)
-                ->map(fn (Collection $page) => $roll($byDate($page)))
-                ->all(),
-            'overall' => $roll($byDate($rows)),
-        ];
+        return $roll($byDate($rows));
     }
 
     /**
