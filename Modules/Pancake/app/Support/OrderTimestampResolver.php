@@ -23,8 +23,8 @@ class OrderTimestampResolver
 
         $returning_at = $this->toLocal($history->firstWhere('status', 4)['updated_at'] ?? null);
 
-        if ($returned_at && !$returning_at) {
-            $returning_at  = $returned_at;
+        if ($returned_at && ! $returning_at) {
+            $returning_at = $returned_at;
         }
 
         return [

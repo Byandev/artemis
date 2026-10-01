@@ -66,7 +66,6 @@ Schedule::command('sync:csr-daily-call-records')->everyTwoHours();
 
 Schedule::command('sync:shop-rts-snapshot')->dailyAt('02:30')->withoutOverlapping();
 
-
 // Pull RMO statuses in line with the courier's parcel status for workspaces
 // that opted in. Runs once at midnight, which lands on the default two-day
 // window (today + yesterday) just as the day rolls over — so the day that has
