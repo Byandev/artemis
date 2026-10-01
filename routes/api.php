@@ -7,6 +7,7 @@ use App\Http\Controllers\PublicApi\HealthController;
 use App\Http\Controllers\PublicApi\InventoryItemController;
 use App\Http\Controllers\PublicApi\PageController;
 use App\Http\Controllers\PublicApi\PurchaseOrderController;
+use App\Http\Controllers\PublicApi\RmoExternalTeamController;
 use App\Http\Controllers\PublicApi\RmoOrderController;
 use App\Http\Controllers\PublicApi\RmoOrderV2Controller;
 use App\Http\Controllers\PublicApi\ShopController;
@@ -33,6 +34,10 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::get('/rmo-orders', [RmoOrderController::class, 'assignedOrders'])->name('rmo-orders.index');
 
     Route::post('/rmo-orders/sync-call-tracking', [RmoOrderController::class, 'syncCallTracking'])->name('rmo-orders.call-tracking.sync');
+
+    // External RMO team sheet callback — n8n posts the day's Google Sheet rows
+    // here after `rmo:trigger-external-team-sync` pings it.
+    Route::post('/rmo-orders/external-team', [RmoExternalTeamController::class, 'sync'])->name('rmo-orders.external-team.sync');
 
     Route::post('/call-logs/sync', [CallLogController::class, 'sync'])->name('call-logs.sync');
     Route::get('/call-logs/kpi', [CallLogController::class, 'kpi'])->name('call-logs.kpi');

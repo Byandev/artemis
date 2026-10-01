@@ -53,7 +53,7 @@ class SyncAds implements ShouldQueue
         try {
             $client = $this->adAccount->graphClient();
 
-            $fields = 'id,name,adset_id,campaign_id,creative{id,thumbnail_url,image_url,object_type,video_id},status,effective_status,created_time,updated_time,created_by';
+            $fields = 'id,name,adset_id,campaign_id,creative{id,thumbnail_url,image_url,object_type,video_id},status,effective_status,created_time,updated_time,created_by,adset{start_time}';
 
             $query = ['fields' => $fields];
             if ($this->afterCursor !== null) {
@@ -86,6 +86,7 @@ class SyncAds implements ShouldQueue
                         'effective_status' => $row['effective_status'] ?? null,
                         'created_by_meta_user_id' => $row['created_by']['id'] ?? null,
                         'created_time' => $row['created_time'] ?? null,
+                        'start_time' => Ad::deriveStartTime($row['created_time'] ?? null, $row['adset']['start_time'] ?? null),
                         'updated_time' => $row['updated_time'] ?? null,
                         'last_synced_at' => Carbon::now(),
                     ],

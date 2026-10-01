@@ -66,13 +66,20 @@ Schedule::command('sync:csr-daily-call-records')->everyTwoHours();
 
 Schedule::command('sync:shop-rts-snapshot')->dailyAt('02:30')->withoutOverlapping();
 
-
 // Pull RMO statuses in line with the courier's parcel status for workspaces
 // that opted in. Runs once at midnight, which lands on the default two-day
 // window (today + yesterday) just as the day rolls over — so the day that has
 // only just ended gets closed out, including parcels whose final status the
 // courier reported late in the evening.
 Schedule::command('rmo:apply-auto-tag')->dailyAt('00:00')->withoutOverlapping();
+
+// Pull the external RMO team's Google Sheet (via n8n) for today and auto-tag
+// the rows they've confirmed / delivered / returned. Runs for every workspace
+// that switched it on in Settings → RMO management; a no-op without a webhook.
+Schedule::command('rmo:trigger-external-team-sync')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->when(fn () => filled(config('services.n8n.rmo_external_team_webhook_url')));
 
 // ── RMO (Discord) ───────────────────────────────────────────────────────
 // Checked hourly; posts only for workspaces whose configured send time matches
@@ -111,6 +118,11 @@ Schedule::command('meta-ads:sync-creatives')->daily()->withoutOverlapping();
 Schedule::command('meta-ads:sync-insights --days=3')->dailyAt('00:30')->withoutOverlapping();
 Schedule::command('meta-ads:sync-insights --days=1 --until=yesterday')->hourlyAt(30)->withoutOverlapping();
 Schedule::command('meta-ads:sync-insights --days=1')->hourlyAt(30)->withoutOverlapping();
+
+// New Creatives Tracker: roll the freshly-synced insights up into per-item,
+// per-test-day records. Runs just after each insights refresh lands, so the
+// tracker reflects the same numbers the Ads Manager is showing.
+Schedule::command('metaads:sync-testing-records')->hourlyAt(45)->withoutOverlapping();
 
 // Snapshot end-of-day budgets so we have history Meta doesn't keep. Runs at
 // 23:55 server time, after the 23:30 entity sync has captured the day's

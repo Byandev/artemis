@@ -12,6 +12,8 @@ class RmoSetting extends Model
         'enable_edit_previous_day',
         'enable_bulk_status_update',
         'enable_auto_tag_status',
+        'enable_external_team_sync',
+        'external_team_sheet_url',
         'discord_daily_stats_enabled',
         'discord_webhook_url',
         'discord_send_at',
@@ -21,6 +23,7 @@ class RmoSetting extends Model
         'enable_edit_previous_day' => 'boolean',
         'enable_bulk_status_update' => 'boolean',
         'enable_auto_tag_status' => 'boolean',
+        'enable_external_team_sync' => 'boolean',
         'discord_daily_stats_enabled' => 'boolean',
     ];
 

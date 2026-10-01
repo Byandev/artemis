@@ -186,6 +186,10 @@ enum Permission: string
     case ViewPageRoasTracker = 'View Page ROAS Tracker';
     case ViewSalesTargets = 'View Sales Targets';
     case ManageSalesTargets = 'Manage Sales Targets';
+    case ViewNewCreativesTracker = 'View New Creatives Tracker';
+    case CreateNewCreativesTracker = 'Create New Creatives Tracker';
+    case EditNewCreativesTracker = 'Edit New Creatives Tracker';
+    case DeleteNewCreativesTracker = 'Delete New Creatives Tracker';
 
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
@@ -212,6 +216,7 @@ enum Permission: string
     case ViewAdAccounts = 'View Ad Accounts';
     case ViewOptimizationLogs = 'View Optimization Logs';
     case ViewAdSpentSummary = 'View Adspent Summary';
+    case ViewLaunchComparison = 'View Launch Comparison';
 
     // Welle
     //
@@ -370,7 +375,11 @@ enum Permission: string
             self::ViewSalesMarketingDailyReport,
             self::ViewPageRoasTracker,
             self::ViewSalesTargets,
-            self::ManageSalesTargets => 'Sales & Marketing',
+            self::ManageSalesTargets,
+            self::ViewNewCreativesTracker,
+            self::CreateNewCreativesTracker,
+            self::EditNewCreativesTracker,
+            self::DeleteNewCreativesTracker => 'Sales & Marketing',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys,
@@ -394,7 +403,8 @@ enum Permission: string
             self::ManageOptimizationRules,
             self::ApproveOptimizationRules,
             self::ViewOptimizationLogs,
-            self::ViewAdSpentSummary => 'Meta Ads',
+            self::ViewAdSpentSummary,
+            self::ViewLaunchComparison => 'Meta Ads',
 
             self::ViewMyEsc => 'Welle',
 
