@@ -10,7 +10,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Modules\MetaAds\Jobs\Concerns\HandlesMetaSyncErrors;
 use Modules\MetaAds\Jobs\Concerns\SerializesPerAdAccount;
-use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\SyncRun;
@@ -68,7 +67,6 @@ class SyncAdSets implements ShouldQueue
             $page = $client->getPage("{$this->adAccount->graphAccountId()}/adsets", $query);
 
             $count = $this->runningCount;
-            $syncedIds = [];
 
             foreach ($page['data'] ?? [] as $row) {
                 if (! ($row['campaign_id'] ?? null)) {
@@ -99,15 +97,8 @@ class SyncAdSets implements ShouldQueue
                         'last_synced_at' => Carbon::now(),
                     ],
                 );
-                $syncedIds[] = $row['id'];
 
                 $count++;
-            }
-
-            // A rescheduled ad set moves its ads' derived start with it, even
-            // when the ads themselves didn't change and won't be re-synced.
-            if ($syncedIds !== []) {
-                Ad::refreshStartTimes(fn ($q) => $q->whereIn('meta_ads_ads.meta_ads_set_id', $syncedIds));
             }
 
             $afterCursor = $page['paging']['cursors']['after'] ?? null;

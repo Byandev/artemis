@@ -6,9 +6,7 @@ use App\Models\User as AppUser;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class Ad extends Model
 {
@@ -61,8 +59,9 @@ class Ad extends Model
 
     /**
      * An ad's start time from the values Meta returns for it: the later of its
-     * created_time and its ad set's start_time (Meta has no ad-level start
-     * time — see refreshStartTimes). Both are in the account's timezone.
+     * created_time and its ad set's start_time. Meta has no ad-level start
+     * time, but an ad can't deliver before it exists, nor before its ad set
+     * starts. Both are in the account's timezone.
      */
     public static function deriveStartTime(?string $createdTime, ?string $adSetStartTime): ?string
     {
@@ -73,35 +72,5 @@ class Ad extends Model
         return Carbon::parse($adSetStartTime)->greaterThan(Carbon::parse($createdTime))
             ? $adSetStartTime
             : $createdTime;
-    }
-
-    /**
-     * Re-derive `start_time` for ads (all of them, or those $scope narrows the
-     * update query to). Meta has no ad start time: an ad can't deliver before it
-     * exists, nor before its ad set is scheduled to start, so it's the later of
-     * the ad's created_time and its ad set's start_time — whichever is known
-     * when the other is missing. Both come from Meta in the account's timezone,
-     * so the comparison is like-for-like.
-     *
-     * @param  (callable(Builder): mixed)|null  $scope
-     */
-    public static function refreshStartTimes(?callable $scope = null): int
-    {
-        $query = DB::table('meta_ads_ads')
-            ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id');
-
-        if ($scope) {
-            $scope($query);
-        }
-
-        return $query->update([
-            'meta_ads_ads.start_time' => DB::raw(
-                'CASE'
-                .' WHEN meta_ads_sets.start_time IS NULL THEN meta_ads_ads.created_time'
-                .' WHEN meta_ads_ads.created_time IS NULL THEN meta_ads_sets.start_time'
-                .' ELSE GREATEST(meta_ads_ads.created_time, meta_ads_sets.start_time)'
-                .' END'
-            ),
-        ]);
     }
 }

@@ -4,7 +4,6 @@ use App\Enums\Permission;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Modules\MetaAds\Jobs\SyncAds;
-use Modules\MetaAds\Jobs\SyncAdSets;
 use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
@@ -419,40 +418,5 @@ describe('ad start time', function () {
             ->and(Ad::find(900002)->start_time->toDateTimeString())->toBe('2026-09-06 08:00:00')
             ->and(Ad::find(900003)->start_time->toDateTimeString())->toBe('2026-09-04 10:00:00')
             ->and(Ad::find(900004)->start_time->toDateTimeString())->toBe('2026-09-01 08:00:00');
-    });
-
-    it('follows an ad set that is rescheduled after the ad synced', function () {
-        $account = launchSyncAccount([222 => '2026-09-01 08:00:00']);
-
-        launchFakeGraph(
-            [launchAdRow('900001', '222', '2026-09-03 10:00:00', '2026-09-01 08:00:00')],
-            [['id' => '222', 'campaign_id' => '111', 'name' => 'Set 222', 'start_time' => '2026-09-08 00:00:00']],
-        );
-
-        (new SyncAds($account))->handle();
-        expect(Ad::find(900001)->start_time->toDateTimeString())->toBe('2026-09-03 10:00:00');
-
-        // The ad didn't change, so only the ad set sync sees the new schedule.
-        (new SyncAdSets($account))->handle();
-        expect(Ad::find(900001)->start_time->toDateTimeString())->toBe('2026-09-08 00:00:00');
-    });
-
-    it('backfills every ad when run without a scope', function () {
-        $account = launchSyncAccount([222 => '2026-09-05 00:00:00']);
-
-        Ad::create([
-            'id' => 900009,
-            'meta_ads_account_id' => $account->id,
-            'meta_ads_campaign_id' => 111,
-            'meta_ads_set_id' => 222,
-            'name' => 'Pre-existing ad',
-            'created_time' => '2026-09-02 00:00:00',
-        ]);
-
-        expect(Ad::find(900009)->start_time)->toBeNull();
-
-        Ad::refreshStartTimes();
-
-        expect(Ad::find(900009)->start_time->toDateTimeString())->toBe('2026-09-05 00:00:00');
     });
 });
