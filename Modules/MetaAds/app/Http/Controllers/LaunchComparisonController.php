@@ -39,6 +39,8 @@ class LaunchComparisonController extends Controller
     public function index(Request $request, Workspace $workspace): Response
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
+        // Owners hold every permission, so the module toggle is the gate.
+        abort_unless($workspace->meta_ads_module_enabled, 404);
 
         $level = $this->resolveLevel($request);
         $days = $this->resolveDays($request);

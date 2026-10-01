@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Permission;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Modules\MetaAds\Jobs\SyncAds;
@@ -28,6 +29,8 @@ afterEach(function () {
  */
 function seedLaunches($workspace, array $launches): AdAccount
 {
+    $workspace->update(['meta_ads_module_enabled' => true]);
+
     $metaUser = MetaUser::create(['id' => 9301, 'name' => 'Connected User', 'access_token' => 'test-token']);
     $metaUser->workspaces()->attach($workspace->id);
 
@@ -297,6 +300,32 @@ it('shows nothing when every account is unticked', function () {
 
     expect($props['items'])->toBe([])
         ->and($props['selectedAccounts'])->toBe([]);
+});
+
+it('is behind the View Launch Comparison permission', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['meta_ads_module_enabled' => true]);
+
+    // A member with no role holds nothing.
+    $this->actingAs(makeWorkspaceMember($workspace))
+        ->get(launchComparisonUrl($workspace))
+        ->assertForbidden();
+
+    // Seeing the rest of Meta Ads isn't enough on its own.
+    $this->actingAs(makeMemberWithPermissions($workspace, [Permission::ViewMetaAds->value], 'Meta Ads'))
+        ->get(launchComparisonUrl($workspace))
+        ->assertForbidden();
+
+    $this->actingAs(makeMemberWithPermissions($workspace, [Permission::ViewLaunchComparison->value], 'Meta Ads'))
+        ->get(launchComparisonUrl($workspace))
+        ->assertOk();
+});
+
+it('is hidden while the Meta Ads module is off', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['meta_ads_module_enabled' => false]);
+
+    $this->get(launchComparisonUrl($workspace))->assertNotFound();
 });
 
 it('leaves out launches from accounts outside the workspace', function () {

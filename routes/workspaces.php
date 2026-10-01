@@ -386,7 +386,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-calendar');
     Route::get('/workspaces/{workspace}/integrations/meta/launch-comparison', [LaunchComparisonController::class, 'index'])
-        ->middleware('can:View Meta Ads,workspace')
+        ->middleware('can:View Launch Comparison,workspace')
         ->name('workspaces.metaads.launch-comparison');
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')

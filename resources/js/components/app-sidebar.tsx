@@ -420,6 +420,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewOptimizationRules,
                           PERMISSIONS.ApproveOptimizationRules,
                           PERMISSIONS.ViewOptimizationLogs,
+                          PERMISSIONS.ViewLaunchComparison,
                       ],
                       items: [
                           {
@@ -456,7 +457,7 @@ export function AppSidebar() {
                               title: 'Launch Comparison',
                               href: `/workspaces/${slug}/integrations/meta/launch-comparison`,
                               icon: GitCompareArrows,
-                              permission: PERMISSIONS.ViewMetaAds,
+                              permission: PERMISSIONS.ViewLaunchComparison,
                           },
                           {
                               title: 'Optimization Rules',
