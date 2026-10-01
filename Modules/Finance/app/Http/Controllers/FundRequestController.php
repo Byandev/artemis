@@ -425,6 +425,7 @@ class FundRequestController extends Controller
                     'value' => $value,
                     'label' => $label,
                     'needs_account' => in_array($value, FundRequest::PAYMENT_METHODS_WITH_ACCOUNT, true),
+                    'providers' => FundRequest::PAYMENT_PROVIDERS[$value] ?? [],
                 ])
                 ->values(),
             'departments' => Department::ofWorkspace($workspace)

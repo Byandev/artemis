@@ -22,6 +22,9 @@ class FundRequestRequest extends FormRequest
      */
     public const ATTACHMENT_MIMES = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'];
 
+    /** Whether every attachment the chosen type calls for must have a file. */
+    public const ATTACHMENTS_REQUIRED = false;
+
     /** Memo for isPerProduct(). */
     private ?bool $perProduct = null;
 
@@ -58,8 +61,9 @@ class FundRequestRequest extends FormRequest
                 Rule::exists('departments', 'id')->where('workspace_id', $workspace->id),
             ],
             // A request can be charged to several members, each bearing a share
-            // of the amount. A blank share is split evenly (see SplitsShares).
-            'charge_to' => ['required', 'array', 'min:1'],
+            // of the amount, or to no one yet. A blank share is split evenly
+            // (see SplitsShares).
+            'charge_to' => ['nullable', 'array'],
             'charge_to.*.user_id' => ['required', 'distinct', $memberRule],
             'charge_to.*.amount' => ['nullable', 'numeric', 'min:0'],
             // What the funds are for, line by line. The amount requested is
@@ -87,10 +91,11 @@ class FundRequestRequest extends FormRequest
                 'date',
             ],
 
-            // How the funds are released. Online banking and e-wallets send them
-            // to an account, which has to be given; for the others the account
-            // fields are dropped (see the controller).
-            'payment_method' => ['required', Rule::in(array_keys(FundRequest::PAYMENT_METHODS))],
+            // How the funds are released, which may be left for later. Online
+            // banking and e-wallets send them to an account, which has to be
+            // given; for the others the account fields are dropped (see the
+            // controller).
+            'payment_method' => ['nullable', Rule::in(array_keys(FundRequest::PAYMENT_METHODS))],
             'bank_name' => [Rule::requiredIf($this->needsAccount()), 'nullable', 'string', 'max:255'],
             'account_name' => [Rule::requiredIf($this->needsAccount()), 'nullable', 'string', 'max:255'],
             'account_number' => [Rule::requiredIf($this->needsAccount()), 'nullable', 'string', 'max:255'],
@@ -119,7 +124,7 @@ class FundRequestRequest extends FormRequest
             // chosen type calls for is checked in after(), since the keys
             // aren't values a rule can see.
             'attachments' => ['nullable', 'array'],
-            'attachments.*' => ['file', 'mimes:'.implode(',', self::ATTACHMENT_MIMES), 'max:10240'],
+            'attachments.*' => ['nullable','file', 'mimes:'.implode(',', self::ATTACHMENT_MIMES), 'max:10240'],
             // Attachment requirement ids whose file should be removed (edit only).
             'remove_attachments' => ['nullable', 'array'],
             'remove_attachments.*' => ['integer'],
@@ -152,6 +157,12 @@ class FundRequestRequest extends FormRequest
                 if (! $required->has($attachmentId)) {
                     $validator->errors()->add("attachments.{$attachmentId}", 'This attachment is not one the selected type calls for.');
                 }
+            }
+
+            // Attachments are optional for now (nullable): flip this on to
+            // require a file for every attachment the type calls for again.
+            if (! self::ATTACHMENTS_REQUIRED) {
+                return;
             }
 
             // Every attachment the type calls for needs a file: a new upload, or
@@ -283,7 +294,6 @@ class FundRequestRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'payment_method.required' => 'Pick how the funds are to be released.',
             'bank_name.required' => 'Enter the bank or e-wallet.',
             'account_name.required' => 'Enter the account name.',
             'account_number.required' => 'Enter the account number.',
@@ -294,7 +304,6 @@ class FundRequestRequest extends FormRequest
             'particulars.*.product_id.required' => 'Pick a product for every particular.',
             'particulars.*.product_id.exists' => 'The product must belong to this workspace.',
             'particulars.*.quantity.gt' => 'The quantity must be more than zero.',
-            'charge_to.required' => 'Charge the request to at least one member.',
             'charge_to.*.user_id.required' => 'Select a member for every charge-to row.',
             'charge_to.*.user_id.exists' => 'The charge-to user must be a member of this workspace.',
             'charge_to.*.user_id.distinct' => 'Each member can only be charged once.',

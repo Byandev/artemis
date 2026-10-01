@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Modules\Finance\Http\Requests\FundRequestRequest;
 use Modules\Finance\Models\FundRequest;
 use Modules\Finance\Models\FundRequestAttachment;
 use Modules\Finance\Models\TransactionType;
@@ -147,7 +148,7 @@ test('cannot save without a file for every attachment the type calls for', funct
         ->assertSessionHasErrors(["attachments.{$this->statement->id}", "attachments.{$this->tracker->id}"]);
 
     expect(FundRequest::count())->toBe(0);
-});
+})->skip(! FundRequestRequest::ATTACHMENTS_REQUIRED, 'Attachments are optional for now.');
 
 test('a type with no attachments needs no files', function () {
     $bare = TransactionType::create(['workspace_id' => $this->workspace->id, 'name' => 'Refund', 'nature' => 'credit', 'fund_requestable' => true]);
@@ -168,7 +169,7 @@ test('an edit cannot remove a required file without replacing it', function () {
         ->assertSessionHasErrors("attachments.{$this->tracker->id}");
 
     expect(requestMedia($request))->toHaveCount(2);
-});
+})->skip(! FundRequestRequest::ATTACHMENTS_REQUIRED, 'Attachments are optional for now.');
 
 test('an edit without files keeps the ones on file', function () {
     $this->actingAs($this->user)->post($this->url, requirementsPayload($this->adSpent, [
