@@ -1610,7 +1610,7 @@ function RmoManagement({
             },
             {
                 accessorFn: (row) =>
-                    (row.order.items ?? []).map((item) => item.name).join(', '),
+                    (row.order.items ?? []).map((item) => 'Item ######').join(', '),
                 id: 'items',
                 enableSorting: false,
                 header: ({ column }) => (
