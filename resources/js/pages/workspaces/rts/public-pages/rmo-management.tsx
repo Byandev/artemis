@@ -5,7 +5,10 @@ import {
     orderStatusConfig,
     ParcelStatusEntry,
 } from '@/components/rts/rmo-config';
-import { RmoStatCards } from '@/components/rts/RmoStatCards';
+import {
+    RmoPersonaCallStats,
+    RmoStatCards,
+} from '@/components/rts/RmoStatCards';
 import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -653,6 +656,11 @@ interface RmoStats {
      */
     avg_call_duration: number | null;
     hit_rate: number | null;
+    /** The same call figures, split into calls to the customer and to the rider. */
+    call_logs_by_persona: {
+        customer: RmoPersonaCallStats;
+        rider: RmoPersonaCallStats;
+    };
 }
 
 function RmoManagement({
@@ -2349,6 +2357,7 @@ function RmoManagement({
                             }
                             avg_call_duration={stats?.avg_call_duration ?? null}
                             hit_rate={stats?.hit_rate ?? null}
+                            call_logs_by_persona={stats?.call_logs_by_persona}
                             loading={statsLoading || stats === null}
                         />
                     </div>

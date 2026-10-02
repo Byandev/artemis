@@ -148,6 +148,73 @@ class RmoDailyStats
         ?Builder $orderScope = null,
         ?string $callerId = null,
     ): int {
+        $value = self::callLogQuery($workspace, $date, $orderScope, $callerId)
+            ->selectRaw($aggregate.' as value')
+            ->value('value');
+
+        return (int) ($value ?? 0);
+    }
+
+    /**
+     * The call figures split by persona — the customer row and the rider row
+     * the RMO page shows under the combined cards.
+     *
+     * Narrowed exactly as callLogStat() narrows, so each persona's figures add
+     * up to the combined card above them. One grouped query for both personas
+     * rather than three per persona. A persona nobody called comes back as
+     * zeros, not missing.
+     *
+     * @return array<string, array{
+     *     total_call_logs_count: int,
+     *     total_call_duration: int,
+     *     connected_call_logs_count: int,
+     *     avg_call_duration: float|null,
+     *     hit_rate: float|null,
+     * }>
+     */
+    public static function callLogStatsByPersona(
+        Workspace $workspace,
+        string $date,
+        ?Builder $orderScope = null,
+        ?string $callerId = null,
+    ): array {
+        $rows = self::callLogQuery($workspace, $date, $orderScope, $callerId)
+            ->selectRaw('
+                persona,
+                COUNT(*) as total,
+                COALESCE(SUM(duration), 0) as duration,
+                COUNT(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as connected
+            ')
+            ->groupBy('persona')
+            ->get()
+            ->keyBy('persona');
+
+        return collect(self::RMO_PERSONAS)->mapWithKeys(function (string $persona) use ($rows) {
+            $row = $rows->get($persona);
+            $total = (int) ($row->total ?? 0);
+            $duration = (int) ($row->duration ?? 0);
+            $connected = (int) ($row->connected ?? 0);
+
+            return [$persona => [
+                'total_call_logs_count' => $total,
+                'total_call_duration' => $duration,
+                'connected_call_logs_count' => $connected,
+                ...self::derivedCallStats($total, $duration, $connected),
+            ]];
+        })->all();
+    }
+
+    /**
+     * The day's RMO calls, narrowed — the rows every call figure is measured over.
+     *
+     * @return Builder<CallLog>
+     */
+    private static function callLogQuery(
+        Workspace $workspace,
+        string $date,
+        ?Builder $orderScope,
+        ?string $callerId,
+    ): Builder {
         $query = CallLog::where('workspace_id', $workspace->id)
             ->whereDate('call_date', $date)
             // RMO calls only — see RMO_PERSONAS. Reads off
@@ -176,9 +243,7 @@ class RmoDailyStats
             );
         }
 
-        $value = $query->selectRaw($aggregate.' as value')->value('value');
-
-        return (int) ($value ?? 0);
+        return $query;
     }
 
     /**

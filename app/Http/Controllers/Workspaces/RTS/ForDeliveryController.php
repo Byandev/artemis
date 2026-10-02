@@ -531,6 +531,10 @@ class ForDeliveryController extends Controller
             $callerId
         );
 
+        // Must run before $statsBase is turned into the aggregate below —
+        // $callLogScope is a clone of it, so this is only about ordering.
+        $callLogsByPersona = RmoDailyStats::callLogStatsByPersona($workspace, $deliveryDate, $callLogScope, $callerId);
+
         // The other 4 stats share $statsBase — roll them into a single aggregate query
         $statusBreakdown = $statsBase
             ->selectRaw("
@@ -558,6 +562,9 @@ class ForDeliveryController extends Controller
             // Derived server-side so the page and the daily report quote the
             // same arithmetic. Null, not zero, when nobody has called yet.
             ...RmoDailyStats::derivedCallStats($totalCallLogs, $totalCallDuration, $connectedCallLogs),
+            // The same five call figures, once for calls to the customer and
+            // once for calls to the rider.
+            'call_logs_by_persona' => $callLogsByPersona,
         ];
     }
 
