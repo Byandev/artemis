@@ -51,7 +51,7 @@ export default function RmoSettings({
     const baseUrl = `/workspaces/${workspace.slug}/settings/rmo`;
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'RMO management', href: baseUrl },
+        { title: 'RMO settings', href: baseUrl },
     ];
 
     const { data, setData, put, processing, errors, recentlySuccessful } =
@@ -73,12 +73,12 @@ export default function RmoSettings({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="RMO management settings" />
+            <Head title="RMO settings" />
 
             <SettingsLayout workspace={workspace}>
                 <div className="space-y-6">
                     <HeadingSmall
-                        title="RMO Management"
+                        title="RMO Settings"
                         description="Control how far back the RMO management page stays editable, what can be changed in bulk, and which statuses tag themselves."
                     />
 

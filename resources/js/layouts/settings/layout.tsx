@@ -13,6 +13,7 @@ import {
     Plug,
     ReceiptText,
     Server,
+    Tags,
     User,
     type LucideIcon,
 } from 'lucide-react';
@@ -118,12 +119,17 @@ export default function SettingsLayout({
 
         if (canManageRmoSettings) {
             groups.push({
-                label: 'RTS',
+                label: 'RMO Management',
                 items: [
                     {
-                        title: 'RMO Management',
+                        title: 'RMO Settings',
                         href: `/workspaces/${workspace.slug}/settings/rmo`,
                         icon: CalendarClock,
+                    },
+                    {
+                        title: 'RMO Statuses',
+                        href: `/workspaces/${workspace.slug}/settings/rmo/statuses`,
+                        icon: Tags,
                     },
                 ],
             });
