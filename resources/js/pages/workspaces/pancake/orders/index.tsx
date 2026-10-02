@@ -7,6 +7,7 @@ import {
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
     Select,
     SelectContent,
@@ -94,6 +95,10 @@ interface Props {
     /** Comparisons the customer-RTS filter accepts, from the same allowlist the
      *  server compares on. */
     rtsOperators: string[];
+    /** The Page filter's options, already narrowed to the user's teams. */
+    pages: { id: number; name: string }[];
+    /** The Shop filter's options, narrowed the same way. */
+    shops: { id: number; name: string }[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -106,6 +111,8 @@ interface Props {
             date_to?: string;
             date_type?: string;
             rider?: string;
+            page?: string;
+            shop?: string;
             report?: string;
             rts_op?: string;
             rts_value?: string;
@@ -190,6 +197,7 @@ const RTS_COMPARISON_LABELS: Record<string, string> = {
 };
 
 const DEFAULT_RTS_REPORT = 'any';
+
 const DEFAULT_RTS_COMPARISON = 'gt';
 
 // The Customer orders chip compares the same way, so it reads from the same
@@ -209,6 +217,10 @@ interface FilterState {
     dateTo: string;
     dateType: string;
     rider: string;
+    /** Page ids; empty for every page. */
+    pages: string[];
+    /** Shop ids; empty for every shop. */
+    shops: string[];
     /** '' when the Customer RTS chip isn't on the bar; otherwise a key of
      *  RTS_REPORT_LABELS. */
     report: string;
@@ -287,6 +299,8 @@ export default function PancakeOrdersIndex({
     shippingFeeImport,
     dateFields,
     rtsOperators,
+    pages,
+    shops,
     query,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/pancake/orders`;
@@ -299,6 +313,13 @@ export default function PancakeOrdersIndex({
     const [orderId, setOrderId] = useState(query?.filter?.order_id ?? '');
     const [status, setStatus] = useState<string>(query?.filter?.status ?? '');
     const [rider, setRider] = useState<string>(query?.filter?.rider ?? '');
+    // Sent comma-joined, which Spatie splits back into a list server-side.
+    const [pageIds, setPageIds] = useState<string[]>(() =>
+        (query?.filter?.page ?? '').split(',').filter(Boolean),
+    );
+    const [shopIds, setShopIds] = useState<string[]>(() =>
+        (query?.filter?.shop ?? '').split(',').filter(Boolean),
+    );
     const [dateFrom, setDateFrom] = useState<string>(
         query?.filter?.date_from ?? '',
     );
@@ -333,6 +354,15 @@ export default function PancakeOrdersIndex({
     );
     const [cxOrdersTo, setCxOrdersTo] = useState<string>(
         query?.filter?.customer_orders_to ?? '',
+    );
+
+    const pageOptions = useMemo(
+        () => pages.map((p) => ({ value: String(p.id), label: p.name })),
+        [pages],
+    );
+    const shopOptions = useMemo(
+        () => shops.map((s) => ({ value: String(s.id), label: s.name })),
+        [shops],
     );
 
     const canImportFees = usePermission(PERMISSIONS.ImportOrderShippingFees);
@@ -442,6 +472,8 @@ export default function PancakeOrdersIndex({
                 ? f.dateType
                 : undefined,
         rider: f.rider || undefined,
+        page: f.pages.length ? f.pages.join(',') : undefined,
+        shop: f.shops.length ? f.shops.join(',') : undefined,
         report: f.report === DEFAULT_RTS_REPORT ? undefined : f.report,
         // A comparison only counts once there is a number in the box; until then
         // the chip is asking about the history alone.
@@ -477,6 +509,8 @@ export default function PancakeOrdersIndex({
         dateTo,
         dateType,
         rider,
+        pages: pageIds,
+        shops: shopIds,
         report,
         rtsOp,
         rtsValue,
@@ -523,6 +557,8 @@ export default function PancakeOrdersIndex({
         dateTo,
         dateType,
         rider,
+        pageIds,
+        shopIds,
         report,
         rtsOp,
         rtsValue,
@@ -532,7 +568,7 @@ export default function PancakeOrdersIndex({
         cxOrdersTo,
     ]);
 
-    // The two standing filters are always on the bar, so their presence says
+    // The standing filters are always on the bar, so their presence says
     // nothing — only a value moved off its resting state is actually narrowing.
     const isFiltered =
         !!search ||
@@ -541,6 +577,8 @@ export default function PancakeOrdersIndex({
         !!dateFrom ||
         !!dateTo ||
         !!rider ||
+        pageIds.length > 0 ||
+        shopIds.length > 0 ||
         !!cxOrders ||
         report !== DEFAULT_RTS_REPORT;
 
@@ -549,6 +587,8 @@ export default function PancakeOrdersIndex({
         setOrderId('');
         setStatus('');
         setRider('');
+        setPageIds([]);
+        setShopIds([]);
         setDateFrom('');
         setDateTo('');
         setDateType(DEFAULT_DATE_FIELD);
@@ -932,7 +972,7 @@ export default function PancakeOrdersIndex({
                     ))}
                 </div>
 
-                {/* Filters: search, the two standing filters, then anything
+                {/* Filters: search, the standing filters, then anything
                     arrived at from elsewhere in the app. */}
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative w-full max-w-xs">
@@ -955,6 +995,28 @@ export default function PancakeOrdersIndex({
                             setDateTo(to);
                         }}
                     />
+
+                    <FilterChip label="Page">
+                        <MultiSelect
+                            compact
+                            className="w-[160px]"
+                            placeholder="All pages"
+                            options={pageOptions}
+                            selected={pageIds}
+                            onChange={setPageIds}
+                        />
+                    </FilterChip>
+
+                    <FilterChip label="Shop">
+                        <MultiSelect
+                            compact
+                            className="w-[160px]"
+                            placeholder="All shops"
+                            options={shopOptions}
+                            selected={shopIds}
+                            onChange={setShopIds}
+                        />
+                    </FilterChip>
 
                     <CustomerRtsFilterChip
                         report={report}
@@ -1061,7 +1123,7 @@ export default function PancakeOrdersIndex({
  * field needs. The fill is what separates it from the filter beside it and from
  * the search box, so each reads as a question of its own.
  *
- * The X is only for a filter that can actually come off the bar. The two
+ * The X is only for a filter that can actually come off the bar. The
  * standing ones have no "off" — their own resting value is what stops them
  * narrowing — so an X there would promise something it can't do.
  */
