@@ -4,6 +4,7 @@ namespace Modules\Pancake\Actions;
 
 use App\Models\Page;
 use App\Models\Workspace;
+use App\Support\RmoDefaultStatuses;
 use Carbon\Carbon;
 use Modules\GencysERP\Support\RmoUpsellStamper;
 use Modules\Pancake\Models\Order;
@@ -106,9 +107,16 @@ readonly class SyncParcelTrackingAction
                     $parcel_status = 'returning';
                 }
 
-                $order_for_delivery->update([
-                    'parcel_status' => $parcel_status,
-                ]);
+                $attributes = ['parcel_status' => $parcel_status];
+
+                // A freshly fetched row starts on the rider PENDING status, the
+                // same as the main status above. Only on creation, so a CSR's
+                // later pick isn't reset by the next fetch.
+                if ($order_for_delivery->wasRecentlyCreated) {
+                    $attributes['rider_status_id'] = RmoDefaultStatuses::riderStatusId($workspace, 'PENDING');
+                }
+
+                $order_for_delivery->update($attributes);
 
                 // The RMO row exists now, so pull the Gencys upsell figures onto
                 // it in the same pass. Fetch-orders runs on a schedule and keeps

@@ -105,7 +105,8 @@ interface Props {
 
 /**
  * The RMO row's status: one dropdown listing the workspace-defined customer and
- * rider statuses together. The pill shows whichever of the two are set.
+ * rider statuses together. The pill shows whichever of the two are set, by
+ * name only.
  */
 export function RmoSubStatusPicker({
     cxStatuses,
@@ -127,17 +128,9 @@ export function RmoSubStatusPicker({
     );
     const content = isSet ? (
         <>
-            {cx && (
-                <span className="flex max-w-[160px] gap-1">
-                    <span className="shrink-0 opacity-60">Customer:</span>
-                    <span className="truncate">{cx.name}</span>
-                </span>
-            )}
+            {cx && <span className="max-w-[160px] truncate">{cx.name}</span>}
             {rider && (
-                <span className="flex max-w-[160px] gap-1">
-                    <span className="shrink-0 opacity-60">Rider:</span>
-                    <span className="truncate">{rider.name}</span>
-                </span>
+                <span className="max-w-[160px] truncate">{rider.name}</span>
             )}
         </>
     ) : (

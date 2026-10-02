@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Permission as PermissionEnum;
 use App\Support\Metrics\MetricRegistry;
+use App\Support\RmoDefaultStatuses;
 use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -247,6 +248,8 @@ class Workspace extends Model
                     'default_metrics' => $defaults,
                 ]
             );
+
+            RmoDefaultStatuses::seed($workspace);
         });
     }
 

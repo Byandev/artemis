@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
+import { RmoSubStatus } from '@/types/models/Pancake/OrderForDelivery';
 import { Workspace } from '@/types/models/Workspace';
 import { Transition } from '@headlessui/react';
 import { Head, useForm } from '@inertiajs/react';
@@ -22,6 +23,14 @@ import { type FormEventHandler } from 'react';
 
 // Whole-hour options (00:00 – 23:00); the scheduler checks hourly, so a send
 // time on any other minute would never match.
+// The statuses the external team writes in its sheet, in the order they
+// happen. Keys match RmoExternalTeamSheet::STATUS_MAP.
+const SHEET_STATUSES = [
+    { key: 'confirmed', label: 'Confirmed' },
+    { key: 'delivered', label: 'Delivered' },
+    { key: 'returned', label: 'Returned' },
+] as const;
+
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => {
     const value = `${String(h).padStart(2, '0')}:00`;
     return { value, label: value };
@@ -35,18 +44,24 @@ interface Props {
         enable_auto_tag_status: boolean;
         enable_external_team_sync: boolean;
         external_team_sheet_url: string | null;
+        /** Sheet status => "cx:{id}" / "rider:{id}", or '' to tag nothing. */
+        external_team_status_map: Record<string, string>;
         discord_daily_stats_enabled: boolean;
         discord_webhook_url: string | null;
         discord_send_at: string;
     };
     /** Whether this user holds "Manage RMO Notifications" on top of the page's own permission. */
     canManageNotifications: boolean;
+    cxStatuses: RmoSubStatus[];
+    riderStatuses: RmoSubStatus[];
 }
 
 export default function RmoSettings({
     workspace,
     settings,
     canManageNotifications,
+    cxStatuses,
+    riderStatuses,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/settings/rmo`;
 
@@ -61,10 +76,17 @@ export default function RmoSettings({
             enable_auto_tag_status: settings.enable_auto_tag_status,
             enable_external_team_sync: settings.enable_external_team_sync,
             external_team_sheet_url: settings.external_team_sheet_url ?? '',
+            external_team_status_map: settings.external_team_status_map,
             discord_daily_stats_enabled: settings.discord_daily_stats_enabled,
             discord_webhook_url: settings.discord_webhook_url ?? '',
             discord_send_at: settings.discord_send_at,
         });
+
+    // Per-key errors ("external_team_status_map.confirmed") shown under the
+    // pickers as one message.
+    const statusMapError = Object.entries(errors).find(([key]) =>
+        key.startsWith('external_team_status_map'),
+    )?.[1];
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -172,9 +194,10 @@ export default function RmoSettings({
                                                 re-tags its RMO status to{' '}
                                                 <strong>DELIVERED</strong>, and{' '}
                                                 <strong>Returning</strong> to{' '}
-                                                <strong>RETURNING</strong>.
-                                                Every other parcel status stays
-                                                under CSR control.
+                                                <strong>RETURNING</strong> — the
+                                                rider status of the same name is
+                                                tagged too. Every other parcel
+                                                status stays under CSR control.
                                             </p>
                                         </div>
                                     </div>
@@ -271,6 +294,86 @@ export default function RmoSettings({
                                     <InputError
                                         message={errors.external_team_sheet_url}
                                     />
+                                </div>
+
+                                <div className="mt-3 grid gap-2 border-t border-black/6 pt-3 dark:border-white/6">
+                                    <div>
+                                        <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                                            Also tag the customer / rider status
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                            On top of the main status above.
+                                            Manage the list in{' '}
+                                            <a
+                                                href={`${baseUrl}/statuses`}
+                                                className="underline underline-offset-2"
+                                            >
+                                                RMO Statuses
+                                            </a>
+                                            .
+                                        </p>
+                                    </div>
+                                    {SHEET_STATUSES.map(({ key, label }) => (
+                                        <div
+                                            key={key}
+                                            className="flex items-center gap-3"
+                                        >
+                                            <Label
+                                                htmlFor={`external_team_status_map_${key}`}
+                                                className="w-20 shrink-0 text-[12px] text-gray-700 dark:text-gray-300"
+                                            >
+                                                {label}
+                                            </Label>
+                                            <select
+                                                id={`external_team_status_map_${key}`}
+                                                value={
+                                                    data
+                                                        .external_team_status_map[
+                                                        key
+                                                    ] ?? ''
+                                                }
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'external_team_status_map',
+                                                        {
+                                                            ...data.external_team_status_map,
+                                                            [key]: e.target
+                                                                .value,
+                                                        },
+                                                    )
+                                                }
+                                                disabled={
+                                                    !data.enable_external_team_sync
+                                                }
+                                                className="h-8 flex-1 rounded-md border border-black/8 bg-white px-2 text-[12px] text-gray-800 outline-none disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100"
+                                            >
+                                                <option value="">
+                                                    Don&apos;t tag
+                                                </option>
+                                                <optgroup label="Customer">
+                                                    {cxStatuses.map((s) => (
+                                                        <option
+                                                            key={s.id}
+                                                            value={`cx:${s.id}`}
+                                                        >
+                                                            {s.name}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                                <optgroup label="Rider">
+                                                    {riderStatuses.map((s) => (
+                                                        <option
+                                                            key={s.id}
+                                                            value={`rider:${s.id}`}
+                                                        >
+                                                            {s.name}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            </select>
+                                        </div>
+                                    ))}
+                                    <InputError message={statusMapError} />
                                 </div>
                             </div>
                         </div>
