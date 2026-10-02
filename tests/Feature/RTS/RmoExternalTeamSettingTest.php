@@ -96,3 +96,47 @@ test('the RMO page only offers the external team filter while sync is on', funct
     $this->actingAs($admin)->get($url)
         ->assertInertia(fn ($page) => $page->where('enable_external_team_sync', true));
 });
+
+test('the settings page offers the cx / rider statuses and shows the default status map', function () {
+    $rider = $this->workspace->rmoRiderStatuses()->pluck('id', 'name');
+
+    $this->actingAs($this->manager)
+        ->get(route('rmo-settings.edit', ['workspace' => $this->workspace->slug]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('cxStatuses')
+            ->has('riderStatuses')
+            ->where('settings.external_team_status_map', [
+                'confirmed' => "rider:{$rider['RIDER OTW']}",
+                'delivered' => "rider:{$rider['DELIVERED']}",
+                'returned' => "rider:{$rider['RETURNING']}",
+            ]));
+});
+
+test('the external team status map saves, keeping a blank pick as tag nothing', function () {
+    $cx = $this->workspace->rmoCxStatuses()->where('name', 'CANCELLED')->value('id');
+
+    $this->actingAs($this->manager)->put($this->settingsUrl, [
+        'enable_edit_previous_day' => false,
+        'enable_bulk_status_update' => false,
+        'external_team_status_map' => ['confirmed' => '', 'returned' => "cx:{$cx}"],
+    ])->assertSessionHasNoErrors();
+
+    // toEqual: MySQL's JSON column hands the keys back in its own order.
+    expect($this->workspace->fresh()->rmoSetting->external_team_status_map)->toEqual([
+        'confirmed' => '',
+        'delivered' => '',
+        'returned' => "cx:{$cx}",
+    ]);
+});
+
+test('the external team status map rejects another workspace\'s status', function () {
+    $other = Workspace::factory()->create(['owner_id' => $this->owner->id]);
+    $foreign = $other->rmoRiderStatuses()->value('id');
+
+    $this->actingAs($this->manager)->put($this->settingsUrl, [
+        'enable_edit_previous_day' => false,
+        'enable_bulk_status_update' => false,
+        'external_team_status_map' => ['confirmed' => "rider:{$foreign}"],
+    ])->assertSessionHasErrors('external_team_status_map.confirmed');
+});

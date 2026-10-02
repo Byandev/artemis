@@ -42,11 +42,15 @@ class RmoSettingController extends Controller
                 'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
                 'enable_external_team_sync' => (bool) ($setting->enable_external_team_sync ?? false),
                 'external_team_sheet_url' => $setting->external_team_sheet_url ?? null,
+                'external_team_status_map' => RmoExternalTeamSheet::subStatusMap($workspace),
                 'discord_daily_stats_enabled' => (bool) ($setting->discord_daily_stats_enabled ?? false),
                 'discord_webhook_url' => $setting->discord_webhook_url ?? null,
                 'discord_send_at' => $setting->discord_send_at ?? '18:00',
             ],
             'canManageNotifications' => $canManageNotifications,
+            // Options for the external-team status pickers.
+            'cxStatuses' => $workspace->rmoCxStatuses()->get(['id', 'name']),
+            'riderStatuses' => $workspace->rmoRiderStatuses()->get(['id', 'name']),
         ]);
     }
 
@@ -66,6 +70,20 @@ class RmoSettingController extends Controller
                 function (string $attribute, mixed $value, \Closure $fail) {
                     if (filled($value) && RmoExternalTeamSheet::sheetId($value) === null) {
                         $fail('Enter a Google Sheets link (https://docs.google.com/spreadsheets/d/…).');
+                    }
+                },
+            ],
+            // Sheet status => "cx:{id}" / "rider:{id}", or empty to tag nothing.
+            'external_team_status_map' => ['sometimes', 'array:'.implode(',', array_keys(RmoExternalTeamSheet::STATUS_MAP))],
+            'external_team_status_map.*' => [
+                'nullable',
+                'string',
+                function (string $attribute, mixed $value, \Closure $fail) use ($workspace) {
+                    [$type, $id] = array_pad(explode(':', (string) $value, 2), 2, null);
+                    $relation = ['cx' => 'rmoCxStatuses', 'rider' => 'rmoRiderStatuses'][$type] ?? null;
+
+                    if (! $relation || ! ctype_digit((string) $id) || ! $workspace->{$relation}()->whereKey($id)->exists()) {
+                        $fail('Pick one of this workspace\'s customer or rider statuses.');
                     }
                 },
             ],
@@ -92,6 +110,15 @@ class RmoSettingController extends Controller
         if (array_key_exists('enable_external_team_sync', $data)) {
             $attributes['enable_external_team_sync'] = $data['enable_external_team_sync'];
             $attributes['external_team_sheet_url'] = $data['external_team_sheet_url'] ?? null;
+        }
+
+        if (array_key_exists('external_team_status_map', $data)) {
+            // Every sheet status stored explicitly, so a blank pick stays
+            // "tag nothing" rather than falling back to the default again.
+            $attributes['external_team_status_map'] = array_map(
+                fn ($sheetStatus) => (string) ($data['external_team_status_map'][$sheetStatus] ?? ''),
+                array_combine(array_keys(RmoExternalTeamSheet::STATUS_MAP), array_keys(RmoExternalTeamSheet::STATUS_MAP)),
+            );
         }
 
         // Only written by someone who holds the notification permission. A
