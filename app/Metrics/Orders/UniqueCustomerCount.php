@@ -41,9 +41,8 @@ final class UniqueCustomerCount
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->baseQuery($workspaceId, $date_range, $filter, true)
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
-            ->whereNotNull('pages.shop_id')
+        return $this->baseQuery($workspaceId, $date_range, $filter)
+            ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
             ->selectRaw('shops.id as shop_id, shops.name as shop_name, COUNT(DISTINCT pancake_orders.customer_id) as value')
             ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')

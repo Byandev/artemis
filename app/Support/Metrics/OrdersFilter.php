@@ -7,14 +7,19 @@ use Illuminate\Database\Query\Builder;
 class OrdersFilter
 {
     /**
+     * Page-keyed rollups with no shop_id column; their shop filter has to go through pages.
+     */
+    private const TABLES_WITHOUT_SHOP_ID = ['workspace_page_daily_metrics'];
+
+    /**
      * Conditionally JOIN pages and apply page_ids / shop_ids / user_ids filters.
      * Use this when a metric's base query may or may not need the pages join.
      *
      * Pass $forceJoin = true when the caller (breakdown/perPage/perShop/perUser)
      * needs pages joined regardless of whether a filter is set.
      *
-     * Filters reference pages.id (page_ids), pages.shop_id (shop_ids),
-     * pages.owner_id (user_ids).
+     * Filters reference pages.id (page_ids), the orders table's own shop_id
+     * (shop_ids; pages.shop_id for page-keyed rollups), pages.owner_id (user_ids).
      */
     public static function joinAndApply(Builder $query, array $filter, bool $forceJoin = false, string $ordersAlias = 'pancake_orders'): void
     {
@@ -29,6 +34,14 @@ class OrdersFilter
         // join on pages would drop them, defeating an "order source" filter.
         self::applySourceNames($query, $filter, $ordersAlias);
 
+        // The order's own shop_id is what Pancake reports, so filter on it directly
+        // when the table has one. Going through pages.shop_id drops page-less
+        // (Webcake) orders and orders whose page was re-synced into another shop.
+        if ($shopIds && ! in_array($ordersAlias, self::TABLES_WITHOUT_SHOP_ID, true)) {
+            $query->whereIn("{$ordersAlias}.shop_id", $shopIds);
+            $shopIds = null;
+        }
+
         if (! $forceJoin && ! $pageIds && ! $shopIds && ! $userIds && ! $productIds && ! $teamIds) {
             return;
         }
@@ -40,20 +53,33 @@ class OrdersFilter
 
     /**
      * Apply page_ids / shop_ids / user_ids / product_ids / team_ids filters when pages is already joined.
-     * Filters reference pages.id, pages.shop_id, pages.owner_id, pages.shop_id→shops.product_id, and team_user→pages.owner_id.
+     * Filters reference pages.id, the orders table's shop_id, pages.owner_id,
+     * pages.shop_id→shops.product_id, and team_user→pages.owner_id.
+     *
+     * Pass $ordersAlias = null for queries with no orders table (e.g. users ⋈ pages);
+     * shop_ids then falls back to pages.shop_id and order sources are skipped.
      */
-    public static function applyToJoined(Builder $query, array $filter, string $ordersAlias = 'po'): void
+    public static function applyToJoined(Builder $query, array $filter, ?string $ordersAlias = 'po'): void
     {
+        $shopIds = self::ids($filter, 'shop_ids');
+
+        if ($shopIds && $ordersAlias !== null) {
+            $query->whereIn("{$ordersAlias}.shop_id", $shopIds);
+            $shopIds = null;
+        }
+
         self::applyPageColumnFilters(
             $query,
             self::ids($filter, 'page_ids'),
-            self::ids($filter, 'shop_ids'),
+            $shopIds,
             self::ids($filter, 'user_ids'),
             self::ids($filter, 'product_ids'),
             self::ids($filter, 'team_ids'),
         );
 
-        self::applySourceNames($query, $filter, $ordersAlias);
+        if ($ordersAlias !== null) {
+            self::applySourceNames($query, $filter, $ordersAlias);
+        }
     }
 
     /**
