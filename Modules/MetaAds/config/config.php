@@ -84,6 +84,11 @@ return [
         'ads_read',
         'ads_management',
         'business_management',
+        // Ad previews render the page post behind the ad, which Meta only shows
+        // to a token that can read that page — without these, previews come
+        // back as "Story Unavailable". See Services\AdPreviewResolver.
+        'pages_show_list',
+        'pages_read_engagement',
         'public_profile',
         'email',
     ],
