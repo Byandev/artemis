@@ -28,6 +28,7 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import axios from 'axios';
 import { omit } from 'lodash';
 import {
     Check,
@@ -37,13 +38,14 @@ import {
     Target,
     Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface Props {
     workspace: Workspace;
-    goals: PaginatedData<Goal>;
     teams: TeamOption[];
     canManage: boolean;
+    /** The table page the URL asked for; the page owns it after that. */
+    filters: { page: number; per_page: number };
 }
 
 /** Small colored dot keyed to a goal's status. */
@@ -87,10 +89,63 @@ function BestIndicator({ goal }: { goal: Goal }) {
 
 export default function AdSpendGoalsIndex({
     workspace,
-    goals,
     teams,
     canManage,
+    filters,
 }: Props) {
+    const [query, setQuery] = useState(filters);
+    const [goals, setGoals] = useState<PaginatedData<Goal> | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    // Bumping the nonce re-runs the fetch — retry, and refresh after a change.
+    const [nonce, setNonce] = useState(0);
+    const refetch = useCallback(() => setNonce((n) => n + 1), []);
+
+    const pageUrl = `/workspaces/${workspace.slug}/sales-marketing/ad-spend-goals`;
+
+    useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+        setError(false);
+
+        axios
+            .get<PaginatedData<Goal>>(
+                `/api/workspaces/${workspace.slug}/sales-marketing/ad-spend-goals`,
+                { params: query, signal: controller.signal },
+            )
+            .then((res) => setGoals(res.data))
+            .catch((err) => {
+                if (axios.isCancel(err)) return;
+                console.error('ad spend goals: list failed', err);
+                setError(true);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [workspace.slug, query, nonce]);
+
+    // Creating, editing or deleting a goal is an Inertia visit that lands back
+    // on this page without remounting it, so the table refetches after any
+    // successful visit rather than keep showing the old rows.
+    useEffect(() => router.on('success', () => refetch()), [refetch]);
+
+    /** Move the table and keep the URL in step so a reload lands here too. */
+    function goTo(next: { page: number; per_page: number }) {
+        setQuery(next);
+
+        const qs = new URLSearchParams();
+        if (next.page > 1) qs.set('page', String(next.page));
+        if (next.per_page !== 10) qs.set('per_page', String(next.per_page));
+
+        router.replace({
+            url: qs.size > 0 ? `${pageUrl}?${qs}` : pageUrl,
+            preserveState: true,
+            preserveScroll: true,
+        });
+    }
+
     const canManageGoals =
         usePermission(PERMISSIONS.ManageAdSpendGoals) || canManage;
     const [createOpen, setCreateOpen] = useState(false);
@@ -265,7 +320,19 @@ export default function AdSpendGoalsIndex({
                     )}
                 </div>
 
-                {goals.total === 0 ? (
+                {error && !goals ? (
+                    <div className="mt-4 flex flex-col items-center justify-center rounded-[16px] border border-dashed border-black/8 bg-white py-20 dark:border-white/8 dark:bg-zinc-900">
+                        <p className="font-mono text-[12px] text-gray-400 dark:text-gray-500">
+                            Couldn't load the goals.{' '}
+                            <button
+                                onClick={refetch}
+                                className="text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400"
+                            >
+                                Retry
+                            </button>
+                        </p>
+                    </div>
+                ) : goals && goals.total === 0 ? (
                     <div className="mt-4 flex flex-col items-center justify-center rounded-[16px] border border-dashed border-black/8 bg-white py-20 dark:border-white/8 dark:bg-zinc-900">
                         <div className="rounded-2xl bg-stone-100 p-3.5 dark:bg-zinc-800">
                             <Target className="h-7 w-7 text-gray-400 dark:text-gray-500" />
@@ -281,23 +348,17 @@ export default function AdSpendGoalsIndex({
                     <div className="mt-4 overflow-hidden rounded-[16px] border border-black/6 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900">
                         <DataTable
                             columns={columns}
-                            data={goals.data}
-                            meta={omit(goals, ['data'])}
+                            data={goals?.data ?? []}
+                            meta={goals ? omit(goals, ['data']) : undefined}
+                            loading={loading}
                             onRowClick={(goal) => router.visit(showUrl(goal))}
                             onFetch={(params) =>
-                                router.get(
-                                    `/workspaces/${workspace.slug}/sales-marketing/ad-spend-goals`,
-                                    {
-                                        page: params?.page ?? 1,
-                                        per_page: params?.per_page ?? undefined,
-                                    },
-                                    {
-                                        preserveState: true,
-                                        replace: true,
-                                        preserveScroll: true,
-                                        only: ['goals'],
-                                    },
-                                )
+                                goTo({
+                                    page: Number(params?.page ?? 1),
+                                    per_page: Number(
+                                        params?.per_page ?? query.per_page,
+                                    ),
+                                })
                             }
                         />
                     </div>

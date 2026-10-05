@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use App\Queries\TeamAdSpendGoalStatusQuery;
 use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -18,15 +19,39 @@ class TeamAdSpendGoalController extends Controller
 {
     use AuthorizesRequests;
 
+    /**
+     * The page shell. The goals table loads over XHR from goals(), so the page
+     * paints before the status query runs.
+     */
     public function index(Request $request, Workspace $workspace)
     {
-        // Rendered as the "Ad Spend Goals" tab of the S&M dashboard, so it
-        // shares that dashboard's gating (module flag + permission) on top of
-        // its own module toggle.
-        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
-        $this->guardModule($workspace);
+        $this->authorizeList($workspace);
 
-        $this->authorize(Permission::ViewAdSpendGoals->value, $workspace);
+        // Team picker for the create/edit form — the teams the user may set a
+        // goal for (all for unrestricted, own teams for scoped users), each with
+        // its members for the per-member allocation UI.
+        $teams = TeamVisibility::selectableTeams($request->user(), $workspace)
+            ->load('members:id,name');
+
+        return Inertia::render('workspaces/sales-marketing/ad-spend-goals/index', [
+            'workspace' => $workspace,
+            'teams' => $teams,
+            'canManage' => $request->user()->hasPermission(Permission::ManageAdSpendGoals->value, $workspace),
+            // Read off the URL so a reload opens on the same page of the table.
+            'filters' => [
+                'page' => max(1, $request->integer('page', 1)),
+                'per_page' => $request->integer('per_page', 10),
+            ],
+        ]);
+    }
+
+    /**
+     * The goals table, one page at a time. Served from browser-api.php at
+     * api/workspaces/{workspace}/sales-marketing/ad-spend-goals.
+     */
+    public function goals(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeList($workspace);
 
         // Team visibility: scoped users see only their team(s)' goals; the
         // "viewing as team" switcher narrows everyone to the chosen team. A null
@@ -50,21 +75,52 @@ class TeamAdSpendGoalController extends Controller
             fn (TeamAdSpendGoal $goal) => $this->presentGoal($goal, $statuses[$goal->id]),
         );
 
+        return response()->json($goals);
+    }
+
+    /**
+     * The list sits in the S&M group, so it shares the group's module flag and
+     * its own permission on top of the Ad Spend Goals toggle.
+     */
+    private function authorizeList(Workspace $workspace): void
+    {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+        $this->guardModule($workspace);
+
+        $this->authorize(Permission::ViewAdSpendGoals->value, $workspace);
+    }
+
+    /**
+     * The detail page shell. The goal and its status load over XHR from goal(),
+     * so the page paints before the status query runs.
+     */
+    public function show(Request $request, Workspace $workspace, TeamAdSpendGoal $goal)
+    {
+        $this->guardModule($workspace);
+
+        $this->authorize(Permission::ViewAdSpendGoals->value, $workspace);
+
+        $this->guardOwnership($workspace, $goal);
+
         // Team picker for the create/edit form — the teams the user may set a
         // goal for (all for unrestricted, own teams for scoped users), each with
         // its members for the per-member allocation UI.
         $teams = TeamVisibility::selectableTeams($request->user(), $workspace)
             ->load('members:id,name');
 
-        return Inertia::render('workspaces/sales-marketing/ad-spend-goals/index', [
+        return Inertia::render('workspaces/sales-marketing/ad-spend-goals/show', [
             'workspace' => $workspace,
-            'goals' => $goals,
+            'goalId' => $goal->id,
             'teams' => $teams,
             'canManage' => $request->user()->hasPermission(Permission::ManageAdSpendGoals->value, $workspace),
         ]);
     }
 
-    public function show(Request $request, Workspace $workspace, TeamAdSpendGoal $goal)
+    /**
+     * One goal with its status, for the detail page. Served from
+     * browser-api.php at api/workspaces/{workspace}/sales-marketing/ad-spend-goals/{goal}.
+     */
+    public function goal(Request $request, Workspace $workspace, TeamAdSpendGoal $goal): JsonResponse
     {
         $this->guardModule($workspace);
 
@@ -76,18 +132,7 @@ class TeamAdSpendGoalController extends Controller
 
         $status = (new TeamAdSpendGoalStatusQuery($workspace))->statusFor($goal);
 
-        // Team picker for the create/edit form — the teams the user may set a
-        // goal for (all for unrestricted, own teams for scoped users), each with
-        // its members for the per-member allocation UI.
-        $teams = TeamVisibility::selectableTeams($request->user(), $workspace)
-            ->load('members:id,name');
-
-        return Inertia::render('workspaces/sales-marketing/ad-spend-goals/show', [
-            'workspace' => $workspace,
-            'goal' => $this->presentGoal($goal, $status),
-            'teams' => $teams,
-            'canManage' => $request->user()->hasPermission(Permission::ManageAdSpendGoals->value, $workspace),
-        ]);
+        return response()->json($this->presentGoal($goal, $status));
     }
 
     /**

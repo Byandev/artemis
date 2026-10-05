@@ -12,20 +12,26 @@ import {
     WARN_GRAD,
     fmtDate,
 } from '@/components/ad-spend-goals/goal-graph';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { cn, currencyFormatter } from '@/lib/utils';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import axios from 'axios';
 import { ArrowLeft, ArrowRight, Check, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface Props {
     workspace: Workspace;
-    goal: Goal;
+    goalId: number;
     teams: TeamOption[];
     canManage: boolean;
+}
+
+interface DetailProps extends Omit<Props, 'goalId'> {
+    goal: Goal;
 }
 
 function Fact({
@@ -318,12 +324,101 @@ function RampChart({
     );
 }
 
+/**
+ * The page is a shell: the goal and its status come from the API, so the page
+ * paints before the status query runs.
+ */
 export default function AdSpendGoalShow({
     workspace,
-    goal,
+    goalId,
     teams,
     canManage,
 }: Props) {
+    const [goal, setGoal] = useState<Goal | null>(null);
+    const [error, setError] = useState(false);
+    // Bumping the nonce re-runs the fetch — retry, and refresh after an edit.
+    const [nonce, setNonce] = useState(0);
+    const refetch = useCallback(() => setNonce((n) => n + 1), []);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        setError(false);
+
+        axios
+            .get<Goal>(
+                `/api/workspaces/${workspace.slug}/sales-marketing/ad-spend-goals/${goalId}`,
+                { signal: controller.signal },
+            )
+            .then((res) => setGoal(res.data))
+            .catch((err) => {
+                if (axios.isCancel(err)) return;
+                console.error('ad spend goal: load failed', err);
+                setError(true);
+            });
+
+        return () => controller.abort();
+    }, [workspace.slug, goalId, nonce]);
+
+    // Editing is an Inertia visit that lands back on this page without
+    // remounting it, so the goal refetches after any successful visit.
+    useEffect(() => router.on('success', () => refetch()), [refetch]);
+
+    if (goal) {
+        return (
+            <GoalDetail
+                workspace={workspace}
+                goal={goal}
+                teams={teams}
+                canManage={canManage}
+            />
+        );
+    }
+
+    return (
+        <AppLayout>
+            <Head title="Ad Spend Goal" />
+            <div className="w-full px-4 py-4 md:px-6 md:py-6">
+                <Link
+                    href={`/workspaces/${workspace.slug}/ad-spend-goals`}
+                    className="inline-flex items-center gap-1.5 font-mono text-[11px] font-medium text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Ad Spend Goals
+                </Link>
+
+                {error ? (
+                    <p className="mt-6 font-mono text-[12px] text-gray-400 dark:text-gray-500">
+                        Couldn't load this goal.{' '}
+                        <button
+                            onClick={refetch}
+                            className="text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400"
+                        >
+                            Retry
+                        </button>
+                    </p>
+                ) : (
+                    <>
+                        <div className="mt-4 space-y-2">
+                            <Skeleton className="h-6 w-48" />
+                            <Skeleton className="h-4 w-64" />
+                        </div>
+                        <Skeleton className="mt-6 h-64 w-full rounded-[18px]" />
+                        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+                            {[0, 1, 2].map((i) => (
+                                <Skeleton
+                                    key={i}
+                                    className="h-28 rounded-[14px]"
+                                />
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
+        </AppLayout>
+    );
+}
+
+function GoalDetail({ workspace, goal, teams, canManage }: DetailProps) {
     const canManageGoals =
         usePermission(PERMISSIONS.ManageAdSpendGoals) || canManage;
 
