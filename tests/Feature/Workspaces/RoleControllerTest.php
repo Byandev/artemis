@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\Permission;
 use App\Models\Role;
+use App\Models\User;
 
 test('owner can view roles index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -87,56 +89,77 @@ test('restore brings back a soft-deleted role', function () {
     expect(Role::find($role->id))->not->toBeNull();
 });
 
-// ----- Filter & sort coverage -----
+// Filter / sort / paginate for the list live in BrowserApi/RoleListApiTest —
+// the page loads its table from the browser API.
 
-function rolesFromInertia($response): array
-{
-    return collect($response->getOriginalContent()->getData()['page']['props']['roles']['data'])
-        ->pluck('name')->all();
-}
+// ----- Authorization -----
 
-test('roles index filter[search] matches partial name', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
-    Role::factory()->create(['workspace_id' => $w->id, 'name' => 'AdminLevel1']);
-    Role::factory()->create(['workspace_id' => $w->id, 'name' => 'Editor']);
+test('guests are redirected to login and nothing is created', function () {
+    ['workspace' => $w] = makeWorkspaceWithOwner();
 
-    $names = rolesFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/roles?filter[search]=admin")->assertOk()
-    );
-    expect($names)->toBe(['AdminLevel1']);
+    $this->get("/workspaces/{$w->slug}/roles")->assertRedirect('/login');
+    $this->post("/workspaces/{$w->slug}/roles", ['name' => 'Hacked'])->assertRedirect('/login');
+
+    expect(Role::where('name', 'Hacked')->exists())->toBeFalse();
 });
 
-test('roles index sort=name returns ascending', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
-    Role::factory()->create(['workspace_id' => $w->id, 'name' => 'Charlie']);
-    Role::factory()->create(['workspace_id' => $w->id, 'name' => 'Alpha']);
+test('a user outside the workspace cannot view, create, edit, archive or restore roles', function () {
+    ['workspace' => $w] = makeWorkspaceWithOwner();
+    $role = Role::factory()->create(['workspace_id' => $w->id, 'name' => 'Victim']);
+    $trashed = Role::factory()->create(['workspace_id' => $w->id]);
+    $trashed->delete();
+    $stranger = User::factory()->create();
 
-    $names = rolesFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/roles?sort=name")->assertOk()
-    );
-    expect($names)->toBe(['Alpha', 'Charlie']);
+    $this->actingAs($stranger)->get("/workspaces/{$w->slug}/roles")->assertForbidden();
+    $this->actingAs($stranger)->get("/workspaces/{$w->slug}/roles/archived")->assertForbidden();
+    $this->actingAs($stranger)->post("/workspaces/{$w->slug}/roles", ['name' => 'Hacked'])->assertForbidden();
+    $this->actingAs($stranger)->patch("/workspaces/{$w->slug}/roles/{$role->id}", ['name' => 'Pwned'])->assertForbidden();
+    $this->actingAs($stranger)->delete("/workspaces/{$w->slug}/roles/{$role->id}")->assertForbidden();
+    $this->actingAs($stranger)->post("/workspaces/{$w->slug}/roles/{$trashed->id}/restore")->assertForbidden();
+
+    expect(Role::where('name', 'Hacked')->exists())->toBeFalse()
+        ->and($role->fresh()->name)->toBe('Victim')
+        ->and($role->fresh()->trashed())->toBeFalse()
+        ->and($trashed->fresh()->trashed())->toBeTrue();
 });
 
-test('roles index sort=-created_at default puts newer first', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
-    Role::factory()->create(['workspace_id' => $w->id, 'name' => 'Old']);
-    sleep(1);
-    Role::factory()->create(['workspace_id' => $w->id, 'name' => 'New']);
+test('a member without role permissions gets 403', function () {
+    ['workspace' => $w] = makeWorkspaceWithOwner();
+    $role = Role::factory()->create(['workspace_id' => $w->id]);
+    $member = makeWorkspaceMember($w);
 
-    $names = rolesFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/roles")->assertOk()
-    );
-    expect($names[0])->toBe('New');
+    $this->actingAs($member)->get("/workspaces/{$w->slug}/roles")->assertForbidden();
+    $this->actingAs($member)->post("/workspaces/{$w->slug}/roles", ['name' => 'X'])->assertForbidden();
+    $this->actingAs($member)->patch("/workspaces/{$w->slug}/roles/{$role->id}", ['name' => 'X'])->assertForbidden();
+    $this->actingAs($member)->delete("/workspaces/{$w->slug}/roles/{$role->id}")->assertForbidden();
 });
 
-test('roles index includes soft-deleted (withTrashed)', function () {
-    ['user' => $owner, 'workspace' => $w] = makeWorkspaceWithOwner();
-    Role::factory()->create(['workspace_id' => $w->id, 'name' => 'Active']);
-    $deleted = Role::factory()->create(['workspace_id' => $w->id, 'name' => 'Trashed']);
-    $deleted->delete();
+test('each action needs its own permission', function () {
+    ['workspace' => $w] = makeWorkspaceWithOwner();
+    $role = Role::factory()->create(['workspace_id' => $w->id, 'name' => 'Old']);
+    $viewer = makeMemberWithPermissions($w, [Permission::ViewRoles->value], 'Roles');
+    $editor = makeMemberWithPermissions($w, [Permission::EditRoles->value], 'Roles');
 
-    $names = rolesFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/roles")->assertOk()
-    );
-    expect($names)->toContain('Active', 'Trashed');
+    $this->actingAs($viewer)->get("/workspaces/{$w->slug}/roles")->assertOk();
+    $this->actingAs($viewer)->patch("/workspaces/{$w->slug}/roles/{$role->id}", ['name' => 'X'])->assertForbidden();
+
+    $this->actingAs($editor)->patch("/workspaces/{$w->slug}/roles/{$role->id}", ['name' => 'New'])->assertRedirect();
+    $this->actingAs($editor)->delete("/workspaces/{$w->slug}/roles/{$role->id}")->assertForbidden();
+
+    expect($role->fresh()->name)->toBe('New')
+        ->and($role->fresh()->trashed())->toBeFalse();
+});
+
+test('a role from another workspace cannot be edited, archived or have its permissions changed', function () {
+    ['user' => $ownerA, 'workspace' => $a] = makeWorkspaceWithOwner();
+    ['workspace' => $b] = makeWorkspaceWithOwner();
+    $foreign = Role::factory()->create(['workspace_id' => $b->id, 'name' => 'Theirs']);
+
+    $this->actingAs($ownerA)->patch("/workspaces/{$a->slug}/roles/{$foreign->id}", ['name' => 'Pwned'])->assertNotFound();
+    $this->actingAs($ownerA)->delete("/workspaces/{$a->slug}/roles/{$foreign->id}")->assertNotFound();
+    $this->actingAs($ownerA)->get("/workspaces/{$a->slug}/roles/{$foreign->id}/permissions")->assertNotFound();
+    $this->actingAs($ownerA)->put("/workspaces/{$a->slug}/roles/{$foreign->id}/permissions", ['permission_ids' => []])->assertNotFound();
+
+    expect($foreign->fresh()->name)->toBe('Theirs')
+        ->and($foreign->fresh()->trashed())->toBeFalse();
 });

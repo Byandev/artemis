@@ -6,6 +6,7 @@ use App\Http\Controllers\API\Workspace\CsrDashboardController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ParcelJourneyStatsController;
+use App\Http\Controllers\API\Workspace\RoleController;
 use App\Http\Controllers\API\Workspace\SalesMarketingDashboardController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
@@ -105,6 +106,10 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             ->middleware('throttle:6,1')
             ->name('csrs.sync');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
+
+        // The roles page's list. Create/edit/archive stay on the Inertia
+        // routes in routes/workspaces.php.
+        Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
         Route::get('/pages', [PageController::class, 'index'])->name('pages.index');

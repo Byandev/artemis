@@ -16,9 +16,16 @@ interface Props {
     role?: Role;
     open: boolean;
     onOpenChange: (value: boolean) => void;
+    onSaved?: () => void;
 }
 
-const RoleFormDialog = ({ workspace, open, onOpenChange, role }: Props) => {
+const RoleFormDialog = ({
+    workspace,
+    open,
+    onOpenChange,
+    role,
+    onSaved,
+}: Props) => {
     const isEditing = useMemo(() => !!role, [role]);
 
     const {
@@ -60,6 +67,8 @@ const RoleFormDialog = ({ workspace, open, onOpenChange, role }: Props) => {
 
         request(url, {
             preserveScroll: true,
+            // Keep the page mounted; it refetches the list itself.
+            preserveState: true,
             onSuccess: () => {
                 toast.success(
                     isEditing
@@ -70,6 +79,7 @@ const RoleFormDialog = ({ workspace, open, onOpenChange, role }: Props) => {
                 reset();
                 clearErrors();
                 onOpenChange(false);
+                onSaved?.();
             },
             onError: () =>
                 toast.error('Failed to save role. Please check the form.'),
