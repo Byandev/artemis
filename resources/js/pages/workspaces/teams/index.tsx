@@ -13,10 +13,12 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import teamsApi from '@/routes/api/workspaces/teams';
 import { PaginatedData, User } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import axios from 'axios';
 import { omit } from 'lodash';
 import {
     Calendar,
@@ -27,7 +29,8 @@ import {
     Search,
     Trash2,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 interface Team {
     id: number;
@@ -36,13 +39,19 @@ interface Team {
     members: User[];
 }
 
+type FetchParams = {
+    sort?: string | null;
+    search?: string;
+    page?: number | string;
+    per_page?: number | string;
+};
+
 interface Props {
     workspace: Workspace;
-    teams: PaginatedData<Team>;
     workspaceMembers: User[];
     query?: {
         sort?: string | null;
-        perPage?: number | string;
+        per_page?: number | string;
         page?: number | string;
         filter?: { search?: string };
     };
@@ -50,7 +59,6 @@ interface Props {
 
 export default function TeamsIndex({
     workspace,
-    teams,
     workspaceMembers,
     query,
 }: Props) {
@@ -64,31 +72,86 @@ export default function TeamsIndex({
     const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
 
+    const [teams, setTeams] = useState<PaginatedData<Team> | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    // The params of the last fetch, so a refetch after a save or delete keeps
+    // the page, sort and search the user was looking at.
+    const paramsRef = useRef<FetchParams>({
+        sort: query?.sort ?? null,
+        search: query?.filter?.search ?? '',
+        page: query?.page ?? 1,
+        per_page: query?.per_page,
+    });
+    // Drops responses from fetches a newer one has superseded.
+    const requestIdRef = useRef(0);
+
+    const fetchTeams = useCallback(
+        async (next: FetchParams = {}) => {
+            const params = { ...paramsRef.current, ...next };
+            paramsRef.current = params;
+
+            const queryParams = {
+                sort: params.sort || undefined,
+                'filter[search]': params.search || undefined,
+                page: params.page || undefined,
+                per_page: params.per_page || undefined,
+            };
+
+            // Mirror the params into the address bar so a reload lands on the
+            // same view.
+            const pageUrl = new URL(window.location.href);
+            pageUrl.search = '';
+            Object.entries(queryParams).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    pageUrl.searchParams.set(key, String(value));
+                }
+            });
+            window.history.replaceState(window.history.state, '', pageUrl);
+
+            const requestId = ++requestIdRef.current;
+            setLoading(true);
+            try {
+                const res = await axios.get<PaginatedData<Team>>(
+                    teamsApi.index.url({ workspace }),
+                    { params: queryParams },
+                );
+                if (requestId === requestIdRef.current) {
+                    setTeams(res.data);
+                }
+            } catch {
+                if (requestId === requestIdRef.current) {
+                    toast.error('Failed to load teams.');
+                }
+            } finally {
+                if (requestId === requestIdRef.current) {
+                    setLoading(false);
+                }
+            }
+        },
+        [workspace],
+    );
+
+    const isFirstSearch = useRef(true);
+    useEffect(() => {
+        // The first run loads the initial page; later runs are the debounced
+        // search, which resets to page 1.
+        if (isFirstSearch.current) {
+            isFirstSearch.current = false;
+            fetchTeams();
+            return;
+        }
+        const timer = setTimeout(() => {
+            fetchTeams({ search: searchValue, page: 1 });
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchValue, fetchTeams]);
+
     const canCreateTeams = usePermission(PERMISSIONS.CreateTeams);
     const canEditTeams = usePermission(PERMISSIONS.EditTeams);
     const canDeleteTeams = usePermission(PERMISSIONS.DeleteTeams);
     const canManageSchedule = usePermission(PERMISSIONS.ManageSchedule);
     const showActions = canManageSchedule || canEditTeams || canDeleteTeams;
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            router.get(
-                `/workspaces/${workspace.slug}/teams`,
-                {
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : (query?.page ?? 1),
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['teams'],
-                },
-            );
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchValue]);
 
     const columns: ColumnDef<Team>[] = [
         {
@@ -243,24 +306,16 @@ export default function TeamsIndex({
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}
-                        data={teams.data || []}
+                        data={teams?.data ?? []}
+                        loading={loading}
                         initialSorting={initialSorting}
-                        meta={{ ...omit(teams, ['data']) }}
+                        meta={teams ? omit(teams, ['data']) : undefined}
                         onFetch={(params) => {
-                            router.get(
-                                `/workspaces/${workspace.slug}/teams`,
-                                {
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    page: params?.page ?? 1,
-                                    per_page: params?.per_page,
-                                },
-                                {
-                                    preserveState: true,
-                                    replace: true,
-                                    preserveScroll: true,
-                                },
-                            );
+                            fetchTeams({
+                                sort: params?.sort as string | null,
+                                page: params?.page ?? 1,
+                                per_page: params?.per_page ?? undefined,
+                            });
                         }}
                     />
                 </div>
@@ -277,6 +332,7 @@ export default function TeamsIndex({
                         team={editingTeam}
                         workspace={workspace}
                         workspaceMembers={workspaceMembers}
+                        onSaved={() => fetchTeams()}
                     />
                 )}
 
@@ -285,6 +341,16 @@ export default function TeamsIndex({
                         team={teamToDelete}
                         workspace={workspace}
                         onClose={() => setTeamToDelete(null)}
+                        onDeleted={() =>
+                            // Step back a page when the last row on it went.
+                            fetchTeams(
+                                teams &&
+                                    teams.data.length === 1 &&
+                                    teams.current_page > 1
+                                    ? { page: teams.current_page - 1 }
+                                    : {},
+                            )
+                        }
                     />
                 )}
             </div>
