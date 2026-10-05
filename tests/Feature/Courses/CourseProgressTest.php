@@ -183,15 +183,13 @@ it('reports workspace course stats on the index', function () {
 
     $this->post($oneUrl);
 
-    $this->get("/workspaces/{$workspace->slug}/courses")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->where('stats.total_courses', 2)
-            ->where('stats.active_courses', 1)
-            ->where('stats.draft_courses', 1)
-            ->where('stats.total_lessons', 2)
-            // One member, one of two lessons done.
-            ->where('stats.avg_completion', 50),
-    );
+    $this->getJson("/api/workspaces/{$workspace->slug}/courses/stats")->assertOk()
+        ->assertJsonPath('total_courses', 2)
+        ->assertJsonPath('active_courses', 1)
+        ->assertJsonPath('draft_courses', 1)
+        ->assertJsonPath('total_lessons', 2)
+        // One member, one of two lessons done.
+        ->assertJsonPath('avg_completion', 50);
 });
 
 it('ranks members on the completion leaderboard', function () {
@@ -199,19 +197,16 @@ it('ranks members on the completion leaderboard', function () {
 
     $this->post($oneUrl);
 
-    $this->get("/workspaces/{$workspace->slug}/courses")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->where('leaderboard.0.id', $user->id)
-            ->where('leaderboard.0.percent', 50),
-    );
+    $this->getJson("/api/workspaces/{$workspace->slug}/courses/leaderboard")->assertOk()
+        ->assertJsonPath('0.id', $user->id)
+        ->assertJsonPath('0.percent', 50);
 });
 
 it('leaves the leaderboard empty until someone completes something', function () {
     ['workspace' => $workspace] = progressCourse();
 
-    $this->get("/workspaces/{$workspace->slug}/courses")->assertOk()->assertInertia(
-        fn ($page) => $page->where('leaderboard', []),
-    );
+    $this->getJson("/api/workspaces/{$workspace->slug}/courses/leaderboard")->assertOk()
+        ->assertExactJson([]);
 });
 
 it('rates a course against the learners enrolled in it', function () {
@@ -222,25 +217,22 @@ it('rates a course against the learners enrolled in it', function () {
 
     $this->post($oneUrl);
 
-    $this->get("/workspaces/{$workspace->slug}/courses")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->where('courses.data.0.id', $course->id)
-            ->where('courses.data.0.lessons_count', 2)
-            ->where('courses.data.0.enrolled_count', 1)
-            // One enrolled learner, 1 of their 2 lessons done.
-            ->where('courses.data.0.completion_percent', 50),
-    );
+    $this->getJson("/api/workspaces/{$workspace->slug}/courses")->assertOk()
+        ->assertJsonPath('data.0.id', $course->id)
+        ->assertJsonPath('data.0.lessons_count', 2)
+        ->assertJsonPath('data.0.enrolled_count', 1)
+        // One enrolled learner, 1 of their 2 lessons done.
+        ->assertJsonPath('data.0.completion_percent', 50);
 });
 
 it('rates nothing for a course nobody enrolled in', function () {
     ['workspace' => $workspace] = progressCourse();
 
-    $this->get("/workspaces/{$workspace->slug}/courses")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->where('courses.data.0.enrolled_count', 0)
-            ->where('courses.data.0.completion_percent', 0)
-            ->where('stats.avg_completion', 0),
-    );
+    $this->getJson("/api/workspaces/{$workspace->slug}/courses")->assertOk()
+        ->assertJsonPath('data.0.enrolled_count', 0)
+        ->assertJsonPath('data.0.completion_percent', 0);
+    $this->getJson("/api/workspaces/{$workspace->slug}/courses/stats")->assertOk()
+        ->assertJsonPath('avg_completion', 0);
 });
 
 it('averages the completion rate over enrollments, not members', function () {
@@ -252,11 +244,9 @@ it('averages the completion rate over enrollments, not members', function () {
 
     $this->post($oneUrl);
 
-    $this->get("/workspaces/{$workspace->slug}/courses")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->where('stats.enrolled_count', 1)
-            ->where('stats.avg_completion', 50),
-    );
+    $this->getJson("/api/workspaces/{$workspace->slug}/courses/stats")->assertOk()
+        ->assertJsonPath('enrolled_count', 1)
+        ->assertJsonPath('avg_completion', 50);
 });
 
 it('lists only learners who have started the course', function () {
