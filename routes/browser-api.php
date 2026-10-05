@@ -17,6 +17,7 @@ use App\Http\Controllers\Workspaces\SalesMarketing\TeamAdSpendGoalController;
 use Modules\Courses\Http\Controllers\Api\CourseCatalogController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
+use Modules\MetaAds\Http\Controllers\AdSpentSummaryController;
 use Modules\Products\Http\Controllers\Api\ProductController;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
@@ -145,6 +146,11 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             ->name('sales-marketing.ad-spend-goals');
         Route::get('/sales-marketing/ad-spend-goals/{goal}', [TeamAdSpendGoalController::class, 'goal'])
             ->name('sales-marketing.ad-spend-goals.show');
+
+        // Ad Spent Summary — one row per day over the range. The page itself is
+        // a shell (AdSpentSummaryController::index).
+        Route::get('/sales-marketing/ad-spent-summary', [AdSpentSummaryController::class, 'data'])
+            ->name('sales-marketing.ad-spent-summary');
 
         // Daily Report — the whole report for one day, fetched on load and on
         // every date change. The page itself is a shell (DailyReportController).
