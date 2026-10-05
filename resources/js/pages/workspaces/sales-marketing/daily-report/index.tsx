@@ -1,10 +1,11 @@
 import DatePicker from '@/components/ui/date-picker';
+import { Skeleton } from '@/components/ui/skeleton';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import axios from 'axios';
 import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import DashboardCharts, { ChartsData, DashboardKpis } from './charts';
 
@@ -70,12 +71,37 @@ interface Filters {
 
 interface Props {
     workspace: Workspace;
-    view: View;
+    /** The date the URL asked for; null lets the endpoint pick the default day. */
     filters: Filters;
-    // Base path for the page's data endpoint / URL sync. Defaults to the gencys
-    // route; the S&M dashboard passes its own so this page can serve both.
-    baseUrl?: string;
 }
+
+const FLAT = { pct: null, status: 'flat' } as const;
+
+/** What the tables and charts render before the first response lands. */
+const EMPTY_VIEW: View = {
+    date: null,
+    date_label: null,
+    prev_date: null,
+    prev_date_label: null,
+    rows: [],
+    subtotal: null,
+    ad_rts: { rows: [], subtotal: null },
+    charts: {
+        kpis: {
+            total_sales: 0,
+            total_ad_spent: 0,
+            roas: null,
+            total_orders: 0,
+            deltas: {
+                total_sales: FLAT,
+                total_ad_spent: FLAT,
+                roas: FLAT,
+                total_orders: FLAT,
+            },
+        },
+        by_advertiser: [],
+    },
+};
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
 const peso = (v: number | null) =>
@@ -351,18 +377,18 @@ function AdRtsSubtotalRow({ st }: { st: AdRtsSubtotal }) {
     );
 }
 
-export default function InternDashboard({
-    workspace,
-    view: initialView,
-    filters,
-    baseUrl: baseUrlProp,
-}: Props) {
+export default function InternDashboard({ workspace, filters }: Props) {
     const [date, setDate] = useState<string>(filters.date ?? '');
-    const [view, setView] = useState<View>(initialView);
-    const [loading, setLoading] = useState(false);
+    // Null until the first response, so the KPIs can skeleton instead of
+    // flashing zeroes and the tables don't claim there are no records yet.
+    const [loaded, setLoaded] = useState<View | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    const view = loaded ?? EMPTY_VIEW;
 
-    const baseUrl =
-        baseUrlProp ?? `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
+    // The request in flight, so picking a new date cancels the old one and a
+    // slow response can't overwrite a newer day.
+    const inFlight = useRef<AbortController | null>(null);
 
     // Persist the selected date in the URL so a refresh restores it — the
     // controller reads filter.date on load. replaceState (not an Inertia visit)
@@ -380,23 +406,49 @@ export default function InternDashboard({
         );
     };
 
-    // Fetch the table via the JSON endpoint (axios) whenever the date changes;
-    // reflect the server-resolved date back into the picker so the default day
-    // is visible.
-    const applyDate = (value: string) => {
-        setDate(value);
+    // Fetch the report via the JSON endpoint on load and whenever the date
+    // changes; reflect the server-resolved date back into the picker so the
+    // default day is visible.
+    const load = (value: string | null) => {
+        inFlight.current?.abort();
+        const controller = new AbortController();
+        inFlight.current = controller;
+
+        if (value) setDate(value);
         setLoading(true);
+        setError(false);
+
         axios
-            .get(`${baseUrl}/data`, { params: { filter: { date: value } } })
+            .get(
+                `/api/workspaces/${workspace.slug}/sales-marketing/daily-report`,
+                {
+                    params: value ? { filter: { date: value } } : {},
+                    signal: controller.signal,
+                },
+            )
             .then((res) => {
                 const data = res.data as { view: View; filters: Filters };
-                setView(data.view);
+                setLoaded(data.view);
                 setDate(data.filters.date ?? '');
                 syncUrl(data.filters.date ?? null);
             })
-            .catch(() => toast.error('Failed to load dashboard data.'))
-            .finally(() => setLoading(false));
+            .catch((err) => {
+                if (axios.isCancel(err)) return;
+                setError(true);
+                toast.error('Failed to load dashboard data.');
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
     };
+
+    useEffect(() => {
+        load(filters.date);
+
+        return () => inFlight.current?.abort();
+        // Once on mount; date changes go through the picker.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const datePicker = (
         <DatePicker
@@ -406,7 +458,7 @@ export default function InternDashboard({
             placeholder="Report date"
             defaultDate={date || undefined}
             onChange={(_dates, dateStr) => {
-                if (dateStr) applyDate(dateStr);
+                if (dateStr) load(dateStr);
             }}
         />
     );
@@ -428,6 +480,18 @@ export default function InternDashboard({
                         {datePicker}
                     </div>
 
+                    {error && (
+                        <p className="mt-3 font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                            Couldn't load the report.{' '}
+                            <button
+                                onClick={() => load(date || null)}
+                                className="text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400"
+                            >
+                                Retry
+                            </button>
+                        </p>
+                    )}
+
                     {/* Summary statistics on top — for the selected day only */}
                     <div className="mt-4">
                         <p className="mb-2 px-1 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
@@ -435,7 +499,18 @@ export default function InternDashboard({
                                 ? `Totals for ${view.date_label}`
                                 : 'Totals for the selected day'}
                         </p>
-                        <DashboardKpis kpis={view.charts.kpis} />
+                        {loaded ? (
+                            <DashboardKpis kpis={view.charts.kpis} />
+                        ) : (
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                {[0, 1, 2, 3].map((i) => (
+                                    <Skeleton
+                                        key={i}
+                                        className="h-[88px] rounded-[14px]"
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="relative mt-6 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -482,7 +557,7 @@ export default function InternDashboard({
                             </thead>
 
                             <tbody>
-                                {view.rows.length === 0 && (
+                                {loaded && view.rows.length === 0 && (
                                     <tr>
                                         <td
                                             colSpan={10}
@@ -542,7 +617,7 @@ export default function InternDashboard({
                                 </tr>
                             </thead>
                             <tbody>
-                                {view.ad_rts.rows.length === 0 && (
+                                {loaded && view.ad_rts.rows.length === 0 && (
                                     <tr>
                                         <td
                                             colSpan={7}

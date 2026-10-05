@@ -21,22 +21,25 @@ class DailyReportController extends Controller
 {
     use AuthorizesRequests;
 
-    /** Inertia page shell + first paint, on the default date. */
+    /**
+     * The page shell only. The report itself loads over XHR from data(), so
+     * the page paints before AdvertiserDashboardQuery runs. The date is echoed
+     * as given; the endpoint resolves the default day.
+     */
     public function index(Request $request, Workspace $workspace): Response
     {
         $this->authorizeAccess($workspace);
 
-        [$data, $filters] = $this->build($request, $workspace);
-
         return Inertia::render('workspaces/sales-marketing/daily-report/index', [
             'workspace' => $workspace,
-            'view' => $data,
-            'filters' => $filters,
-            'baseUrl' => "/workspaces/{$workspace->slug}/sales-marketing/daily-report",
+            'filters' => ['date' => $request->input('filter.date') ?: null],
         ]);
     }
 
-    /** JSON data endpoint the page fetches (axios) when the date changes. */
+    /**
+     * JSON the page fetches on load and whenever the date changes. Served from
+     * browser-api.php at api/workspaces/{workspace}/sales-marketing/daily-report.
+     */
     public function data(Request $request, Workspace $workspace): JsonResponse
     {
         $this->authorizeAccess($workspace);

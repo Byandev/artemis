@@ -12,6 +12,7 @@ use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
 use App\Http\Controllers\API\Workspace\WelleStatsController;
+use App\Http\Controllers\Workspaces\SalesMarketing\DailyReportController;
 use Modules\Courses\Http\Controllers\Api\CourseCatalogController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
@@ -137,6 +138,11 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
 
         // Per-advertiser figures the team comparison plots. Its own endpoint:
         // the panel switches metric client-side, so one fetch serves all four.
+        // Daily Report — the whole report for one day, fetched on load and on
+        // every date change. The page itself is a shell (DailyReportController).
+        Route::get('/sales-marketing/daily-report', [DailyReportController::class, 'data'])
+            ->name('sales-marketing.daily-report');
+
         Route::get('/sales-marketing/dashboard/team-comparison', [SalesMarketingDashboardController::class, 'teamComparison'])
             ->name('sales-marketing.dashboard.team-comparison');
         Route::get('/sales-marketing/dashboard/team-breakdown', [SalesMarketingDashboardController::class, 'teamBreakdown'])

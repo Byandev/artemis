@@ -184,8 +184,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard', [SalesMarketingDashboardController::class, 'index'])->name('dashboard');
 
         Route::get('/daily-report', [DailyReportController::class, 'index'])->name('daily-report');
-        // JSON the Daily Report page fetches when the date changes.
-        Route::get('/daily-report/data', [DailyReportController::class, 'data'])->name('daily-report.data');
 
         Route::get('/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('page-roas-tracker');
         Route::get('/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('ad-spend-goals');
@@ -211,7 +209,7 @@ Route::middleware(['auth'])->group(function () {
         // The tabbed dashboard's old tab URLs. `{tab}` is last or it swallows
         // the more specific redirect above it. `/dashboard` itself is no longer
         // a redirect — it is the group's own page, declared at the top.
-        Route::permanentRedirect('/dashboard/data', '/workspaces/{workspace}/sales-marketing/daily-report/data');
+        Route::permanentRedirect('/dashboard/data', '/api/workspaces/{workspace}/sales-marketing/daily-report');
         Route::get('/dashboard/{tab}', function (Workspace $workspace, string $tab) {
             $moved = ['page-roas-tracker', 'ad-spend-goals', 'ad-spent-summary', 'sales-targets'];
 
