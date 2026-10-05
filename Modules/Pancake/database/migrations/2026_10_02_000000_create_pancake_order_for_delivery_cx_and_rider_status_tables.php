@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        foreach (['pancake_order_for_delivery_cx_status', 'pancake_order_for_delivery_rider_status'] as $name) {
+        foreach (['pancake_order_for_delivery_cx_statuses', 'pancake_order_for_delivery_rider_statuses'] as $name) {
             Schema::create($name, function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('workspace_id')->constrained()->cascadeOnDelete();
@@ -40,7 +40,7 @@ return new class extends Migration
             $table->dropColumn(['cx_status_id', 'rider_status_id']);
         });
 
-        Schema::dropIfExists('pancake_order_for_delivery_rider_status');
-        Schema::dropIfExists('pancake_order_for_delivery_cx_status');
+        Schema::dropIfExists('pancake_order_for_delivery_rider_statuses');
+        Schema::dropIfExists('pancake_order_for_delivery_cx_statuses');
     }
 };

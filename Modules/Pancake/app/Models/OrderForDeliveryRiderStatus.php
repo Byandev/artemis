@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** A workspace-defined rider status an RMO order can be tagged with. */
 class OrderForDeliveryRiderStatus extends Model
 {
-    protected $table = 'pancake_order_for_delivery_rider_status';
+    protected $table = 'pancake_order_for_delivery_rider_statuses';
 
     protected $fillable = ['workspace_id', 'name'];
 
