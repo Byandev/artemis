@@ -272,7 +272,25 @@ it('retries through the account\'s other linked tokens before giving up', functi
     $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 1002]))
         ->assertOk()
         ->assertJsonPath('src', 'https://business.facebook.com/p?tok=second-token')
-        ->assertJsonPath('reason', null);
+        ->assertJsonPath('reason', null)
+        // Who each request went through, so the drawer can show it: the
+        // primary user across the format candidates, then the colleague.
+        ->assertJsonCount(4, 'attempts')
+        ->assertJsonPath('attempts.0.user_id', '9001')
+        ->assertJsonPath('attempts.0.user_name', 'Connected User')
+        ->assertJsonPath('attempts.0.format', 'MOBILE_FEED_STANDARD')
+        ->assertJsonPath('attempts.0.result', 'story_unavailable')
+        ->assertJsonPath('attempts.3.user_id', '9002')
+        ->assertJsonPath('attempts.3.user_name', 'Page Admin')
+        ->assertJsonPath('attempts.3.result', 'rendered')
+        ->assertJsonPath('attempts.3.cached', false);
+
+    // The second look-up reuses the cached pair and says so.
+    $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->assertJsonCount(1, 'attempts')
+        ->assertJsonPath('attempts.0.user_name', 'Page Admin')
+        ->assertJsonPath('attempts.0.cached', true);
 });
 
 it('reports story_unavailable when no ad format renders', function () {
@@ -293,7 +311,16 @@ it('reports story_unavailable when no ad format renders', function () {
         ->assertOk()
         ->assertJsonPath('src', null)
         ->assertJsonPath('format', null)
-        ->assertJsonPath('reason', 'story_unavailable');
+        ->assertJsonPath('reason', 'story_unavailable')
+        ->assertJsonPath('attempts.0.user_name', 'Connected User')
+        ->assertJsonPath('attempts.0.result', 'story_unavailable');
+
+    // A cached miss still says who was tried.
+    $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->assertJsonPath('reason', 'story_unavailable')
+        ->assertJsonPath('attempts.0.user_name', 'Connected User')
+        ->assertJsonPath('attempts.0.cached', true);
 });
 
 it('keeps returning ad detail when the preview call fails outright', function () {
