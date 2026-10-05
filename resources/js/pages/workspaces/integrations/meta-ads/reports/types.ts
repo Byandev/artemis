@@ -289,6 +289,8 @@ export interface AdDetail {
          * `no_preview` means Meta returned no iframe at all.
          */
         reason: 'story_unavailable' | 'no_preview' | null;
+        /** Each request in the order it was made; the last is what's on screen. */
+        attempts?: PreviewAttempt[];
         /** Stand-in shown when nothing renders. */
         fallback: {
             image_url: string | null;
@@ -309,6 +311,19 @@ export type PreviewFormat =
     | 'INSTAGRAM_STORY'
     | 'FACEBOOK_STORY_MOBILE'
     | 'DESKTOP_FEED_STANDARD';
+
+/**
+ * One preview request: the Meta user whose token signed it (null user_id is
+ * the Business Manager system user), the format asked for, and what came back.
+ * `cached` means it was remembered from an earlier look-up, not asked again.
+ */
+export interface PreviewAttempt {
+    user_id: string | null;
+    user_name: string;
+    format: PreviewFormat;
+    result: 'rendered' | 'story_unavailable' | 'no_iframe';
+    cached: boolean;
+}
 
 export const PREVIEW_FORMAT_LABELS: Record<PreviewFormat, string> = {
     MOBILE_FEED_STANDARD: 'Facebook feed',

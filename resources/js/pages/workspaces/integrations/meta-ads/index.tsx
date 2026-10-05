@@ -82,6 +82,8 @@ import {
     useColumnPresets,
 } from './_shared';
 import { RowTimelineModal, TimelineTarget } from './row-timeline-modal';
+import { PreviewAttempts } from './reports/components/PreviewAttempts';
+import type { PreviewAttempt } from './reports/types';
 
 import DateOption = flatpickr.Options.DateOption;
 
@@ -935,7 +937,7 @@ interface AdDetail {
         media_type: 'video' | 'image' | null;
         call_to_action: string | null;
     };
-    preview: { src: string | null };
+    preview: { src: string | null; attempts?: PreviewAttempt[] };
 }
 
 function DimRow({
@@ -1072,6 +1074,8 @@ function CreativeDetailDrawer({
                             Download
                         </a>
                     )}
+
+                    <PreviewAttempts attempts={detail?.preview.attempts} />
 
                     <p className="mt-5 mb-1 text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                         Dimensions
