@@ -13,14 +13,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        foreach (['pancake_order_for_delivery_cx_statuses', 'pancake_order_for_delivery_rider_statuses'] as $name) {
-            Schema::create($name, function (Blueprint $table) {
+        foreach (['cx', 'rider'] as $kind) {
+            $name = "pancake_order_for_delivery_{$kind}_statuses";
+
+            // Earlier deploys died on the rider table's auto-generated unique index
+            // name (66 chars, over MySQL's 64) after the tables had been created,
+            // leaving them behind without a migrations row. They never held data,
+            // so drop them and build again.
+            Schema::dropIfExists($name);
+
+            Schema::create($name, function (Blueprint $table) use ($kind) {
                 $table->id();
                 $table->foreignId('workspace_id')->constrained()->cascadeOnDelete();
                 $table->string('name', 50);
                 $table->timestamps();
 
-                $table->unique(['workspace_id', 'name']);
+                $table->unique(['workspace_id', 'name'], "pofd_{$kind}_statuses_workspace_name_unique");
             });
         }
 
