@@ -125,6 +125,12 @@ export function getStatusPillClass(status: OrderStatus): string {
     return `${colors.bg} ${colors.text} ${colors.border} border px-3 py-1 rounded-full text-xs font-medium`;
 }
 
+/** A workspace-defined CX or rider status (Settings → RMO management). */
+export interface RmoSubStatus {
+    id: number;
+    name: string;
+}
+
 export interface OrderForDelivery {
     id: number;
     order_id: number;
@@ -132,6 +138,8 @@ export interface OrderForDelivery {
     shop_id: number;
     workspace_id: number;
     status: OrderStatus;
+    cx_status_id: number | null;
+    rider_status_id: number | null;
     parcel_status: string | null;
     rider_name: string;
     rider_phone: string;

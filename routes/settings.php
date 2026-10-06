@@ -5,6 +5,7 @@ use App\Http\Controllers\Settings\IntegrationSettingsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\RmoSettingController;
+use App\Http\Controllers\Settings\RmoStatusController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -70,6 +71,23 @@ Route::middleware('auth')->group(function () {
     Route::put('/workspaces/{workspace}/settings/rmo', [RmoSettingController::class, 'update'])
         ->middleware('can:Manage RMO Settings,workspace')
         ->name('rmo-settings.update');
+
+    // CX / rider statuses offered next to the main status on the public RMO page.
+    Route::get('/workspaces/{workspace}/settings/rmo/statuses', [RmoStatusController::class, 'index'])
+        ->middleware('can:Manage RMO Settings,workspace')
+        ->name('rmo-statuses.index');
+    Route::middleware('can:Manage RMO Settings,workspace')
+        ->whereIn('type', ['cx', 'rider'])
+        ->group(function () {
+            Route::post('/workspaces/{workspace}/settings/rmo/statuses/{type}', [RmoStatusController::class, 'store'])
+                ->name('rmo-statuses.store');
+            Route::put('/workspaces/{workspace}/settings/rmo/statuses/{type}/{status}', [RmoStatusController::class, 'update'])
+                ->whereNumber('status')
+                ->name('rmo-statuses.update');
+            Route::delete('/workspaces/{workspace}/settings/rmo/statuses/{type}/{status}', [RmoStatusController::class, 'destroy'])
+                ->whereNumber('status')
+                ->name('rmo-statuses.destroy');
+        });
 
     // Billing details (the "bill to" party). The controller authorizes View vs
     // Manage separately, so no `can:` middleware here.

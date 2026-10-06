@@ -11,7 +11,9 @@ use Modules\Pancake\Models\OrderForDelivery;
  * "DELIVERED" on its own, with nobody touching the row.
  *
  * The pairs are fixed — only the two that mean the same thing on both sides —
- * so a workspace's only choice is whether auto-tagging runs at all.
+ * so a workspace's only choice is whether auto-tagging runs at all. The rider
+ * status of the same name (DELIVERED / RETURNING) is tagged alongside, when the
+ * workspace still has one by that name.
  *
  * The tagging itself is driven by the `rmo:apply-auto-tag` command, which runs
  * nightly once the day's parcel syncs have landed.
@@ -65,6 +67,12 @@ class RmoAutoTag
         $tagged = 0;
 
         foreach (self::MAP as $parcelStatus => $rmoStatus) {
+            $riderStatusId = RmoDefaultStatuses::riderStatusId($workspace, $rmoStatus);
+            $values = ['status' => $rmoStatus];
+            if ($riderStatusId !== null) {
+                $values['rider_status_id'] = $riderStatusId;
+            }
+
             $tagged += OrderForDelivery::query()
                 ->where('workspace_id', $workspace->id)
                 ->whereDate('delivery_date', $date)
@@ -73,11 +81,16 @@ class RmoAutoTag
                 ->whereRaw("LOWER(REPLACE(parcel_status, ' ', '_')) = ?", [$parcelStatus])
                 // Skip rows already carrying the target status — this runs on a
                 // schedule, so most passes should update nothing at all.
-                ->where(function ($query) use ($rmoStatus) {
+                ->where(function ($query) use ($rmoStatus, $riderStatusId) {
                     $query->where('status', '!=', $rmoStatus)
                         ->orWhereNull('status');
+
+                    if ($riderStatusId !== null) {
+                        $query->orWhere('rider_status_id', '!=', $riderStatusId)
+                            ->orWhereNull('rider_status_id');
+                    }
                 })
-                ->update(['status' => $rmoStatus]);
+                ->update($values);
         }
 
         return $tagged;

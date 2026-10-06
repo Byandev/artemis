@@ -365,6 +365,12 @@ class ForDeliveryController extends Controller
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $query->whereIn('status', $values);
                 }),
+                AllowedFilter::callback('cx_status_id', function ($query, $value) {
+                    $this->applySubStatusFilter($query, 'cx_status_id', $value);
+                }),
+                AllowedFilter::callback('rider_status_id', function ($query, $value) {
+                    $this->applySubStatusFilter($query, 'rider_status_id', $value);
+                }),
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
@@ -440,6 +446,10 @@ class ForDeliveryController extends Controller
             'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
             'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
             'enable_external_team_sync' => $workspace->rmoExternalTeamSyncEnabled(),
+            // The workspace's own statuses (Settings → RMO statuses) — the page
+            // picks and filters by these rather than the legacy `status`.
+            'cx_statuses' => $workspace->rmoCxStatuses()->get(['id', 'name']),
+            'rider_statuses' => $workspace->rmoRiderStatuses()->get(['id', 'name']),
         ]);
     }
 
@@ -621,6 +631,12 @@ class ForDeliveryController extends Controller
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $query->whereIn('status', $values);
                 }),
+                AllowedFilter::callback('cx_status_id', function ($query, $value) {
+                    $this->applySubStatusFilter($query, 'cx_status_id', $value);
+                }),
+                AllowedFilter::callback('rider_status_id', function ($query, $value) {
+                    $this->applySubStatusFilter($query, 'rider_status_id', $value);
+                }),
                 AllowedFilter::callback('parcel_status', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
                     $values = array_map('strtolower', $values);
@@ -678,6 +694,8 @@ class ForDeliveryController extends Controller
                 },
                 'conferrer:id,name',
                 'assignee:id,name',
+                'cxStatus:id,name',
+                'riderStatus:id,name',
             ]);
 
         $columns = $request->input('columns', []);
@@ -685,9 +703,41 @@ class ForDeliveryController extends Controller
             $columns = array_filter(explode(',', $columns));
         }
 
+        // The page shows the CX / rider statuses rather than the legacy
+        // `status`, so "every column" means those.
+        if (empty($columns)) {
+            $columns = array_values(array_diff(array_keys(RmoManagementExport::AVAILABLE_COLUMNS), ['updated_status']));
+        }
+
         $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
         return Excel::download(new RmoManagementExport($query, $columns), $filename);
+    }
+
+    /**
+     * Narrow the list to orders tagged with one of the given CX / rider status
+     * ids. `none` picks the untagged ones, and can sit alongside real ids.
+     *
+     * @param  string|array<int, string>|int|null  $value
+     */
+    private function applySubStatusFilter(Builder $query, string $column, mixed $value): void
+    {
+        $values = array_map('strval', is_string($value) ? explode(',', $value) : (array) $value);
+        $ids = array_values(array_filter($values, 'ctype_digit'));
+        $withNone = in_array('none', $values, true);
+
+        if (! $ids && ! $withNone) {
+            return;
+        }
+
+        $query->where(function ($q) use ($column, $ids, $withNone) {
+            if ($ids) {
+                $q->whereIn($column, $ids);
+            }
+            if ($withNone) {
+                $q->orWhereNull($column);
+            }
+        });
     }
 
     /**
