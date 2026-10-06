@@ -110,6 +110,43 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Creative Media Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where creative images and videos uploaded straight into Artemis live.
+    | S3 in every deployed environment; override to "local" on machines with
+    | no AWS credentials. Private, and served through the app with a signed
+    | URL like the disks above.
+    |
+    */
+
+    'creative_media_disk' => env('CREATIVE_MEDIA_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Creative CDN (CloudFront)
+    |--------------------------------------------------------------------------
+    |
+    | Video played straight from the S3 bucket crawls from the Philippines —
+    | measured at ~25 KB/s per connection against ~1.2 MB/s through CloudFront
+    | — so the review player streams through a CloudFront distribution in
+    | front of the same bucket when one is configured. The bucket stays
+    | private: the distribution reads it via Origin Access Control and only
+    | serves URLs signed with this key pair.
+    |
+    | `private_key` is a path to the PEM file (or the PEM itself). Leave `url`
+    | empty to stream from S3 directly.
+    |
+    */
+
+    'creative_cdn' => [
+        'url' => env('CREATIVE_CDN_URL'),
+        'key_pair_id' => env('CLOUDFRONT_KEY_PAIR_ID'),
+        'private_key' => env('CLOUDFRONT_PRIVATE_KEY'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

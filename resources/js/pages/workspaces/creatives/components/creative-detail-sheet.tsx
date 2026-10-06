@@ -8,23 +8,27 @@ import {
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Workspace } from '@/types/models/Workspace';
-import { useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import {
     CalendarCheck,
     Clapperboard,
+    Download,
     ExternalLink,
     FileImage,
     Flag,
     LucideIcon,
+    MapPin,
+    Maximize2,
     Megaphone,
     MessageSquare,
     Package,
     Pencil,
     Plus,
+    Trash2,
     Users,
     X,
 } from 'lucide-react';
-import { ComponentType, ReactNode, useMemo, useState } from 'react';
+import { ComponentType, ReactNode, useMemo, useRef, useState } from 'react';
 import {
     Creative,
     REVIEW_AVATAR_BG,
@@ -35,6 +39,15 @@ import {
 } from '../types';
 import { AdsBadge, FinalBadge, InitialAvatar, ReviewBadge } from './atoms';
 import { CreativeCode } from './creative-code';
+import { DeleteReviewDialog } from './delete-review-dialog';
+import { mediaRoute, useFallbackSrc, voiceRoute } from './media-src';
+import {
+    TimestampChip,
+    TimestampInput,
+    formatClock,
+    timestampPayload,
+} from './review-timestamp';
+import { VoiceClip, VoiceNote, VoiceRecorder } from './voice-recorder';
 
 // ─── Shared primitives ──────────────────────────────────────────────────────────
 
@@ -129,24 +142,36 @@ function ReviewComment({
     workspace,
     currentUserId,
     isLast,
+    onSeek,
+    currentTime,
 }: {
     review: Review;
     creative: Creative;
     workspace: Workspace;
     currentUserId: number;
     isLast: boolean;
+    /** Jumps the player to a second; absent when there's no player. */
+    onSeek?: (seconds: number) => void;
+    currentTime?: () => number;
 }) {
     const [editing, setEditing] = useState(false);
-    const { data, setData, put, processing, reset } = useForm({
-        status: review.status,
-        feedback: review.feedback ?? '',
-    });
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
+    const { data, setData, put, transform, processing, errors, reset } =
+        useForm({
+            status: review.status,
+            feedback: review.feedback ?? '',
+            timestamp: formatClock(review.timestamp_seconds),
+        });
 
     const isAuthor = review.reviewer?.id === currentUserId;
     const initial = (review.reviewer?.name ?? '?').charAt(0).toUpperCase();
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        transform(({ timestamp, ...d }) => ({
+            ...d,
+            timestamp_seconds: timestampPayload(timestamp),
+        }));
         put(
             `/workspaces/${workspace.slug}/creatives/${creative.id}/reviews/${review.id}`,
             {
@@ -160,6 +185,11 @@ function ReviewComment({
 
     return (
         <div className="relative flex gap-3">
+            <DeleteReviewDialog
+                review={confirmingDelete ? review : null}
+                url={`/workspaces/${workspace.slug}/creatives/${creative.id}/reviews/${review.id}`}
+                onClose={() => setConfirmingDelete(false)}
+            />
             {!isLast && (
                 <div className="absolute top-8 bottom-0 left-3.5 w-px bg-black/6 dark:bg-white/6" />
             )}
@@ -203,6 +233,17 @@ function ReviewComment({
                                 placeholder="Feedback..."
                                 className="w-full resize-none rounded-[8px] border border-black/8 bg-stone-50 p-2.5 font-mono! text-[12px]! text-gray-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/8 dark:bg-zinc-700 dark:text-gray-100"
                             />
+                            {creative.format === 'video' && (
+                                <TimestampInput
+                                    value={data.timestamp}
+                                    onChange={(v) => setData('timestamp', v)}
+                                    currentTime={currentTime}
+                                    error={
+                                        (errors as Record<string, string>)
+                                            .timestamp_seconds
+                                    }
+                                />
+                            )}
                             <div className="flex gap-2">
                                 <button
                                     type="submit"
@@ -235,6 +276,15 @@ function ReviewComment({
                                     {review.created_at}
                                 </time>
                             </div>
+                            {review.region && (
+                                <Link
+                                    href={`/workspaces/${workspace.slug}/creatives/${creative.id}/review`}
+                                    title="See the marked area"
+                                    className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-600 hover:bg-violet-100 dark:bg-violet-500/[0.12] dark:text-violet-400"
+                                >
+                                    <MapPin className="h-2.5 w-2.5" /> Area
+                                </Link>
+                            )}
                             <ReviewBadge status={review.status} />
                             {isAuthor && (
                                 <button
@@ -245,15 +295,55 @@ function ReviewComment({
                                     <Pencil className="h-3 w-3" />
                                 </button>
                             )}
+                            {isAuthor && (
+                                <button
+                                    onClick={() => setConfirmingDelete(true)}
+                                    title="Delete review"
+                                    aria-label="Delete review"
+                                    className="-mr-1 shrink-0 rounded-md p-1 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-gray-700 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </button>
+                            )}
                         </div>
                         {review.feedback ? (
                             <p className="px-3 py-2.5 text-[12px] leading-relaxed break-words text-gray-600 dark:text-gray-400">
+                                {review.timestamp_seconds !== null && (
+                                    <>
+                                        <TimestampChip
+                                            seconds={review.timestamp_seconds}
+                                            onSeek={onSeek}
+                                        />{' '}
+                                    </>
+                                )}
                                 {review.feedback}
                             </p>
-                        ) : (
+                        ) : review.timestamp_seconds !== null ? (
+                            <p className="px-3 py-2.5">
+                                <TimestampChip
+                                    seconds={review.timestamp_seconds}
+                                    onSeek={onSeek}
+                                />
+                            </p>
+                        ) : !review.voice ? (
                             <p className="px-3 py-2.5 font-mono text-[11px] text-gray-300 italic dark:text-gray-700">
                                 No feedback left
                             </p>
+                        ) : null}
+                        {review.voice && (
+                            <div className="px-3 pb-2.5 first:pt-2.5 [&:not(:first-child)]:pt-0">
+                                <VoiceNote
+                                    url={review.voice.url}
+                                    fallbackUrl={voiceRoute(
+                                        workspace.slug,
+                                        creative.id,
+                                        review.id,
+                                    )}
+                                    durationSeconds={
+                                        review.voice.duration_seconds
+                                    }
+                                />
+                            </div>
                         )}
                     </div>
                 )}
@@ -275,11 +365,52 @@ function ReviewsTab({
     currentUserId: number;
     canReview: boolean;
 }) {
-    const { data, setData, post, processing, reset } = useForm({
-        status: 'approved' as ReviewStatus,
-        feedback: '',
-    });
+    const { data, setData, post, transform, processing, errors, reset } =
+        useForm({
+            status: 'approved' as ReviewStatus,
+            feedback: '',
+            timestamp: '',
+        });
     const [showForm, setShowForm] = useState(false);
+
+    // Only an uploaded video can be played (and seeked) here; a video that
+    // lives behind a Drive link can still take a typed timestamp.
+    const isVideo = creative.format === 'video';
+    const playable =
+        isVideo && !!creative.media?.mime_type.startsWith('video/');
+    const playerRef = useRef<HTMLVideoElement>(null);
+    const [playerSrc, onPlayerError] = useFallbackSrc(
+        creative.media?.url ?? '',
+        mediaRoute(workspace.slug, creative.id),
+    );
+    const [duration, setDuration] = useState<number | null>(null);
+
+    const seek = playable
+        ? (seconds: number) => {
+              const video = playerRef.current;
+              if (!video) return;
+              video.currentTime = seconds;
+              video.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              void video.play();
+          }
+        : undefined;
+    const currentTime = playable
+        ? () => playerRef.current?.currentTime ?? 0
+        : undefined;
+
+    /** Pause on the frame being reviewed and open the form stamped with it. */
+    const reviewAtCurrentTime = () => {
+        const video = playerRef.current;
+        if (!video) return;
+        video.pause();
+        setData('timestamp', formatClock(video.currentTime));
+        setShowForm(true);
+    };
+
+    const timestamped = useMemo(
+        () => creative.reviews.filter((r) => r.timestamp_seconds !== null),
+        [creative.reviews],
+    );
     const reversed = useMemo(
         () => [...creative.reviews].reverse(),
         [creative.reviews],
@@ -294,11 +425,25 @@ function ReviewsTab({
         [canReview, creative.assigned_reviewers, currentUserId],
     );
 
+    const [voice, setVoice] = useState<VoiceClip | null>(null);
+
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        transform(({ timestamp, ...d }) => ({
+            ...d,
+            timestamp_seconds: timestampPayload(timestamp),
+            // Sending a file makes this multipart; Inertia switches over itself.
+            ...(voice
+                ? {
+                      voice: voice.file,
+                      voice_duration_seconds: voice.durationSeconds,
+                  }
+                : {}),
+        }));
         post(`/workspaces/${workspace.slug}/creatives/${creative.id}/reviews`, {
             onSuccess: () => {
                 reset();
+                setVoice(null);
                 setShowForm(false);
             },
         });
@@ -306,11 +451,63 @@ function ReviewsTab({
 
     const closeForm = () => {
         reset();
+        setVoice(null);
         setShowForm(false);
     };
 
     return (
         <div className="flex flex-col gap-5">
+            <Link
+                href={`/workspaces/${workspace.slug}/creatives/${creative.id}/review`}
+                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] bg-zinc-900 font-mono text-[12px] font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-gray-200"
+            >
+                <Maximize2 className="h-3.5 w-3.5" /> Open full-screen review
+            </Link>
+
+            {/* Player — reviews can point at a moment in it */}
+            {playable && (
+                <div>
+                    <video
+                        ref={playerRef}
+                        src={playerSrc}
+                        onError={onPlayerError}
+                        controls
+                        preload="metadata"
+                        onLoadedMetadata={(e) =>
+                            setDuration(e.currentTarget.duration || null)
+                        }
+                        className="max-h-[300px] w-full rounded-[12px] bg-black"
+                    />
+                    {/* Where each timestamped review sits on the timeline */}
+                    {duration && timestamped.length > 0 && (
+                        <div className="relative mt-2 h-3 rounded-full bg-stone-100 dark:bg-zinc-800">
+                            {timestamped.map((r) => (
+                                <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() => seek?.(r.timestamp_seconds!)}
+                                    title={`${formatClock(r.timestamp_seconds)} · ${r.reviewer?.name ?? 'Unknown'}${r.feedback ? ` — ${r.feedback}` : ''}`}
+                                    style={{
+                                        left: `${Math.min(100, (r.timestamp_seconds! / duration) * 100)}%`,
+                                    }}
+                                    className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white dark:ring-zinc-900 ${REVIEW_AVATAR_BG[r.status]}`}
+                                />
+                            ))}
+                        </div>
+                    )}
+                    {canSubmitReview && (
+                        <button
+                            type="button"
+                            onClick={reviewAtCurrentTime}
+                            className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-[10px] bg-violet-50 font-mono text-[12px] font-medium text-violet-600 transition-colors hover:bg-violet-100 dark:bg-violet-500/[0.1] dark:text-violet-400 dark:hover:bg-violet-500/[0.18]"
+                        >
+                            <MessageSquare className="h-3.5 w-3.5" /> Review at
+                            current time
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Assigned reviewers */}
             <div>
                 <p className={`mb-2 ${sectionLabel}`}>Assigned reviewers</p>
@@ -359,6 +556,8 @@ function ReviewsTab({
                                 workspace={workspace}
                                 currentUserId={currentUserId}
                                 isLast={i === reversed.length - 1}
+                                onSeek={seek}
+                                currentTime={currentTime}
                             />
                         ))}
                     </div>
@@ -411,6 +610,27 @@ function ReviewsTab({
                                 placeholder="Leave feedback or revision notes..."
                                 className="w-full resize-none rounded-[8px] border border-black/8 bg-white p-2.5 font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600"
                             />
+                            <VoiceRecorder
+                                value={voice}
+                                onChange={setVoice}
+                                onStart={() => playerRef.current?.pause()}
+                            />
+                            {(errors as Record<string, string>).voice && (
+                                <p className="font-mono text-[11px] text-red-500">
+                                    {(errors as Record<string, string>).voice}
+                                </p>
+                            )}
+                            {isVideo && (
+                                <TimestampInput
+                                    value={data.timestamp}
+                                    onChange={(v) => setData('timestamp', v)}
+                                    currentTime={currentTime}
+                                    error={
+                                        (errors as Record<string, string>)
+                                            .timestamp_seconds
+                                    }
+                                />
+                            )}
                             <div className="flex gap-2">
                                 <button
                                     type="submit"
@@ -459,6 +679,56 @@ const FORMAT_META: Record<
         fg: 'text-blue-500 dark:text-blue-400',
     },
 };
+
+/**
+ * The file uploaded into Artemis, previewed inline straight from its signed
+ * URL. `routeUrl` is the app route: the Download link, and the fallback if
+ * the signed URL has expired.
+ */
+function UploadedMedia({
+    media,
+    routeUrl,
+}: {
+    media: NonNullable<Creative['media']>;
+    routeUrl: string;
+}) {
+    const isVideo = media.mime_type.startsWith('video/');
+    const [src, onError] = useFallbackSrc(media.url, routeUrl);
+
+    return (
+        <div className="mb-2 overflow-hidden rounded-[12px] border border-black/6 bg-stone-50 dark:border-white/6 dark:bg-zinc-800/50">
+            {isVideo ? (
+                <video
+                    src={src}
+                    onError={onError}
+                    controls
+                    preload="metadata"
+                    className="max-h-[360px] w-full bg-black"
+                />
+            ) : (
+                <a href={src} target="_blank" rel="noopener noreferrer">
+                    <img
+                        src={src}
+                        onError={onError}
+                        alt={media.file_name}
+                        className="max-h-[360px] w-full object-contain"
+                    />
+                </a>
+            )}
+            <div className="flex items-center gap-2 px-3 py-2">
+                <p className="min-w-0 flex-1 truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                    {media.file_name}
+                </p>
+                <a
+                    href={`${routeUrl}?download=1`}
+                    className="inline-flex items-center gap-1 font-mono text-[11px] text-emerald-600 hover:underline dark:text-emerald-400"
+                >
+                    <Download className="h-3.5 w-3.5" /> Download
+                </a>
+            </div>
+        </div>
+    );
+}
 
 export function CreativeDetailSheet({
     creative,
@@ -644,31 +914,42 @@ export function CreativeDetailSheet({
                             </Section>
 
                             {/* Media */}
-                            {creative.picture_url && (
+                            {(creative.media || creative.picture_url) && (
                                 <Section label="Media">
-                                    <a
-                                        href={creative.picture_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="group flex items-center gap-3 rounded-[12px] border border-black/6 bg-stone-50 p-3 transition-colors hover:border-black/12 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800/50 dark:hover:border-white/12 dark:hover:bg-zinc-800"
-                                    >
-                                        <div
-                                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${fmt.tint}`}
+                                    {creative.media && (
+                                        <UploadedMedia
+                                            media={creative.media}
+                                            routeUrl={mediaRoute(
+                                                workspace.slug,
+                                                creative.id,
+                                            )}
+                                        />
+                                    )}
+                                    {creative.picture_url && (
+                                        <a
+                                            href={creative.picture_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="group flex items-center gap-3 rounded-[12px] border border-black/6 bg-stone-50 p-3 transition-colors hover:border-black/12 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800/50 dark:hover:border-white/12 dark:hover:bg-zinc-800"
                                         >
-                                            <FormatIcon
-                                                className={`h-4 w-4 ${fmt.fg}`}
-                                            />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                                                Open media
-                                            </p>
-                                            <p className="mt-0.5 truncate font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                                {creative.picture_url}
-                                            </p>
-                                        </div>
-                                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-300 transition-colors group-hover:text-gray-500 dark:text-gray-600" />
-                                    </a>
+                                            <div
+                                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${fmt.tint}`}
+                                            >
+                                                <FormatIcon
+                                                    className={`h-4 w-4 ${fmt.fg}`}
+                                                />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                                                    Open media
+                                                </p>
+                                                <p className="mt-0.5 truncate font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                                    {creative.picture_url}
+                                                </p>
+                                            </div>
+                                            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-300 transition-colors group-hover:text-gray-500 dark:text-gray-600" />
+                                        </a>
+                                    )}
                                 </Section>
                             )}
 
@@ -725,7 +1006,8 @@ export function CreativeDetailSheet({
 
                             {!hasContent &&
                                 !hasLinks &&
-                                !creative.picture_url && (
+                                !creative.picture_url &&
+                                !creative.media && (
                                     <div className="px-5 py-10 text-center">
                                         <p className={muted}>
                                             No content added yet

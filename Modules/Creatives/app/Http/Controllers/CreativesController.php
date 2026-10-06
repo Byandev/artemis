@@ -13,19 +13,30 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\Creatives\Http\Controllers\Concerns\GuardsCreatives;
+use Modules\Creatives\Http\Presenters\CreativePresenter;
 use Modules\Creatives\Http\Requests\StoreCreativeRequest;
-use Modules\Creatives\Http\Requests\StoreReviewRequest;
 use Modules\Creatives\Http\Requests\UpdateCreativeRequest;
 use Modules\Creatives\Models\Creative;
-use Modules\Creatives\Models\CreativeReview;
+use Modules\Creatives\Services\CreativeMediaStorage;
 use Modules\Products\Models\Product;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
+/**
+ * The creatives list and the create/edit forms. Uploaded files live in
+ * CreativeMediaController (and CreativeMediaStorage); reviews in
+ * CreativeReviewController.
+ */
 class CreativesController extends Controller
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, GuardsCreatives;
+
+    public function __construct(
+        private CreativePresenter $presenter,
+        private CreativeMediaStorage $storage,
+    ) {}
 
     public function index(Request $request, Workspace $workspace)
     {
@@ -38,13 +49,7 @@ class CreativesController extends Controller
                     TeamVisibility::shouldScope($request->user(), $workspace),
                     fn ($q) => $q->whereHas('product.pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
                 )
-                ->with([
-                    'creator:id,name',
-                    'approvedBy:id,name',
-                    'product:id,title',
-                    'assignedReviewers:id,name',
-                    'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest(),
-                ])
+                ->with(CreativePresenter::relations())
                 ->withCount('reviews')
         )
             ->allowedFilters([
@@ -103,7 +108,7 @@ class CreativesController extends Controller
             ->defaultSort('-creative_date', '-id')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString()
-            ->through(fn ($c) => $this->formatCreative($c));
+            ->through(fn ($c) => $this->presenter->present($c, $workspace));
 
         $creatorIds = Creative::where('workspace_id', $workspace->id)
             ->whereNotNull('creator_id')
@@ -157,6 +162,9 @@ class CreativesController extends Controller
         $reviewerIds = $data['assigned_reviewer_ids'] ?? [];
         unset($data['assigned_reviewer_ids']);
 
+        // The uploaded file goes to the media collection, not a column.
+        unset($data['media_key'], $data['media_name'], $data['media_file']);
+
         // Setting a non-default ads / final status at creation is gated by the
         // status permission, mirroring updates. Untouched fields fall back to
         // the DB defaults (pending ads / for-approval).
@@ -180,6 +188,8 @@ class CreativesController extends Controller
         ]);
 
         $creative->assignedReviewers()->sync($reviewerIds);
+
+        $this->storage->attachFromRequest($request, $creative);
 
         return redirect()
             ->route('workspaces.creatives.index', $workspace)
@@ -230,11 +240,11 @@ class CreativesController extends Controller
         $this->guard($request, $workspace, $creative);
         $this->authorize(Permission::EditCreatives->value, $workspace);
 
-        $creative->load(['creator:id,name', 'product:id,title', 'assignedReviewers:id,name', 'reviews' => fn ($q) => $q->with('reviewer:id,name')->oldest()]);
+        $creative->load(CreativePresenter::relations());
 
         return Inertia::render('workspaces/creatives/edit', [
             'workspace' => $workspace,
-            'creative' => $this->formatCreative($creative),
+            'creative' => $this->presenter->present($creative, $workspace),
             'reviewers' => $this->reviewers($workspace),
             'products' => $this->products($workspace),
         ]);
@@ -274,7 +284,9 @@ class CreativesController extends Controller
             $this->authorize(Permission::EditCreatives->value, $workspace);
         }
 
-        // Stamp / clear approved_at whenever the final status changes.
+        // The uploaded file goes to the media collection, not a column.
+        unset($data['media_key'], $data['media_name'], $data['media_file'], $data['remove_media']);
+
         // Stamp / clear approved_at + approved_by whenever the final status changes.
         if (array_key_exists('final_status', $data)) {
             $isApproved = $data['final_status'] === 'approved';
@@ -287,6 +299,8 @@ class CreativesController extends Controller
         if ($reviewerIds !== null) {
             $creative->assignedReviewers()->sync($reviewerIds);
         }
+
+        $this->storage->attachFromRequest($request, $creative);
 
         // Inline edits (e.g. the status dropdowns on the index) post partial
         // payloads and expect to stay put — back() lands on the index they were
@@ -311,44 +325,6 @@ class CreativesController extends Controller
 
         $this->deleteStoredFile($creative->picture_url);
         $creative->delete();
-
-        return back();
-    }
-
-    public function addReview(StoreReviewRequest $request, Workspace $workspace, Creative $creative)
-    {
-        $this->guard($request, $workspace, $creative);
-        $this->authorize(Permission::ReviewCreatives->value, $workspace);
-
-        // Having the permission is not enough — only reviewers assigned to this
-        // specific creative may review it.
-        if (! $creative->assignedReviewers()->whereKey($request->user()->id)->exists()) {
-            abort(403, 'You are not an assigned reviewer for this creative.');
-        }
-
-        CreativeReview::create([
-            'creative_id' => $creative->id,
-            'reviewer_id' => $request->user()->id,
-            ...$request->validated(),
-        ]);
-
-        return back();
-    }
-
-    public function updateReview(StoreReviewRequest $request, Workspace $workspace, Creative $creative, CreativeReview $review)
-    {
-        $this->guard($request, $workspace, $creative);
-        $this->authorize(Permission::ReviewCreatives->value, $workspace);
-
-        if ($review->creative_id !== $creative->id) {
-            abort(404);
-        }
-
-        if ($review->reviewer_id !== $request->user()->id) {
-            abort(403, 'You can only edit your own reviews.');
-        }
-
-        $review->update($request->validated());
 
         return back();
     }
@@ -403,62 +379,5 @@ class CreativesController extends Controller
 
         $relativePath = substr($url, strlen('/storage/'));
         Storage::disk('public')->delete($relativePath);
-    }
-
-    private function guard(Request $request, Workspace $workspace, ?Creative $creative = null): void
-    {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403);
-        }
-
-        if ($creative && $creative->workspace_id !== $workspace->id) {
-            abort(404);
-        }
-    }
-
-    private function formatCreative(Creative $c): array
-    {
-        $reviews = $c->reviews->map(fn ($r) => [
-            'id' => $r->id,
-            'status' => $r->status,
-            'feedback' => $r->feedback,
-            'reviewer' => $r->reviewer ? ['id' => $r->reviewer->id, 'name' => $r->reviewer->name] : null,
-            'created_at' => $r->created_at->format('M d, Y g:i A'),
-        ])->values()->all();
-
-        $latestReview = $c->reviews->last();
-
-        return [
-            'id' => $c->id,
-            'code' => $c->code,
-            'name' => $c->name,
-            'description' => $c->description,
-            'format' => $c->format,
-            'creative_date' => $c->creative_date?->format('Y-m-d'),
-            'creative_date_label' => $c->creative_date_label,
-            'submission_status' => $c->submission_status,
-            'created_at' => $c->created_at?->format('M j, Y g:i A'),
-            'script' => $c->script,
-            'picture_url' => $c->picture_url,
-            'reference_link' => $c->reference_link,
-            'ads_status' => $c->ads_status,
-            'ads_manager_link' => $c->ads_manager_link,
-            'ads_remarks' => $c->ads_remarks,
-            'final_status' => $c->final_status,
-            'approved_at' => $c->approved_at?->format('M d, Y g:i A'),
-            'approved_by' => $c->approvedBy ? ['id' => $c->approvedBy->id, 'name' => $c->approvedBy->name] : null,
-            'caption' => $c->caption,
-            'headline' => $c->headline,
-            'notes' => $c->notes,
-            'creator' => $c->creator ? ['id' => $c->creator->id, 'name' => $c->creator->name] : null,
-            'product' => $c->product ? ['id' => $c->product->id, 'title' => $c->product->title] : null,
-            'assigned_reviewers' => $c->assignedReviewers->map(fn ($r) => ['id' => $r->id, 'name' => $r->name])->values()->all(),
-            'reviews' => $reviews,
-            'review_count' => count($reviews),
-            'latest_review' => $latestReview ? [
-                'status' => $latestReview->status,
-                'feedback' => $latestReview->feedback,
-            ] : null,
-        ];
     }
 }
