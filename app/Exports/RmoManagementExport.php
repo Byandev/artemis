@@ -24,11 +24,19 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
         'cx_rts' => 'CX RTS',
         'location_rts' => 'Location RTS',
         'updated_status' => 'Updated Status',
+        'cx_status' => 'CX Status',
+        'rider_status' => 'Rider Status',
         'csr' => 'CSR',
         'upsell_date' => 'Upsell Date',
         'upsell_price' => 'Upsell',
         'order_details' => 'Order Details',
     ];
+
+    /**
+     * Left out unless asked for by name: only the public RMO page picks these,
+     * and the other exports shouldn't grow two blank columns.
+     */
+    private const OPT_IN_COLUMNS = ['cx_status', 'rider_status'];
 
     private array $columns;
 
@@ -39,7 +47,7 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
     ) {
         $this->columns = ! empty($columns)
             ? array_intersect($columns, array_keys(self::AVAILABLE_COLUMNS))
-            : array_keys(self::AVAILABLE_COLUMNS);
+            : array_values(array_diff(array_keys(self::AVAILABLE_COLUMNS), self::OPT_IN_COLUMNS));
     }
 
     public function query()
@@ -72,6 +80,8 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
             'cx_rts' => $order?->cx_rts_rate,
             'location_rts' => $address?->cityOrderSummary?->rts_rate,
             'updated_status' => $row->status,
+            'cx_status' => in_array('cx_status', $this->columns, true) ? $row->cxStatus?->name : null,
+            'rider_status' => in_array('rider_status', $this->columns, true) ? $row->riderStatus?->name : null,
             'csr' => $this->preferPancakeAssignee
                 ? ($row->pancakeAssignee?->name ?? $row->assignee?->name)
                 : ($row->assignee?->name ?? $row->pancakeAssignee?->name),
