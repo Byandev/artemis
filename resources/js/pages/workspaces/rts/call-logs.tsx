@@ -80,6 +80,9 @@ interface Props {
     logs: PaginatedData<CallLogRow>;
     /** Filterable persona values, server-supplied so the two lists can't drift. */
     personas: string[];
+    /** Everyone who placed a call here. Values are `system:<id>` or
+     *  `pancake:<uuid>` — see App\Support\CallLogCallers::options(). */
+    callers: { value: string; label: string }[];
     query?: {
         sort?: string | null;
         page?: number | string;
@@ -90,6 +93,7 @@ interface Props {
             end_date?: string;
             persona?: string;
             type?: string;
+            caller?: string;
         };
     };
 }
@@ -112,7 +116,13 @@ function formatDuration(seconds: number): string {
 /** Every filter but the one being changed, so a fetch never drops the others. */
 const ALL = 'all';
 
-export default function CallLogs({ workspace, logs, personas, query }: Props) {
+export default function CallLogs({
+    workspace,
+    logs,
+    personas,
+    callers,
+    query,
+}: Props) {
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -125,6 +135,7 @@ export default function CallLogs({ workspace, logs, personas, query }: Props) {
     ]);
     const [persona, setPersona] = useState(query?.filter?.persona ?? ALL);
     const [type, setType] = useState(query?.filter?.type ?? ALL);
+    const [caller, setCaller] = useState(query?.filter?.caller ?? ALL);
 
     const buildFilter = () => ({
         search: search || undefined,
@@ -132,6 +143,7 @@ export default function CallLogs({ workspace, logs, personas, query }: Props) {
         end_date: dateRange[1] || undefined,
         persona: persona === ALL ? undefined : persona,
         type: type === ALL ? undefined : type,
+        caller: caller === ALL ? undefined : caller,
     });
 
     // Debounced because `search` changes on every keystroke; the selects and the
@@ -144,7 +156,8 @@ export default function CallLogs({ workspace, logs, personas, query }: Props) {
             (filter.start_date ?? '') === (current.start_date ?? '') &&
             (filter.end_date ?? '') === (current.end_date ?? '') &&
             (filter.persona ?? '') === (current.persona ?? '') &&
-            (filter.type ?? '') === (current.type ?? '');
+            (filter.type ?? '') === (current.type ?? '') &&
+            (filter.caller ?? '') === (current.caller ?? '');
         if (unchanged) return;
 
         const timer = setTimeout(() => {
@@ -167,7 +180,7 @@ export default function CallLogs({ workspace, logs, personas, query }: Props) {
 
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, dateRange, persona, type]);
+    }, [search, dateRange, persona, type, caller]);
 
     const columns: ColumnDef<CallLogRow>[] = useMemo(
         () => [
@@ -343,6 +356,20 @@ export default function CallLogs({ workspace, logs, personas, query }: Props) {
                             }
                         }}
                     />
+
+                    <Select value={caller} onValueChange={setCaller}>
+                        <SelectTrigger className="h-9 w-[180px]">
+                            <SelectValue placeholder="User" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL}>All users</SelectItem>
+                            {callers.map(({ value, label }) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
                     <Select value={persona} onValueChange={setPersona}>
                         <SelectTrigger className="h-9 w-[160px]">

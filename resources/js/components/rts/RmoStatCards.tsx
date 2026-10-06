@@ -68,6 +68,85 @@ function formatCallDuration(seconds: number): string {
     return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
 }
 
+/** The five call figures for one persona, as RmoDailyStats::callLogStatsByPersona() sends them. */
+export interface RmoPersonaCallStats {
+    total_call_logs_count: number;
+    total_call_duration: number;
+    connected_call_logs_count: number;
+    avg_call_duration: number | null;
+    hit_rate: number | null;
+}
+
+/**
+ * The five call cards, for one set of call figures. `label` names whose calls
+ * they are — "RMO" for the combined row, the persona for the split ones.
+ */
+function CallStatCards({
+    label,
+    stats,
+    loading,
+}: {
+    label: string;
+    stats: RmoPersonaCallStats;
+    loading: boolean;
+}) {
+    return (
+        <>
+            <StatCard
+                title={`Total ${label} Calls`}
+                value={stats.total_call_logs_count}
+                loading={loading}
+                icon={PhoneCallIcon}
+            />
+            <StatCard
+                title={`Total ${label} Call Duration`}
+                value={stats.total_call_duration}
+                valueLabel={formatCallDuration(stats.total_call_duration)}
+                loading={loading}
+                icon={TimerIcon}
+            />
+            <StatCard
+                title={`Connected ${label} Calls (3s+)`}
+                value={stats.connected_call_logs_count}
+                loading={loading}
+                icon={PhoneCallIcon}
+            />
+            <StatCard
+                title={`Avg ${label} Call Duration`}
+                value={stats.avg_call_duration ?? 0}
+                valueLabel={
+                    stats.avg_call_duration === null
+                        ? '—'
+                        : formatCallDuration(
+                              Math.round(stats.avg_call_duration),
+                          )
+                }
+                loading={loading}
+                icon={ClockIcon}
+            />
+            <StatCard
+                title={`${label} Hit Rate`}
+                value={stats.hit_rate ?? 0}
+                valueLabel={
+                    stats.hit_rate === null
+                        ? '—'
+                        : stats.hit_rate.toFixed(1) + '%'
+                }
+                loading={loading}
+                icon={TargetIcon}
+            />
+        </>
+    );
+}
+
+const EMPTY_CALL_STATS: RmoPersonaCallStats = {
+    total_call_logs_count: 0,
+    total_call_duration: 0,
+    connected_call_logs_count: 0,
+    avg_call_duration: null,
+    hit_rate: null,
+};
+
 interface RmoStatCardsProps {
     total_for_delivery_today: number;
     called_count: number;
@@ -100,6 +179,15 @@ interface RmoStatCardsProps {
      */
     avg_call_duration?: number | null;
     hit_rate?: number | null;
+    /**
+     * The same call figures split into calls to the customer and calls to the
+     * rider — each row adds up to the combined one. Left out, only the
+     * combined row shows.
+     */
+    call_logs_by_persona?: {
+        customer?: RmoPersonaCallStats;
+        rider?: RmoPersonaCallStats;
+    };
     /** Show placeholder bars instead of the figures — a reload is in flight. */
     loading?: boolean;
 }
@@ -115,6 +203,7 @@ export function RmoStatCards({
     connected_call_logs_count,
     avg_call_duration = null,
     hit_rate = null,
+    call_logs_by_persona,
     loading = false,
 }: RmoStatCardsProps) {
     const showCallLogs = total_call_logs_count !== undefined;
@@ -162,49 +251,31 @@ export function RmoStatCards({
                 icon={AlertTriangleIcon}
             />
             {showCallLogs && (
+                <CallStatCards
+                    label="RMO"
+                    stats={{
+                        total_call_logs_count: totalCalls,
+                        total_call_duration: total_call_duration ?? 0,
+                        connected_call_logs_count: connectedCalls,
+                        avg_call_duration,
+                        hit_rate,
+                    }}
+                    loading={loading}
+                />
+            )}
+            {showCallLogs && call_logs_by_persona && (
                 <>
-                    <StatCard
-                        title="Total RMO Calls"
-                        value={totalCalls}
-                        loading={loading}
-                        icon={PhoneCallIcon}
-                    />
-                    <StatCard
-                        title="Total RMO Call Duration"
-                        value={total_call_duration ?? 0}
-                        valueLabel={formatCallDuration(
-                            total_call_duration ?? 0,
-                        )}
-                        loading={loading}
-                        icon={TimerIcon}
-                    />
-                    <StatCard
-                        title="Connected RMO Calls (3s+)"
-                        value={connectedCalls}
-                        loading={loading}
-                        icon={PhoneCallIcon}
-                    />
-                    <StatCard
-                        title="Avg RMO Call Duration"
-                        value={avg_call_duration ?? 0}
-                        valueLabel={
-                            avg_call_duration === null
-                                ? '—'
-                                : formatCallDuration(
-                                      Math.round(avg_call_duration),
-                                  )
+                    <CallStatCards
+                        label="Customer"
+                        stats={
+                            call_logs_by_persona.customer ?? EMPTY_CALL_STATS
                         }
                         loading={loading}
-                        icon={ClockIcon}
                     />
-                    <StatCard
-                        title="RMO Hit Rate"
-                        value={hit_rate ?? 0}
-                        valueLabel={
-                            hit_rate === null ? '—' : hit_rate.toFixed(1) + '%'
-                        }
+                    <CallStatCards
+                        label="Rider"
+                        stats={call_logs_by_persona.rider ?? EMPTY_CALL_STATS}
                         loading={loading}
-                        icon={TargetIcon}
                     />
                 </>
             )}
