@@ -51,7 +51,7 @@ export function DeleteReviewDialog({
 
     return (
         <Dialog open={review !== null} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-sm dark:bg-zinc-900 [&_[data-default-close=true]]:hidden">
+            <DialogContent className="grid-cols-[minmax(0,1fr)] gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-sm dark:bg-zinc-900 [&_[data-default-close=true]]:hidden">
                 <div className="relative border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
@@ -72,7 +72,7 @@ export function DeleteReviewDialog({
                         .
                     </p>
                     {review?.feedback && (
-                        <p className="mt-2 line-clamp-3 rounded-lg bg-stone-50 px-3 py-2 text-[12px] text-gray-600 dark:bg-zinc-800 dark:text-gray-300">
+                        <p className="mt-2 line-clamp-3 rounded-lg bg-stone-50 px-3 py-2 text-[12px] break-words text-gray-600 dark:bg-zinc-800 dark:text-gray-300">
                             {review.feedback}
                         </p>
                     )}

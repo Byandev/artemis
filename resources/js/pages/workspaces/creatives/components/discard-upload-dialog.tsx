@@ -22,7 +22,10 @@ export function DiscardUploadDialog({
 }) {
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onStay()}>
-            <DialogContent className="gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-sm dark:bg-zinc-900 [&_[data-default-close=true]]:hidden">
+            {/* grid-cols-[minmax(0,1fr)]: the base DialogContent is a grid, and
+                without it a long file name widens the column past the
+                dialog's clipped edge, cutting off the buttons. */}
+            <DialogContent className="grid-cols-[minmax(0,1fr)] gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-sm dark:bg-zinc-900 [&_[data-default-close=true]]:hidden">
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
@@ -38,7 +41,10 @@ export function DiscardUploadDialog({
                         Leaving now deletes the upload.
                     </p>
                     {fileName && (
-                        <p className="truncate rounded-lg bg-stone-50 px-3 py-2 font-mono text-[12px] text-gray-600 dark:bg-zinc-800 dark:text-gray-300">
+                        <p
+                            title={fileName}
+                            className="truncate rounded-lg bg-stone-50 px-3 py-2 font-mono text-[12px] text-gray-600 dark:bg-zinc-800 dark:text-gray-300"
+                        >
                             {fileName}
                         </p>
                     )}
