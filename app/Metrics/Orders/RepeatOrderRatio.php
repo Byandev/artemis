@@ -76,15 +76,14 @@ final class RepeatOrderRatio
         $repeatCustomers = $this->buildRepeatSubquery($workspaceId, $endExclusive);
 
         return DB::table('pancake_orders as po')
-            ->join('pages', 'pages.id', '=', 'po.page_id')
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->leftJoin('pages', 'pages.id', '=', 'po.page_id')
+            ->join('shops', 'shops.id', '=', 'po.shop_id')
             ->leftJoinSub($repeatCustomers, 'rc', fn ($j) => $j->on('rc.customer_id', '=', 'po.customer_id'))
             ->where('po.workspace_id', $workspaceId)
             ->where('po.confirmed_at', '>=', $startAt)
             ->where('po.confirmed_at', '<', $endExclusive)
             ->whereNotNull('po.customer_id')
             ->whereNotIn('po.status', [6, 7])
-            ->whereNotNull('pages.shop_id')
             ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
             ->groupBy('shops.id', 'shops.name')
             ->selectRaw('

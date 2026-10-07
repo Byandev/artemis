@@ -6,6 +6,7 @@ beforeEach(function () {
     ['workspace' => $this->workspace] = actingAsWorkspaceOwner();
     $this->workspace->update(['courses_module_enabled' => true]);
     $this->url = "/workspaces/{$this->workspace->slug}/courses";
+    $this->api = "/api/workspaces/{$this->workspace->slug}/courses";
 
     Course::create([
         'workspace_id' => $this->workspace->id,
@@ -25,36 +26,29 @@ beforeEach(function () {
 });
 
 it('searches on the course name', function () {
-    $this->get("{$this->url}?search=Meta")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->has('courses.data', 1)
-            ->where('courses.data.0.name', 'Meta Ads Manager'),
-    );
+    $this->getJson("{$this->api}?search=Meta")->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.name', 'Meta Ads Manager');
 });
 
 it('searches on the description too', function () {
-    $this->get("{$this->url}?search=Hook")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->has('courses.data', 1)
-            ->where('courses.data.0.name', 'Creative Briefs'),
-    );
+    $this->getJson("{$this->api}?search=Hook")->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.name', 'Creative Briefs');
 });
 
 it('filters by category, accepting several at once', function () {
-    $this->get("{$this->url}?categories[]=Ads")->assertOk()->assertInertia(
-        fn ($page) => $page->has('courses.data', 1),
-    );
+    $this->getJson("{$this->api}?categories[]=Ads")->assertOk()
+        ->assertJsonCount(1, 'data');
 
-    $this->get("{$this->url}?categories[]=Ads&categories[]=Creatives")
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('courses.data', 2));
+    $this->getJson("{$this->api}?categories[]=Ads&categories[]=Creatives")->assertOk()
+        ->assertJsonCount(2, 'data');
 });
 
 it('combines search with a filter', function () {
     // Matches the search but not the category, so nothing comes back.
-    $this->get("{$this->url}?search=Meta&categories[]=Creatives")
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('courses.data', 0));
+    $this->getJson("{$this->api}?search=Meta&categories[]=Creatives")->assertOk()
+        ->assertJsonCount(0, 'data');
 });
 
 it('offers only categories that are actually in use', function () {
@@ -63,22 +57,21 @@ it('offers only categories that are actually in use', function () {
     );
 });
 
-it('echoes the applied filters back to the toolbar', function () {
-    $this->get("{$this->url}?search=Meta&categories[]=Ads")->assertOk()->assertInertia(
+it('opens the page with the filters from the URL', function () {
+    $this->get("{$this->url}?search=Meta&categories[]=Ads&page=2")->assertOk()->assertInertia(
         fn ($page) => $page
             ->where('filters.search', 'Meta')
-            ->where('filters.categories', ['Ads']),
+            ->where('filters.categories', ['Ads'])
+            ->where('filters.page', 2),
     );
 });
 
 it('never surfaces a draft to a learner', function () {
     $learner = makeMemberWithPermissions($this->workspace, ['View Courses']);
 
-    $this->actingAs($learner)->get($this->url)->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->has('courses.data', 1)
-            ->where('courses.data.0.name', 'Meta Ads Manager'),
-    );
+    $this->actingAs($learner)->getJson($this->api)->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.name', 'Meta Ads Manager');
 });
 
 it('paginates past the first page', function () {
@@ -91,18 +84,14 @@ it('paginates past the first page', function () {
         ]);
     }
 
-    $this->get($this->url)->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->has('courses.data', 15)
-            ->where('courses.last_page', 2)
-            ->where('courses.total', 18),
-    );
+    $this->getJson($this->api)->assertOk()
+        ->assertJsonCount(15, 'data')
+        ->assertJsonPath('last_page', 2)
+        ->assertJsonPath('total', 18);
 
-    $this->get("{$this->url}?page=2")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->has('courses.data', 3)
-            ->where('courses.current_page', 2),
-    );
+    $this->getJson("{$this->api}?page=2")->assertOk()
+        ->assertJsonCount(3, 'data')
+        ->assertJsonPath('current_page', 2);
 });
 
 it('keeps the search applied across pages', function () {
@@ -115,12 +104,9 @@ it('keeps the search applied across pages', function () {
     }
 
     // Paging must not silently drop the filter and show everything.
-    $this->get("{$this->url}?search=Widget&page=2")->assertOk()->assertInertia(
-        fn ($page) => $page
-            ->has('courses.data', 5)
-            ->where('courses.total', 20)
-            ->where('filters.search', 'Widget'),
-    );
+    $this->getJson("{$this->api}?search=Widget&page=2")->assertOk()
+        ->assertJsonCount(5, 'data')
+        ->assertJsonPath('total', 20);
 });
 
 it('offers a learner only categories from published courses', function () {

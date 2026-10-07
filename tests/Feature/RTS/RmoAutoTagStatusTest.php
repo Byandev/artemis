@@ -381,3 +381,41 @@ test('the public page hands the auto-tag state to the frontend', function () {
     $this->actingAs($admin)->get($url)
         ->assertInertia(fn ($page) => $page->where('enable_auto_tag_status', true));
 });
+
+test('auto-tagging also tags the rider status of the same name', function () {
+    enableAutoTag($this->workspace);
+    $rider = $this->workspace->rmoRiderStatuses()->pluck('id', 'name');
+
+    $deliveredId = seedAutoTagDelivery($this->workspace, $this->page, $this->shop, now()->toDateString(), [
+        'parcel_status' => 'delivered',
+        'rider_status_id' => $rider['RIDER OTW'],
+    ]);
+    // Already on the main status — still picks up the rider status.
+    $returningId = seedAutoTagDelivery($this->workspace, $this->page, $this->shop, now()->toDateString(), [
+        'parcel_status' => 'returning',
+        'status' => 'RETURNING',
+    ]);
+    $untouchedId = seedAutoTagDelivery($this->workspace, $this->page, $this->shop, now()->toDateString());
+
+    $this->artisan('rmo:apply-auto-tag')->assertSuccessful();
+
+    $riderOf = fn (int $id) => DB::table('pancake_order_for_delivery')->find($id)->rider_status_id;
+    expect($riderOf($deliveredId))->toBe($rider['DELIVERED'])
+        ->and($riderOf($returningId))->toBe($rider['RETURNING'])
+        ->and($riderOf($untouchedId))->toBeNull()
+        ->and(RmoAutoTag::apply($this->workspace->fresh(), now()->toDateString()))->toBe(0);
+});
+
+test('auto-tagging still sets the main status once the rider status was renamed away', function () {
+    enableAutoTag($this->workspace);
+    $this->workspace->rmoRiderStatuses()->where('name', 'DELIVERED')->update(['name' => 'Done']);
+
+    $id = seedAutoTagDelivery($this->workspace, $this->page, $this->shop, now()->toDateString(), [
+        'parcel_status' => 'delivered',
+    ]);
+
+    $this->artisan('rmo:apply-auto-tag')->assertSuccessful();
+
+    expect(autoTaggedStatusOf($id))->toBe('DELIVERED')
+        ->and(DB::table('pancake_order_for_delivery')->find($id)->rider_status_id)->toBeNull();
+});

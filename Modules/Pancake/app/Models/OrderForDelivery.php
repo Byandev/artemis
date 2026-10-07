@@ -50,6 +50,16 @@ class OrderForDelivery extends Model
         return $this->belongsTo(User::class, 'assignee_id');
     }
 
+    public function cxStatus(): BelongsTo
+    {
+        return $this->belongsTo(OrderForDeliveryCxStatus::class, 'cx_status_id');
+    }
+
+    public function riderStatus(): BelongsTo
+    {
+        return $this->belongsTo(OrderForDeliveryRiderStatus::class, 'rider_status_id');
+    }
+
     /**
      * The Gencys order behind this delivery, matched through the parent order on
      * the only key the two systems share: the waybill.

@@ -22,18 +22,11 @@ import {
     ActivityLogSummary,
     LogStatus,
 } from '@/types/models/ActivityLog';
-import { router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import axios from 'axios';
 import { omit } from 'lodash';
-import debounce from 'lodash/debounce';
 import { AlertTriangle, Clock, ListChecks, Search } from 'lucide-react';
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-    type ReactNode,
-} from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 interface FilterState {
     search?: string | null;
@@ -53,20 +46,23 @@ interface Options {
 }
 
 interface Props {
-    logs: PaginatedData<ActivityLog>;
-    summary: ActivityLogSummary;
     options: Options;
     filters?: FilterState;
     query?: {
         sort?: string | null;
-        per_page?: number | string;
-        page?: number | string;
+        per_page?: number | string | null;
+        page?: number | string | null;
     };
-    baseUrl: string;
+    /** JSON endpoint for the paginated logs table. */
+    logsUrl: string;
+    /** JSON endpoint for the stat cards. */
+    summaryUrl: string;
     showWorkspace?: boolean;
     /** Raw metadata is only surfaced in the global admin view. */
     showMetadata?: boolean;
 }
+
+type Params = Record<string, string | number | undefined>;
 
 const STATUS_STYLES: Record<LogStatus, string> = {
     success:
@@ -81,13 +77,26 @@ const STATUS_STYLES: Record<LogStatus, string> = {
 const titleCase = (value: string) =>
     value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
+/** Mirror the active params into the address bar so a reload keeps the view. */
+const syncUrl = (params: Params) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') search.set(key, String(value));
+    });
+    const qs = search.toString();
+    window.history.replaceState(
+        window.history.state,
+        '',
+        `${window.location.pathname}${qs ? `?${qs}` : ''}`,
+    );
+};
+
 export default function ActivityLogView({
-    logs,
-    summary,
     options,
     filters,
     query,
-    baseUrl,
+    logsUrl,
+    summaryUrl,
     showWorkspace = false,
     showMetadata = false,
 }: Props) {
@@ -97,60 +106,104 @@ export default function ActivityLogView({
     );
 
     const [search, setSearch] = useState(filters?.search ?? '');
+    const [debouncedSearch, setDebouncedSearch] = useState(search);
     const [logType, setLogType] = useState(filters?.log_type ?? 'all');
     const [category, setCategory] = useState(filters?.category ?? 'all');
     const [status, setStatus] = useState(filters?.status ?? 'all');
+    const [sort, setSort] = useState<string | undefined>(
+        query?.sort ?? undefined,
+    );
+    const [page, setPage] = useState(Number(query?.page ?? 1));
+    const [perPage, setPerPage] = useState(Number(query?.per_page ?? 20));
     const [selected, setSelected] = useState<ActivityLog | null>(null);
 
-    const fetchLogs = useCallback(
-        (overrides: Record<string, string | number | undefined> = {}) => {
-            router.get(
-                baseUrl,
-                {
-                    sort: query?.sort ?? undefined,
-                    page: 1,
-                    per_page: query?.per_page,
-                    'filter[search]': search || undefined,
-                    'filter[log_type]': logType === 'all' ? undefined : logType,
-                    'filter[category]':
-                        category === 'all' ? undefined : category,
-                    'filter[status]': status === 'all' ? undefined : status,
-                    ...overrides,
-                },
-                { preserveState: true, replace: true, preserveScroll: true },
-            );
-        },
+    const [logs, setLogs] = useState<PaginatedData<ActivityLog> | null>(null);
+    const [logsLoading, setLogsLoading] = useState(true);
+    const [summary, setSummary] = useState<ActivityLogSummary | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (search === debouncedSearch) return;
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+            setPage(1);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [search, debouncedSearch]);
+
+    /** A changed filter facet always sends the table back to page one. */
+    const withPageReset =
+        (setter: (value: string) => void) => (value: string) => {
+            setter(value);
+            setPage(1);
+        };
+
+    // The filter context shared by the table and the stat cards.
+    const filterParams = useMemo<Params>(
+        () => ({
+            'filter[search]': debouncedSearch || undefined,
+            'filter[log_type]': logType === 'all' ? undefined : logType,
+            'filter[category]': category === 'all' ? undefined : category,
+            'filter[status]': status === 'all' ? undefined : status,
+            'filter[start_date]': filters?.start_date ?? undefined,
+            'filter[end_date]': filters?.end_date ?? undefined,
+            'filter[workspace_id]': filters?.workspace_id ?? undefined,
+        }),
         [
-            baseUrl,
             category,
+            debouncedSearch,
+            filters?.end_date,
+            filters?.start_date,
+            filters?.workspace_id,
             logType,
-            query?.per_page,
-            query?.sort,
-            search,
             status,
         ],
     );
 
-    const debouncedSearch = useMemo(
-        () => debounce(() => fetchLogs(), 400),
-        [fetchLogs],
-    );
+    useEffect(() => {
+        const controller = new AbortController();
+        const params: Params = {
+            ...filterParams,
+            sort,
+            page,
+            per_page: perPage,
+        };
+
+        syncUrl(params);
+        setLogsLoading(true);
+        setError(null);
+
+        axios
+            .get<PaginatedData<ActivityLog>>(logsUrl, {
+                params,
+                signal: controller.signal,
+            })
+            .then((res) => setLogs(res.data))
+            .catch((err) => {
+                if (axios.isCancel(err)) return;
+                setError('Failed to load activity logs.');
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLogsLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [logsUrl, filterParams, page, perPage, sort]);
 
     useEffect(() => {
-        if (search !== (filters?.search ?? '')) debouncedSearch();
-        return () => debouncedSearch.cancel();
-    }, [debouncedSearch, filters?.search, search]);
+        const controller = new AbortController();
 
-    useEffect(() => {
-        if (
-            logType === (filters?.log_type ?? 'all') &&
-            category === (filters?.category ?? 'all') &&
-            status === (filters?.status ?? 'all')
-        ) {
-            return;
-        }
-        fetchLogs();
-    }, [logType, category, status]); // eslint-disable-line react-hooks/exhaustive-deps
+        setSummary(null);
+        axios
+            .get<ActivityLogSummary>(summaryUrl, {
+                params: filterParams,
+                signal: controller.signal,
+            })
+            .then((res) => setSummary(res.data))
+            .catch(() => {});
+
+        return () => controller.abort();
+    }, [summaryUrl, filterParams]);
 
     const columns: ColumnDef<ActivityLog>[] = [
         {
@@ -255,18 +308,18 @@ export default function ActivityLogView({
             <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <SummaryCard
                     label="Total logs"
-                    value={summary.total}
+                    value={summary?.total}
                     icon={<ListChecks className="h-4 w-4 text-gray-400" />}
                 />
                 <SummaryCard
                     label="Failures"
-                    value={summary.failures}
+                    value={summary?.failures}
                     accent="text-red-600 dark:text-red-400"
                     icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
                 />
                 <SummaryCard
                     label="Last 24h"
-                    value={summary.last_24h}
+                    value={summary?.last_24h}
                     icon={<Clock className="h-4 w-4 text-gray-400" />}
                 />
             </div>
@@ -285,49 +338,50 @@ export default function ActivityLogView({
 
                 <FilterSelect
                     value={logType}
-                    onChange={setLogType}
+                    onChange={withPageReset(setLogType)}
                     placeholder="Type"
                     allLabel="All types"
                     options={options.log_types}
                 />
                 <FilterSelect
                     value={category}
-                    onChange={setCategory}
+                    onChange={withPageReset(setCategory)}
                     placeholder="Category"
                     allLabel="All categories"
                     options={options.categories}
                 />
                 <FilterSelect
                     value={status}
-                    onChange={setStatus}
+                    onChange={withPageReset(setStatus)}
                     placeholder="Status"
                     allLabel="All statuses"
                     options={options.statuses}
                 />
             </div>
 
+            {error && (
+                <p className="mb-3 text-sm text-red-600 dark:text-red-400">
+                    {error}
+                </p>
+            )}
+
             <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
                 <DataTable
                     columns={columns}
-                    data={logs.data || []}
+                    data={logs?.data ?? []}
+                    loading={logsLoading}
                     enableInternalPagination={false}
                     initialSorting={initialSorting}
-                    meta={{ ...omit(logs, ['data']) }}
+                    meta={logs ? omit(logs, ['data']) : undefined}
                     onRowClick={(row) => setSelected(row)}
                     onFetch={(params) => {
-                        const sortStr =
-                            params?.sort && params.sort !== null
+                        setSort(
+                            params?.sort != null
                                 ? String(params.sort)
-                                : null;
-                        fetchLogs({
-                            sort: sortStr ?? undefined,
-                            page: Number(params?.page ?? 1),
-                            per_page: Number(
-                                params?.per_page ??
-                                    query?.per_page ??
-                                    logs.per_page,
-                            ),
-                        });
+                                : undefined,
+                        );
+                        setPage(Number(params?.page ?? 1));
+                        setPerPage(Number(params?.per_page ?? perPage));
                     }}
                 />
             </div>
@@ -506,7 +560,8 @@ function SummaryCard({
     accent = 'text-gray-800 dark:text-gray-100',
 }: {
     label: string;
-    value: number;
+    /** Undefined while the summary is loading. */
+    value?: number;
     icon: ReactNode;
     accent?: string;
 }) {
@@ -522,7 +577,11 @@ function SummaryCard({
                     accent,
                 )}
             >
-                {value.toLocaleString()}
+                {value === undefined ? (
+                    <span className="inline-block h-6 w-12 animate-pulse rounded bg-gray-100 dark:bg-zinc-800" />
+                ) : (
+                    value.toLocaleString()
+                )}
             </div>
         </div>
     );

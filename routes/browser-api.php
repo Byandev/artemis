@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Controllers\API\Admin\ActivityLogController as AdminActivityLogController;
+use App\Http\Controllers\API\Workspace\ActivityLogController;
 use App\Http\Controllers\API\Workspace\AnalyticsController;
 use App\Http\Controllers\API\Workspace\CSRController;
 use App\Http\Controllers\API\Workspace\CsrDashboardController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
+use App\Http\Controllers\API\Workspace\DepartmentController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ParcelJourneyStatsController;
 use App\Http\Controllers\API\Workspace\RoleController;
@@ -13,6 +16,7 @@ use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
 use App\Http\Controllers\API\Workspace\WelleStatsController;
+use Modules\Courses\Http\Controllers\Api\CourseCatalogController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
 use Modules\Products\Http\Controllers\Api\ProductController;
@@ -107,6 +111,10 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             ->name('csrs.sync');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
 
+        // The departments page's list. Create/edit/delete stay on the Inertia
+        // routes in routes/workspaces.php.
+        Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
+
         // The roles page's list. Create/edit/archive stay on the Inertia
         // routes in routes/workspaces.php.
         Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
@@ -176,6 +184,14 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
         });
 
+        // Courses page — the grid, the stat tiles and the leaderboard load over
+        // XHR, each on its own. See CourseCatalogController.
+        Route::prefix('courses')->name('courses.')->group(function () {
+            Route::get('/', [CourseCatalogController::class, 'courses'])->name('index');
+            Route::get('/stats', [CourseCatalogController::class, 'stats'])->name('stats');
+            Route::get('/leaderboard', [CourseCatalogController::class, 'leaderboard'])->name('leaderboard');
+        });
+
         // Inventory dashboard — one endpoint per KPI so each loads, skeletons
         // and refreshes independently. See InventoryDashboardStatsController.
         Route::prefix('inventory/dashboard/kpi')->name('inventory.dashboard.kpi.')->group(function () {
@@ -229,6 +245,17 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/calendar', [WelleStatsController::class, 'calendar'])->name('calendar');
             Route::get('/daily-log', [WelleStatsController::class, 'dailyLog'])->name('daily-log');
         });
+
+        // Workspace activity log (audit trail) — the table and the stat cards
+        // load separately. Gated to workspace admins in the controller.
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
+        Route::get('/activity-logs/summary', [ActivityLogController::class, 'summary'])->name('activity-logs.summary');
+    });
+
+    // Global, cross-workspace activity log. Super admins only, checked in the controller.
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])->name('activity-logs.index');
+        Route::get('/activity-logs/summary', [AdminActivityLogController::class, 'summary'])->name('activity-logs.summary');
     });
 });
 
