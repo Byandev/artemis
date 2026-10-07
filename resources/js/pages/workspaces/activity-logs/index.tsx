@@ -1,15 +1,16 @@
+import {
+    index as logsIndex,
+    summary as logsSummary,
+} from '@/actions/App/Http/Controllers/API/Workspace/ActivityLogController';
 import ActivityLogView from '@/components/activity-logs/activity-log-view';
 import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
-import { PaginatedData, type BreadcrumbItem } from '@/types';
-import { ActivityLog, ActivityLogSummary } from '@/types/models/ActivityLog';
+import { type BreadcrumbItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 
 interface Props {
     workspace: Workspace;
-    logs: PaginatedData<ActivityLog>;
-    summary: ActivityLogSummary;
     options: {
         log_types: string[];
         statuses: string[];
@@ -19,15 +20,13 @@ interface Props {
     filters?: Record<string, string | null>;
     query?: {
         sort?: string | null;
-        per_page?: number | string;
+        per_page?: number | string | null;
         page?: number | string;
     };
 }
 
 export default function WorkspaceActivityLogsIndex({
     workspace,
-    logs,
-    summary,
     options,
     filters,
     query,
@@ -48,12 +47,11 @@ export default function WorkspaceActivityLogsIndex({
                 />
                 <div className="mt-6">
                     <ActivityLogView
-                        logs={logs}
-                        summary={summary}
                         options={options}
                         filters={filters}
                         query={query}
-                        baseUrl={baseUrl}
+                        logsUrl={logsIndex.url(workspace.slug)}
+                        summaryUrl={logsSummary.url(workspace.slug)}
                     />
                 </div>
             </div>

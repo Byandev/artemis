@@ -22,6 +22,7 @@ class RolePermissionController extends Controller
                 || $request->user()->hasPermission(PermissionEnum::ManageRolePermissions, $workspace),
             403
         );
+        abort_unless($role->workspace_id === $workspace->id, 404);
 
         $disabled = $workspace->disabledPermissionCategories();
         $hiddenNames = $workspace->hiddenPermissionNames();
@@ -52,6 +53,7 @@ class RolePermissionController extends Controller
     public function update(Request $request, Workspace $workspace, Role $role)
     {
         $this->authorize(PermissionEnum::ManageRolePermissions->value, $workspace);
+        abort_unless($role->workspace_id === $workspace->id, 404);
 
         $request->validate([
             'permission_ids' => 'present|array',

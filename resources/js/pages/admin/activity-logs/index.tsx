@@ -1,13 +1,13 @@
+import {
+    index as logsIndex,
+    summary as logsSummary,
+} from '@/actions/App/Http/Controllers/API/Admin/ActivityLogController';
 import ActivityLogView from '@/components/activity-logs/activity-log-view';
 import PageHeader from '@/components/common/PageHeader';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
-import { PaginatedData } from '@/types';
-import { ActivityLog, ActivityLogSummary } from '@/types/models/ActivityLog';
 import { Head } from '@inertiajs/react';
 
 interface Props {
-    logs: PaginatedData<ActivityLog>;
-    summary: ActivityLogSummary;
     options: {
         log_types: string[];
         statuses: string[];
@@ -17,14 +17,12 @@ interface Props {
     filters?: Record<string, string | null>;
     query?: {
         sort?: string | null;
-        per_page?: number | string;
+        per_page?: number | string | null;
         page?: number | string;
     };
 }
 
 export default function AdminActivityLogsIndex({
-    logs,
-    summary,
     options,
     filters,
     query,
@@ -39,12 +37,11 @@ export default function AdminActivityLogsIndex({
                 />
                 <div className="mt-6">
                     <ActivityLogView
-                        logs={logs}
-                        summary={summary}
                         options={options}
                         filters={filters}
                         query={query}
-                        baseUrl="/admin/activity-logs"
+                        logsUrl={logsIndex.url()}
+                        summaryUrl={logsSummary.url()}
                         showWorkspace
                         showMetadata
                     />

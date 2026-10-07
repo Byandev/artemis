@@ -151,11 +151,12 @@ test('cannot delete a team from a different workspace', function () {
 });
 
 // ----- Filter & sort coverage -----
+// The list loads from the browser API (API\Workspace\TeamController); the
+// Inertia page only renders the shell.
 
-function teamsFromInertia($response): array
+function teamsFromApi($response): array
 {
-    return collect($response->getOriginalContent()->getData()['page']['props']['teams']['data'])
-        ->pluck('name')->all();
+    return collect($response->json('data'))->pluck('name')->all();
 }
 
 test('teams index filter[search] partial match on name', function () {
@@ -163,8 +164,8 @@ test('teams index filter[search] partial match on name', function () {
     Team::factory()->create(['workspace_id' => $w->id, 'name' => 'Engineering Squad']);
     Team::factory()->create(['workspace_id' => $w->id, 'name' => 'Marketing']);
 
-    $names = teamsFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/teams?filter[search]=engineering")->assertOk()
+    $names = teamsFromApi(
+        $this->actingAs($owner)->getJson("/api/workspaces/{$w->slug}/teams?filter[search]=engineering")->assertOk()
     );
     expect($names)->toBe(['Engineering Squad']);
 });
@@ -175,8 +176,8 @@ test('teams index sort=name returns ascending', function () {
     Team::factory()->create(['workspace_id' => $w->id, 'name' => 'Alpha']);
     Team::factory()->create(['workspace_id' => $w->id, 'name' => 'Bravo']);
 
-    $names = teamsFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/teams?sort=name")->assertOk()
+    $names = teamsFromApi(
+        $this->actingAs($owner)->getJson("/api/workspaces/{$w->slug}/teams?sort=name")->assertOk()
     );
     expect($names)->toBe(['Alpha', 'Bravo', 'Charlie']);
 });
@@ -193,8 +194,8 @@ test('teams index sort=members_count returns by member count ascending', functio
     $bigTeam->members()->attach([$u1->id, $u2->id, $u3->id]);
     $smallTeam->members()->attach([$u1->id]);
 
-    $names = teamsFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/teams?sort=members_count")->assertOk()
+    $names = teamsFromApi(
+        $this->actingAs($owner)->getJson("/api/workspaces/{$w->slug}/teams?sort=members_count")->assertOk()
     );
     expect($names)->toBe(['Small', 'Big']);
 });
@@ -206,8 +207,8 @@ test('teams index sort=-members_count returns by member count descending', funct
     $u = makeWorkspaceMember($w);
     $b->members()->attach([$u->id]);
 
-    $names = teamsFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/teams?sort=-members_count")->assertOk()
+    $names = teamsFromApi(
+        $this->actingAs($owner)->getJson("/api/workspaces/{$w->slug}/teams?sort=-members_count")->assertOk()
     );
     expect($names[0])->toBe('B');
 });
@@ -218,8 +219,8 @@ test('teams index defaults to created_at descending', function () {
     sleep(1);
     Team::factory()->create(['workspace_id' => $w->id, 'name' => 'Second']);
 
-    $names = teamsFromInertia(
-        $this->actingAs($owner)->get("/workspaces/{$w->slug}/teams")->assertOk()
+    $names = teamsFromApi(
+        $this->actingAs($owner)->getJson("/api/workspaces/{$w->slug}/teams")->assertOk()
     );
     expect($names[0])->toBe('Second');
 });

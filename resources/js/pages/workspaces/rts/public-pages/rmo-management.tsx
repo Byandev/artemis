@@ -2,10 +2,16 @@ import Filters, { FilterValue } from '@/components/filters/Filters';
 import InputError from '@/components/input-error';
 import {
     authParcelStatusConfig,
-    orderStatusConfig,
     ParcelStatusEntry,
 } from '@/components/rts/rmo-config';
-import { RmoStatCards } from '@/components/rts/RmoStatCards';
+import {
+    RmoSubStatusMenuItems,
+    RmoSubStatusPicker,
+} from '@/components/rts/RmoSubStatusPicker';
+import {
+    RmoPersonaCallStats,
+    RmoStatCards,
+} from '@/components/rts/RmoStatCards';
 import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,7 +26,6 @@ import {
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -37,9 +42,8 @@ import publicPage from '@/routes/public-page';
 import { PaginatedData, SharedData } from '@/types';
 import { CallLog } from '@/types/models/CallLog';
 import {
-    ORDER_STATUSES,
     OrderForDelivery,
-    OrderStatus,
+    RmoSubStatus,
 } from '@/types/models/Pancake/OrderForDelivery';
 import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
@@ -59,7 +63,6 @@ import {
     Phone,
     PhoneCall,
     Search,
-    Tags,
     User as UserIcon,
     UserPlus,
     X,
@@ -82,7 +85,8 @@ const EXPORT_COLUMNS = [
     { key: 'confirmed_by', label: 'Confirmed By' },
     { key: 'cx_rts', label: 'CX RTS' },
     { key: 'location_rts', label: 'Location RTS' },
-    { key: 'updated_status', label: 'Updated Status' },
+    { key: 'cx_status', label: 'CX Status' },
+    { key: 'rider_status', label: 'Rider Status' },
     { key: 'csr', label: 'CSR' },
 ] as const;
 
@@ -97,7 +101,9 @@ interface Props {
         sort?: string | null;
         filter?: {
             search?: string;
-            status?: string | string[];
+            /** Status ids, or 'none' for untagged orders. */
+            cx_status_id?: string | string[];
+            rider_status_id?: string | string[];
             page_id?: string | string[];
             shop_id?: string | string[];
             user_id?: string | string[];
@@ -124,7 +130,7 @@ interface Props {
     enable_edit_previous_day?: boolean;
     /**
      * Workspace-wide switch stored on rmo_settings. When on, the selection bar
-     * offers a "Set status" action that re-statuses every selected order.
+     * offers "Set customer / rider status" actions over every selected order.
      */
     enable_bulk_status_update?: boolean;
     /**
@@ -138,6 +144,9 @@ interface Props {
      * "External Team" filter only exists while it's on.
      */
     enable_external_team_sync?: boolean;
+    /** Workspace-defined CX / rider statuses (Settings → RMO statuses). */
+    cx_statuses?: RmoSubStatus[];
+    rider_statuses?: RmoSubStatus[];
 }
 
 function formatDuration(seconds: number): string {
@@ -653,6 +662,11 @@ interface RmoStats {
      */
     avg_call_duration: number | null;
     hit_rate: number | null;
+    /** The same call figures, split into calls to the customer and to the rider. */
+    call_logs_by_persona: {
+        customer: RmoPersonaCallStats;
+        rider: RmoPersonaCallStats;
+    };
 }
 
 function RmoManagement({
@@ -662,8 +676,9 @@ function RmoManagement({
     users,
     enable_edit_previous_day = false,
     enable_bulk_status_update = false,
-    enable_auto_tag_status = false,
     enable_external_team_sync = false,
+    cx_statuses = [],
+    rider_statuses = [],
 }: Props) {
     const { appEnv, flash } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
@@ -755,13 +770,22 @@ function RmoManagement({
         showMyAssigneeOnly ? '' : (query?.assignee_id ?? ''),
     );
 
-    // Use URL as source of truth for status (avoids stale closure issues with select)
-    const currentStatus = useMemo(
+    // Use URL as source of truth for the status filters (avoids stale closure
+    // issues with select)
+    const currentCxStatus = useMemo(
         () =>
-            Array.isArray(query?.filter?.status)
-                ? (query.filter.status[0] ?? '')
-                : (query?.filter?.status ?? ''),
-        [query?.filter?.status],
+            Array.isArray(query?.filter?.cx_status_id)
+                ? (query.filter.cx_status_id[0] ?? '')
+                : (query?.filter?.cx_status_id ?? ''),
+        [query?.filter?.cx_status_id],
+    );
+
+    const currentRiderStatus = useMemo(
+        () =>
+            Array.isArray(query?.filter?.rider_status_id)
+                ? (query.filter.rider_status_id[0] ?? '')
+                : (query?.filter?.rider_status_id ?? ''),
+        [query?.filter?.rider_status_id],
     );
 
     const currentParcelStatus = useMemo(
@@ -885,7 +909,8 @@ function RmoManagement({
         (
             sort?: string | null,
             page?: number,
-            status?: string,
+            /** Freshly picked CX / rider status filter; '' clears it. */
+            subStatus?: { cx?: string; rider?: string },
             parcelStatus?: string,
             perPage?: number,
             /**
@@ -911,12 +936,19 @@ function RmoManagement({
             return {
                 sort: sort ?? undefined,
                 'filter[search]': searchValue || undefined,
-                ...(status !== undefined
-                    ? status
-                        ? { 'filter[status]': status }
+                ...(subStatus?.cx !== undefined
+                    ? subStatus.cx
+                        ? { 'filter[cx_status_id]': subStatus.cx }
                         : {}
-                    : currentStatus
-                      ? { 'filter[status]': currentStatus }
+                    : currentCxStatus
+                      ? { 'filter[cx_status_id]': currentCxStatus }
+                      : {}),
+                ...(subStatus?.rider !== undefined
+                    ? subStatus.rider
+                        ? { 'filter[rider_status_id]': subStatus.rider }
+                        : {}
+                    : currentRiderStatus
+                      ? { 'filter[rider_status_id]': currentRiderStatus }
                       : {}),
                 ...(parcelStatus !== undefined
                     ? parcelStatus
@@ -962,7 +994,8 @@ function RmoManagement({
         },
         [
             searchValue,
-            currentStatus,
+            currentCxStatus,
+            currentRiderStatus,
             currentParcelStatus,
             currentUpsell,
             currentExternalTeam,
@@ -1031,11 +1064,23 @@ function RmoManagement({
         [workspace, buildAllParams, query?.sort],
     );
 
-    const handleStatusChange = useCallback(
-        (status: string) => {
+    // One select covers both kinds — "cx:5", "rider:none", or '' for all — so
+    // picking one clears the other.
+    const currentStatusFilter = currentCxStatus
+        ? `cx:${currentCxStatus}`
+        : currentRiderStatus
+          ? `rider:${currentRiderStatus}`
+          : '';
+
+    const handleStatusFilterChange = useCallback(
+        (value: string) => {
+            const [type, statusId = ''] = value.split(':');
             router.get(
                 publicPage.rmoManagement({ workspace }),
-                buildAllParams(query?.sort, 1, status),
+                buildAllParams(query?.sort, 1, {
+                    cx: type === 'cx' ? statusId : '',
+                    rider: type === 'rider' ? statusId : '',
+                }),
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
@@ -1163,7 +1208,10 @@ function RmoManagement({
     const exportParams = useCallback(() => {
         const params = new URLSearchParams();
         if (searchValue) params.set('filter[search]', searchValue);
-        if (currentStatus) params.set('filter[status]', currentStatus);
+        if (currentCxStatus)
+            params.set('filter[cx_status_id]', currentCxStatus);
+        if (currentRiderStatus)
+            params.set('filter[rider_status_id]', currentRiderStatus);
         if (currentParcelStatus)
             params.set('filter[parcel_status]', currentParcelStatus);
         if (currentUpsell) params.set('filter[upsell]', currentUpsell);
@@ -1188,7 +1236,8 @@ function RmoManagement({
         return params;
     }, [
         searchValue,
-        currentStatus,
+        currentCxStatus,
+        currentRiderStatus,
         currentParcelStatus,
         currentUpsell,
         currentExternalTeam,
@@ -1230,8 +1279,11 @@ function RmoManagement({
                 {
                     sort: query?.sort || undefined,
                     'filter[search]': searchValue || undefined,
-                    ...(currentStatus
-                        ? { 'filter[status]': currentStatus }
+                    ...(currentCxStatus
+                        ? { 'filter[cx_status_id]': currentCxStatus }
+                        : {}),
+                    ...(currentRiderStatus
+                        ? { 'filter[rider_status_id]': currentRiderStatus }
                         : {}),
                     ...(currentParcelStatus
                         ? { 'filter[parcel_status]': currentParcelStatus }
@@ -1272,7 +1324,8 @@ function RmoManagement({
             workspace,
             query?.sort,
             searchValue,
-            currentStatus,
+            currentCxStatus,
+            currentRiderStatus,
             currentParcelStatus,
             currentUpsell,
             currentExternalTeam,
@@ -1341,12 +1394,12 @@ function RmoManagement({
         [workspace.slug],
     );
 
-    const handleChangeStatus = useCallback(
-        (status: string, id: number) => {
+    const handleChangeSubStatus = useCallback(
+        (type: 'cx' | 'rider', statusId: number | null, id: number) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}`,
-                { status },
-                { preserveScroll: true, preserveState: false },
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/${id}/sub-status`,
+                { type, status_id: statusId },
+                { preserveScroll: true },
             );
         },
         [workspace.slug],
@@ -1528,11 +1581,15 @@ function RmoManagement({
         doBulkAssign(userId);
     }, [selectedOrders, doBulkAssign, currentUserId]);
 
-    const handleBulkUpdateStatus = useCallback(
-        (status: OrderStatus) => {
+    const handleBulkUpdateSubStatus = useCallback(
+        (type: 'cx' | 'rider', statusId: number | null) => {
             router.post(
-                `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-status`,
-                { ids: Array.from(selectedOrders.keys()), status },
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-sub-status`,
+                {
+                    ids: Array.from(selectedOrders.keys()),
+                    type,
+                    status_id: statusId,
+                },
                 {
                     preserveScroll: true,
                     preserveState: false,
@@ -1549,7 +1606,8 @@ function RmoManagement({
     const pendingOrders = useMemo(
         () =>
             (orders.data ?? [])
-                .filter((o) => o.status === 'PENDING')
+                // Nobody has tagged them yet — the old PENDING.
+                .filter((o) => !o.cx_status_id && !o.rider_status_id)
                 .slice(0, 10),
         [orders.data],
     );
@@ -1610,7 +1668,9 @@ function RmoManagement({
             },
             {
                 accessorFn: (row) =>
-                    (row.order.items ?? []).map((item) => 'Item ######').join(', '),
+                    (row.order.items ?? [])
+                        .map((item) => 'Item ######')
+                        .join(', '),
                 id: 'items',
                 enableSorting: false,
                 header: ({ column }) => (
@@ -2002,11 +2062,9 @@ function RmoManagement({
                 },
             },
             {
-                accessorKey: 'status',
-                enableSorting: true,
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Status" />
-                ),
+                id: 'status',
+                enableSorting: false,
+                header: 'Status',
                 cell: ({ row }) => {
                     // Status is editable for today's orders, and for yesterday's
                     // orders only when the parcel was returned, returning, or
@@ -2023,12 +2081,17 @@ function RmoManagement({
 
                     return (
                         <div>
-                            <RmoStatusPicker
-                                currentStatus={
-                                    row.original.status as OrderStatus
-                                }
-                                onChangeStatus={(status) =>
-                                    handleChangeStatus(status, row.original.id)
+                            <RmoSubStatusPicker
+                                cxStatuses={cx_statuses}
+                                riderStatuses={rider_statuses}
+                                cxStatusId={row.original.cx_status_id}
+                                riderStatusId={row.original.rider_status_id}
+                                onChange={(type, statusId) =>
+                                    handleChangeSubStatus(
+                                        type,
+                                        statusId,
+                                        row.original.id,
+                                    )
                                 }
                                 disabled={!canEditStatus}
                             />
@@ -2045,7 +2108,9 @@ function RmoManagement({
         [
             handleAssignToMe,
             handleRemoveAssignee,
-            handleChangeStatus,
+            handleChangeSubStatus,
+            cx_statuses,
+            rider_statuses,
             handleUpdatePhone,
             isToday,
             isYesterday,
@@ -2307,18 +2372,6 @@ function RmoManagement({
                     </div>
                 </div>
 
-                {enable_auto_tag_status && (
-                    <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-[12px] text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
-                        <Tags className="h-3.5 w-3.5 shrink-0" />
-                        <span className="font-medium">Auto-tagging is on.</span>
-                        <span className="text-sky-700/80 dark:text-sky-300/70">
-                            Delivered parcels are set to DELIVERED and returning
-                            ones to RETURNING overnight, overwriting manual
-                            changes.
-                        </span>
-                    </div>
-                )}
-
                 {showStats && (
                     <div className="mb-6">
                         <div className="mb-2 flex justify-end">
@@ -2349,6 +2402,7 @@ function RmoManagement({
                             }
                             avg_call_duration={stats?.avg_call_duration ?? null}
                             hit_rate={stats?.hit_rate ?? null}
+                            call_logs_by_persona={stats?.call_logs_by_persona}
                             loading={statsLoading || stats === null}
                         />
                     </div>
@@ -2368,16 +2422,33 @@ function RmoManagement({
                         </div>
 
                         <select
-                            value={currentStatus}
-                            onChange={(e) => handleStatusChange(e.target.value)}
+                            value={currentStatusFilter}
+                            onChange={(e) =>
+                                handleStatusFilterChange(e.target.value)
+                            }
                             className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
                         >
                             <option value="">All Statuses</option>
-                            {Object.keys(orderStatusConfig).map((status) => (
-                                <option key={status} value={status}>
-                                    {status}
+                            <optgroup label="Customer">
+                                <option value="cx:none">
+                                    No Customer Status
                                 </option>
-                            ))}
+                                {cx_statuses.map((s) => (
+                                    <option key={s.id} value={`cx:${s.id}`}>
+                                        {s.name}
+                                    </option>
+                                ))}
+                            </optgroup>
+                            <optgroup label="Rider">
+                                <option value="rider:none">
+                                    No Rider Status
+                                </option>
+                                {rider_statuses.map((s) => (
+                                    <option key={s.id} value={`rider:${s.id}`}>
+                                        {s.name}
+                                    </option>
+                                ))}
+                            </optgroup>
                         </select>
 
                         <select
@@ -2663,30 +2734,12 @@ function RmoManagement({
                                         align="start"
                                         className="w-52 overflow-hidden p-1"
                                     >
-                                        <p className="px-2 pt-1 pb-1.5 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                            Set {selectedCount} order
-                                            {selectedCount !== 1 ? 's' : ''} to
-                                        </p>
-                                        <div className="max-h-72 overflow-y-auto">
-                                            {ORDER_STATUSES.map((s) => (
-                                                <DropdownMenuItem
-                                                    key={s}
-                                                    onClick={() =>
-                                                        handleBulkUpdateStatus(
-                                                            s,
-                                                        )
-                                                    }
-                                                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px] text-gray-600 dark:text-gray-400"
-                                                >
-                                                    <span
-                                                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${orderStatusConfig[s]?.dot ?? 'bg-gray-400'}`}
-                                                    />
-                                                    <span className="flex-1">
-                                                        {s}
-                                                    </span>
-                                                </DropdownMenuItem>
-                                            ))}
-                                        </div>
+                                        <RmoSubStatusMenuItems
+                                            cxStatuses={cx_statuses}
+                                            riderStatuses={rider_statuses}
+                                            onChange={handleBulkUpdateSubStatus}
+                                            clearable
+                                        />
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             )}

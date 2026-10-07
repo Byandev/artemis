@@ -16,22 +16,31 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import departmentsApi from '@/routes/api/workspaces/departments';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import axios from 'axios';
 import { omit } from 'lodash';
 import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 interface DepartmentRow extends Department {
     users_count: number;
     created_at: string;
 }
 
+type FetchParams = {
+    sort?: string | null;
+    search?: string;
+    page?: number | string;
+    per_page?: number | string;
+};
+
 interface Props {
     workspace: Workspace;
-    departments: PaginatedData<DepartmentRow>;
     query?: {
         sort?: string | null;
         per_page?: number | string;
@@ -40,11 +49,7 @@ interface Props {
     };
 }
 
-export default function DepartmentsIndex({
-    workspace,
-    departments,
-    query,
-}: Props) {
+export default function DepartmentsIndex({ workspace, query }: Props) {
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -60,28 +65,81 @@ export default function DepartmentsIndex({
     const canDelete = usePermission(PERMISSIONS.DeleteDepartments);
     const showActions = canEdit || canDelete;
 
-    const baseUrl = `/workspaces/${workspace.slug}/departments`;
+    const [departments, setDepartments] =
+        useState<PaginatedData<DepartmentRow> | null>(null);
+    const [loading, setLoading] = useState(true);
 
+    // The params of the last fetch, so a refetch after a save or delete keeps
+    // the page, sort and search the user was looking at.
+    const paramsRef = useRef<FetchParams>({
+        sort: query?.sort ?? null,
+        search: query?.filter?.search ?? '',
+        page: query?.page ?? 1,
+        per_page: query?.per_page,
+    });
+    // Drops responses from fetches a newer one has superseded.
+    const requestIdRef = useRef(0);
+
+    const fetchDepartments = useCallback(
+        async (next: FetchParams = {}) => {
+            const params = { ...paramsRef.current, ...next };
+            paramsRef.current = params;
+
+            const queryParams = {
+                sort: params.sort || undefined,
+                'filter[search]': params.search || undefined,
+                page: params.page || undefined,
+                per_page: params.per_page || undefined,
+            };
+
+            // Mirror the params into the address bar so a reload lands on the
+            // same view.
+            const pageUrl = new URL(window.location.href);
+            pageUrl.search = '';
+            Object.entries(queryParams).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    pageUrl.searchParams.set(key, String(value));
+                }
+            });
+            window.history.replaceState(window.history.state, '', pageUrl);
+
+            const requestId = ++requestIdRef.current;
+            setLoading(true);
+            try {
+                const res = await axios.get<PaginatedData<DepartmentRow>>(
+                    departmentsApi.index.url({ workspace }),
+                    { params: queryParams },
+                );
+                if (requestId === requestIdRef.current) {
+                    setDepartments(res.data);
+                }
+            } catch {
+                if (requestId === requestIdRef.current) {
+                    toast.error('Failed to load departments.');
+                }
+            } finally {
+                if (requestId === requestIdRef.current) {
+                    setLoading(false);
+                }
+            }
+        },
+        [workspace],
+    );
+
+    const isFirstSearch = useRef(true);
     useEffect(() => {
+        // The first run loads the initial page; later runs are the debounced
+        // search, which resets to page 1.
+        if (isFirstSearch.current) {
+            isFirstSearch.current = false;
+            fetchDepartments();
+            return;
+        }
         const timer = setTimeout(() => {
-            router.get(
-                baseUrl,
-                {
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : (query?.page ?? 1),
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['departments'],
-                },
-            );
+            fetchDepartments({ search: searchValue, page: 1 });
         }, 500);
         return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchValue]);
+    }, [searchValue, fetchDepartments]);
 
     const columns: ColumnDef<DepartmentRow>[] = [
         {
@@ -237,24 +295,20 @@ export default function DepartmentsIndex({
                     <DataTable
                         columns={columns}
                         enableInternalPagination={false}
-                        data={departments.data || []}
+                        data={departments?.data ?? []}
                         initialSorting={initialSorting}
-                        meta={{ ...omit(departments, ['data']) }}
+                        meta={
+                            departments
+                                ? omit(departments, ['data'])
+                                : undefined
+                        }
+                        loading={loading}
                         onFetch={(params) => {
-                            router.get(
-                                baseUrl,
-                                {
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    page: params?.page ?? 1,
-                                    per_page: params?.per_page,
-                                },
-                                {
-                                    preserveState: true,
-                                    replace: true,
-                                    preserveScroll: true,
-                                },
-                            );
+                            fetchDepartments({
+                                sort: params?.sort as string | null,
+                                page: params?.page ?? 1,
+                                per_page: params?.per_page ?? undefined,
+                            });
                         }}
                     />
                 </div>
@@ -270,6 +324,7 @@ export default function DepartmentsIndex({
                         }}
                         department={editing}
                         workspace={workspace}
+                        onSaved={() => fetchDepartments()}
                     />
                 )}
 
@@ -278,6 +333,16 @@ export default function DepartmentsIndex({
                         department={toDelete}
                         workspace={workspace}
                         onClose={() => setToDelete(null)}
+                        onDeleted={() =>
+                            // Step back a page when the last row on it went.
+                            fetchDepartments(
+                                departments &&
+                                    departments.data.length === 1 &&
+                                    departments.current_page > 1
+                                    ? { page: departments.current_page - 1 }
+                                    : {},
+                            )
+                        }
                     />
                 )}
             </div>

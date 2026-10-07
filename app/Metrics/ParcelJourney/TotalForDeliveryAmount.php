@@ -52,10 +52,9 @@ final class TotalForDeliveryAmount
 
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
-        return $this->baseQuery($workspaceId, $date_range, $filter, true)
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+        return $this->baseQuery($workspaceId, $date_range, $filter)
+            ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
             ->selectRaw('shops.id as shop_id, shops.name as shop_name, SUM(pancake_orders.final_amount) as value')
-            ->whereNotNull('pages.shop_id')
             ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
             ->get();

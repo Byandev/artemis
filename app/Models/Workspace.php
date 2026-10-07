@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Permission as PermissionEnum;
 use App\Support\Metrics\MetricRegistry;
+use App\Support\RmoDefaultStatuses;
 use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,8 @@ use Modules\Inventory\Models\InventoryNotificationSetting;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\MetaAds\Models\User as MetaUser;
+use Modules\Pancake\Models\OrderForDeliveryCxStatus;
+use Modules\Pancake\Models\OrderForDeliveryRiderStatus;
 
 class Workspace extends Model
 {
@@ -245,6 +248,8 @@ class Workspace extends Model
                     'default_metrics' => $defaults,
                 ]
             );
+
+            RmoDefaultStatuses::seed($workspace);
         });
     }
 
@@ -472,6 +477,16 @@ class Workspace extends Model
     public function metricSetting()
     {
         return $this->hasOne(WorkspaceMetricSetting::class);
+    }
+
+    public function rmoCxStatuses(): HasMany
+    {
+        return $this->hasMany(OrderForDeliveryCxStatus::class)->orderBy('name');
+    }
+
+    public function rmoRiderStatuses(): HasMany
+    {
+        return $this->hasMany(OrderForDeliveryRiderStatus::class)->orderBy('name');
     }
 
     public function rmoSetting()
