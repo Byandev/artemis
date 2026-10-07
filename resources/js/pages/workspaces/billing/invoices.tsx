@@ -1,10 +1,12 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { type BreadcrumbItem, PaginatedData } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import { format } from 'date-fns';
 import { debounce, omit, omitBy } from 'lodash';
 import { Download, FileText, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -24,7 +26,13 @@ interface Invoice {
 interface Props {
     workspace: { id: number; name: string; slug: string };
     invoices: PaginatedData<Invoice>;
-    filters: { search?: string; status?: string; sort?: string };
+    filters: {
+        search?: string;
+        status?: string;
+        date_from?: string;
+        date_to?: string;
+        sort?: string;
+    };
 }
 
 const STATUS_STYLES: Record<Invoice['status'], string> = {
@@ -65,6 +73,8 @@ export default function WorkspaceInvoices({
 }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const status = filters.status || '';
+    const from = filters.date_from || '';
+    const to = filters.date_to || '';
     const baseUrl = `/workspaces/${workspace.slug}/billing/invoices`;
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -74,6 +84,13 @@ export default function WorkspaceInvoices({
     const sort = filters.sort || '';
     const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
+    // Memoised because DatePicker re-initialises flatpickr whenever this
+    // array's identity changes.
+    const dateRange = useMemo(
+        () => (from ? [from, to || from] : undefined),
+        [from, to],
+    );
+
     const query = useCallback(
         (params: Record<string, string | number | undefined | null>) => {
             router.get(
@@ -82,8 +99,10 @@ export default function WorkspaceInvoices({
                 // silently reset them; `params` overrides whatever it names.
                 omitBy(
                     {
-                        search: search || undefined,
-                        status: status || undefined,
+                        'filter[search]': search || undefined,
+                        'filter[status]': status || undefined,
+                        'filter[date_from]': from || undefined,
+                        'filter[date_to]': to || undefined,
                         sort: sort || undefined,
                         page: 1,
                         ...params,
@@ -93,11 +112,15 @@ export default function WorkspaceInvoices({
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [search, status, sort, baseUrl],
+        [search, status, from, to, sort, baseUrl],
     );
 
     const performSearch = useMemo(
-        () => debounce((s: string) => query({ search: s || undefined }), 400),
+        () =>
+            debounce(
+                (s: string) => query({ 'filter[search]': s || undefined }),
+                400,
+            ),
         [query],
     );
 
@@ -225,7 +248,9 @@ export default function WorkspaceInvoices({
                     <select
                         value={status}
                         onChange={(e) =>
-                            query({ status: e.target.value || undefined })
+                            query({
+                                'filter[status]': e.target.value || undefined,
+                            })
                         }
                         className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-800 dark:bg-zinc-950"
                     >
@@ -234,6 +259,25 @@ export default function WorkspaceInvoices({
                         <option value="sent">Sent</option>
                         <option value="paid">Paid</option>
                     </select>
+                    <DatePicker
+                        id="invoices-date-range"
+                        mode="range"
+                        placeholder="Issue date"
+                        defaultDate={dateRange}
+                        onChange={(dates) => {
+                            // flatpickr fires after the first click too; wait
+                            // for the end date, or an empty array on clear.
+                            if (dates.length === 1) return;
+                            query({
+                                'filter[date_from]': dates[0]
+                                    ? format(dates[0], 'yyyy-MM-dd')
+                                    : undefined,
+                                'filter[date_to]': dates[1]
+                                    ? format(dates[1], 'yyyy-MM-dd')
+                                    : undefined,
+                            });
+                        }}
+                    />
                 </div>
 
                 <div className="mt-4">
