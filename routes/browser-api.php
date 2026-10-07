@@ -12,6 +12,7 @@ use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
 use App\Http\Controllers\API\Workspace\WelleStatsController;
+use Modules\Courses\Http\Controllers\Api\CourseCatalogController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
 use Modules\Products\Http\Controllers\Api\ProductController;
@@ -169,6 +170,14 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/leaderboard', [VideoEditorDashboardController::class, 'leaderboard'])->name('leaderboard');
             Route::get('/recent-activity', [VideoEditorDashboardController::class, 'recentActivity'])->name('recent-activity');
             Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
+        });
+
+        // Courses page — the grid, the stat tiles and the leaderboard load over
+        // XHR, each on its own. See CourseCatalogController.
+        Route::prefix('courses')->name('courses.')->group(function () {
+            Route::get('/', [CourseCatalogController::class, 'courses'])->name('index');
+            Route::get('/stats', [CourseCatalogController::class, 'stats'])->name('stats');
+            Route::get('/leaderboard', [CourseCatalogController::class, 'leaderboard'])->name('leaderboard');
         });
 
         // Inventory dashboard — one endpoint per KPI so each loads, skeletons

@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import Pagination from '@/components/ui/pagination';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -14,7 +15,7 @@ import {
     Trash2,
     X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import CourseFilters, {
     type CourseFilterValue,
 } from './components/course-filters';
@@ -36,6 +37,7 @@ import {
     TRACK,
     TRACK_THIN,
 } from './lib/ui';
+import { useCoursesApi } from './lib/use-courses-api';
 import {
     type Course,
     type CourseStats,
@@ -45,12 +47,10 @@ import {
 
 interface Props {
     workspace: CourseWorkspace;
-    courses: PaginatedData<Course>;
-    stats: CourseStats;
-    leaderboard: LeaderboardRow[];
     /** Set by ?new=1 so the player's "New course" button lands ready to type. */
     openCreateOnMount?: boolean;
-    filters: { search: string; categories: string[] };
+    /** What the URL asked for on load; the page owns the filters after that. */
+    filters: { search: string; categories: string[]; page: number };
     categoryOptions: string[];
 }
 
@@ -190,19 +190,61 @@ function CourseCard({
     );
 }
 
+/** Retry line shown in place of a section whose request failed. */
+function LoadError({ what, onRetry }: { what: string; onRetry: () => void }) {
+    return (
+        <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+            Couldn't load {what}.{' '}
+            <button
+                onClick={onRetry}
+                className="text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400"
+            >
+                Retry
+            </button>
+        </p>
+    );
+}
+
 export default function CoursesIndex({
     workspace,
-    courses,
-    stats,
-    leaderboard,
     openCreateOnMount = false,
     filters,
     categoryOptions,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/courses`;
 
+    // `search` follows the input; `applied` is what the grid was last asked
+    // for, and only moves once typing settles.
     const [search, setSearch] = useState(filters.search);
-    const [loading, setLoading] = useState(false);
+    const [applied, setApplied] = useState({
+        search: filters.search,
+        categories: filters.categories,
+        page: filters.page,
+    });
+
+    const listParams = useMemo(
+        () => ({
+            search: applied.search,
+            categories: applied.categories,
+            page: applied.page,
+        }),
+        [applied],
+    );
+
+    const courses = useCoursesApi<PaginatedData<Course>>(
+        workspace.slug,
+        '',
+        listParams,
+    );
+    const statsState = useCoursesApi<CourseStats>(workspace.slug, 'stats');
+    const leaderboardState = useCoursesApi<LeaderboardRow[]>(
+        workspace.slug,
+        'leaderboard',
+    );
+
+    const stats = statsState.data;
+    const leaderboard = leaderboardState.data ?? [];
+
     const [dialogOpen, setDialogOpen] = useState(openCreateOnMount);
     const [editing, setEditing] = useState<Course | null>(null);
 
@@ -218,28 +260,33 @@ export default function CoursesIndex({
         categories?: string[];
         page?: number;
     }) {
-        router.get(
-            baseUrl,
-            {
-                search: next.search ?? search,
-                categories: next.categories ?? filters.categories,
-                // Narrowing the list has to send you back to the first page, or
-                // you can land on a page that no longer exists.
-                page: next.page ?? 1,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-                onStart: () => setLoading(true),
-                onFinish: () => setLoading(false),
-            },
-        );
+        const params = {
+            search: next.search ?? search,
+            categories: next.categories ?? applied.categories,
+            // Narrowing the list has to send you back to the first page, or
+            // you can land on a page that no longer exists.
+            page: next.page ?? 1,
+        };
+
+        setApplied(params);
+
+        // Keep the URL in step so a reload or a shared link opens the same
+        // view. Client-side only — the grid already refetches on its own.
+        const qs = new URLSearchParams();
+        if (params.search !== '') qs.set('search', params.search);
+        params.categories.forEach((c) => qs.append('categories[]', c));
+        if (params.page > 1) qs.set('page', String(params.page));
+
+        router.replace({
+            url: qs.size > 0 ? `${baseUrl}?${qs}` : baseUrl,
+            preserveState: true,
+            preserveScroll: true,
+        });
     }
 
     // Debounced so typing doesn't fire a request per keystroke.
     useEffect(() => {
-        if (search === filters.search) return;
+        if (search === applied.search) return;
 
         const timer = setTimeout(() => query({ search }), 350);
 
@@ -248,10 +295,10 @@ export default function CoursesIndex({
     }, [search]);
 
     const activeFilters: CourseFilterValue = {
-        categories: filters.categories,
+        categories: applied.categories,
     };
 
-    const isFiltered = filters.search !== '' || filters.categories.length > 0;
+    const isFiltered = applied.search !== '' || applied.categories.length > 0;
 
     function openCreate() {
         setEditing(null);
@@ -275,13 +322,15 @@ export default function CoursesIndex({
                 <PageHeader
                     title="Courses"
                     description={
-                        stats.can_manage
-                            ? `${plural(stats.total_courses, 'course')}${
-                                  stats.draft_courses > 0
-                                      ? ` · ${stats.draft_courses} in draft`
-                                      : ''
-                              }`
-                            : `${plural(stats.total_courses, 'course')} available · ${stats.my_courses} started`
+                        !stats
+                            ? undefined
+                            : stats.can_manage
+                              ? `${plural(stats.total_courses, 'course')}${
+                                    stats.draft_courses > 0
+                                        ? ` · ${stats.draft_courses} in draft`
+                                        : ''
+                                }`
+                              : `${plural(stats.total_courses, 'course')} available · ${stats.my_courses} started`
                     }
                 >
                     {canCreate && (
@@ -293,73 +342,96 @@ export default function CoursesIndex({
                 </PageHeader>
 
                 {/* Stat tiles */}
-                <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-                    <div className={`${CARD} p-5`}>
-                        <p className={LABEL}>All Courses</p>
-                        <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
-                            {stats.total_courses}
-                        </p>
-                        <p className={`mt-0.5 ${MUTED}`}>
-                            {stats.can_manage
-                                ? `${plural(stats.total_lessons, 'lesson')} in total`
-                                : 'published and open to you'}
-                        </p>
+                {!stats ? (
+                    <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                        {[0, 1, 2].map((i) => (
+                            <div key={i} className={`${CARD} p-5`}>
+                                {statsState.error ? (
+                                    i === 0 && (
+                                        <LoadError
+                                            what="the course figures"
+                                            onRetry={statsState.refetch}
+                                        />
+                                    )
+                                ) : (
+                                    <>
+                                        <Skeleton className="h-3 w-24" />
+                                        <Skeleton className="mt-2 h-6 w-12" />
+                                        <Skeleton className="mt-2 h-3 w-32" />
+                                    </>
+                                )}
+                            </div>
+                        ))}
                     </div>
-
-                    <div className={`${CARD} p-5`}>
-                        <p className={LABEL}>
-                            {stats.can_manage ? 'Published' : 'My Courses'}
-                        </p>
-                        <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
-                            {stats.can_manage
-                                ? stats.active_courses
-                                : stats.my_courses}
-                        </p>
-                        <p className={`mt-0.5 ${MUTED}`}>
-                            {stats.can_manage
-                                ? stats.draft_courses > 0
-                                    ? `${stats.draft_courses} still in draft`
-                                    : 'nothing in draft'
-                                : stats.my_courses === 0
-                                  ? 'nothing started yet'
-                                  : `${plural(stats.total_lessons, 'lesson')} to work through`}
-                        </p>
-                    </div>
-
-                    {stats.can_manage ? (
+                ) : (
+                    <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
                         <div className={`${CARD} p-5`}>
-                            <p className={LABEL}>Avg Completion Rate</p>
-                            <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-amber-600 tabular-nums dark:text-amber-500">
-                                {stats.avg_completion}%
+                            <p className={LABEL}>All Courses</p>
+                            <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
+                                {stats.total_courses}
                             </p>
                             <p className={`mt-0.5 ${MUTED}`}>
-                                {stats.enrolled_count === 0
-                                    ? 'nobody enrolled yet'
-                                    : `across ${plural(stats.enrolled_count, 'enrollment')}`}
+                                {stats.can_manage
+                                    ? `${plural(stats.total_lessons, 'lesson')} in total`
+                                    : 'published and open to you'}
                             </p>
                         </div>
-                    ) : (
+
                         <div className={`${CARD} p-5`}>
-                            <p className={LABEL}>My Completion</p>
-                            <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-emerald-600 tabular-nums dark:text-emerald-500">
-                                {stats.my_completion}%
+                            <p className={LABEL}>
+                                {stats.can_manage ? 'Published' : 'My Courses'}
                             </p>
-                            <div className={`mt-2 ${TRACK}`}>
-                                <div
-                                    className={BAR}
-                                    style={{
-                                        width: `${stats.my_completion}%`,
-                                    }}
-                                />
-                            </div>
-                            <p className={`mt-1.5 ${MUTED}`}>
-                                {stats.completed_lessons} of{' '}
-                                {plural(stats.total_lessons, 'lesson')} in the
-                                courses you started
+                            <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
+                                {stats.can_manage
+                                    ? stats.active_courses
+                                    : stats.my_courses}
+                            </p>
+                            <p className={`mt-0.5 ${MUTED}`}>
+                                {stats.can_manage
+                                    ? stats.draft_courses > 0
+                                        ? `${stats.draft_courses} still in draft`
+                                        : 'nothing in draft'
+                                    : stats.my_courses === 0
+                                      ? 'nothing started yet'
+                                      : `${plural(stats.total_lessons, 'lesson')} to work through`}
                             </p>
                         </div>
-                    )}
-                </div>
+
+                        {stats.can_manage ? (
+                            <div className={`${CARD} p-5`}>
+                                <p className={LABEL}>Avg Completion Rate</p>
+                                <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-amber-600 tabular-nums dark:text-amber-500">
+                                    {stats.avg_completion}%
+                                </p>
+                                <p className={`mt-0.5 ${MUTED}`}>
+                                    {stats.enrolled_count === 0
+                                        ? 'nobody enrolled yet'
+                                        : `across ${plural(stats.enrolled_count, 'enrollment')}`}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className={`${CARD} p-5`}>
+                                <p className={LABEL}>My Completion</p>
+                                <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-emerald-600 tabular-nums dark:text-emerald-500">
+                                    {stats.my_completion}%
+                                </p>
+                                <div className={`mt-2 ${TRACK}`}>
+                                    <div
+                                        className={BAR}
+                                        style={{
+                                            width: `${stats.my_completion}%`,
+                                        }}
+                                    />
+                                </div>
+                                <p className={`mt-1.5 ${MUTED}`}>
+                                    {stats.completed_lessons} of{' '}
+                                    {plural(stats.total_lessons, 'lesson')} in
+                                    the courses you started
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
                     <div className="space-y-3.5 lg:col-span-3">
@@ -407,13 +479,37 @@ export default function CoursesIndex({
 
                         {/* Course grid */}
                         <div>
-                            {courses.data.length === 0 ? (
+                            {courses.error ? (
+                                <div className={EMPTY}>
+                                    <GraduationCap className="h-6 w-6 text-gray-300 dark:text-gray-600" />
+                                    <LoadError
+                                        what="courses"
+                                        onRetry={courses.refetch}
+                                    />
+                                </div>
+                            ) : !courses.data ? (
+                                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+                                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                                        <div
+                                            key={i}
+                                            className={`overflow-hidden ${CARD}`}
+                                        >
+                                            <Skeleton className="h-24 rounded-none" />
+                                            <div className="space-y-2.5 p-3.5">
+                                                <Skeleton className="h-4 w-3/4" />
+                                                <Skeleton className="h-3 w-1/2" />
+                                                <Skeleton className="h-1.5 w-full" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : courses.data.data.length === 0 ? (
                                 <div className={EMPTY}>
                                     <GraduationCap className="h-6 w-6 text-gray-300 dark:text-gray-600" />
                                     <p className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
                                         {isFiltered
                                             ? 'No courses match those filters'
-                                            : stats.can_manage
+                                            : canEdit
                                               ? 'No courses yet'
                                               : 'No published courses yet'}
                                     </p>
@@ -435,10 +531,10 @@ export default function CoursesIndex({
                             ) : (
                                 <div
                                     className={`grid grid-cols-1 gap-3.5 transition-opacity sm:grid-cols-2 xl:grid-cols-3 ${
-                                        loading ? 'opacity-50' : ''
+                                        courses.loading ? 'opacity-50' : ''
                                     }`}
                                 >
-                                    {courses.data.map((course) => (
+                                    {courses.data.data.map((course) => (
                                         <CourseCard
                                             key={course.id}
                                             course={course}
@@ -457,15 +553,19 @@ export default function CoursesIndex({
                                 </div>
                             )}
 
-                            {(courses.last_page ?? 1) > 1 && (
+                            {(courses.data?.last_page ?? 1) > 1 && (
                                 <div className="mt-4 flex items-center justify-between gap-3">
                                     <p className={NUM}>
-                                        {courses.from}–{courses.to} of{' '}
-                                        {courses.total}
+                                        {courses.data?.from}–{courses.data?.to}{' '}
+                                        of {courses.data?.total}
                                     </p>
                                     <Pagination
-                                        currentPage={courses.current_page ?? 1}
-                                        totalPages={courses.last_page ?? 1}
+                                        currentPage={
+                                            courses.data?.current_page ?? 1
+                                        }
+                                        totalPages={
+                                            courses.data?.last_page ?? 1
+                                        }
                                         onPageChange={(page) => query({ page })}
                                     />
                                 </div>
@@ -478,7 +578,23 @@ export default function CoursesIndex({
                         <div className={`${CARD} p-5 lg:sticky lg:top-4`}>
                             <p className={LABEL}>Completion Leaderboard</p>
 
-                            {leaderboard.length === 0 ? (
+                            {leaderboardState.error ? (
+                                <div className="mt-3">
+                                    <LoadError
+                                        what="the leaderboard"
+                                        onRetry={leaderboardState.refetch}
+                                    />
+                                </div>
+                            ) : !leaderboardState.data ? (
+                                <div className="mt-3 space-y-3">
+                                    {[0, 1, 2, 3].map((i) => (
+                                        <div key={i} className="space-y-1.5">
+                                            <Skeleton className="h-3 w-full" />
+                                            <Skeleton className="h-1 w-full" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : leaderboard.length === 0 ? (
                                 <p className="mt-3 font-mono text-[11px] text-gray-400 dark:text-gray-500">
                                     Nobody has completed a lesson yet
                                 </p>
