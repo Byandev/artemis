@@ -32,6 +32,10 @@ use Throwable;
  *
  * The (token, format) pair that ends up rendering is cached per ad, so only the
  * first look-up pays for the search.
+ *
+ * Every look-up also reports `attempts` — which Meta user signed each request,
+ * in which format, and what came back — so the drawer can show whose access a
+ * "Story Unavailable" came from.
  */
 class AdPreviewResolver
 {
@@ -46,8 +50,21 @@ class AdPreviewResolver
 
     public const DEFAULT_FORMAT = 'MOBILE_FEED_STANDARD';
 
-    /** Cache sentinel for "we checked every format and none rendered". */
+    /**
+     * Cache sentinel for "we checked every format and none rendered". Older
+     * entries hold the bare string; newer ones an array that also keeps the
+     * attempts, so a cached miss can still say who was tried.
+     */
     private const NONE = '__none__';
+
+    /** The ref graphClients() gives the Business Manager system user. */
+    private const SYSTEM_REF = 'system';
+
+    /** @var list<array{user_id: string|null, user_name: string, format: string, result: string, cached: bool}> */
+    private array $attempts = [];
+
+    /** @var array<string, string> token ref => display name, for the account being resolved */
+    private array $names = [];
 
     /**
      * Needles from Meta's "Story Unavailable" interstitial, matched
@@ -67,22 +84,36 @@ class AdPreviewResolver
     private const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
     /**
-     * @return array{src: string|null, format: string|null, requested_format: string, reason: string|null}
-     *                                                                                                     `reason` is null when a preview rendered, `story_unavailable` when
-     *                                                                                                     Meta rendered the interstitial for every token/format tried, and
-     *                                                                                                     `no_preview` when Meta returned no iframe at all.
+     * `reason` is null when a preview rendered, `story_unavailable` when Meta
+     * rendered the interstitial for every token/format tried, and `no_preview`
+     * when Meta returned no iframe at all. `attempts` lists each request in the
+     * order it was made; the last one is whose preview is on screen.
+     *
+     * @return array{src: string|null, format: string|null, requested_format: string, reason: string|null, attempts: list<array{user_id: string|null, user_name: string, format: string, result: string, cached: bool}>}
      */
     public function resolve(AdAccount $account, int|string $adId, string $format = self::DEFAULT_FORMAT): array
     {
         $format = $this->sanitizeFormat($format);
         $cacheKey = $this->cacheKey($adId, $format);
         $known = Cache::get($cacheKey);
+        $this->attempts = [];
 
         if ($known === self::NONE) {
             return $this->miss($format, 'story_unavailable');
         }
 
+        if (is_array($known) && ($known['none'] ?? false)) {
+            // Replay who was tried when the miss was cached, marked as such.
+            $this->attempts = array_map(
+                fn (array $attempt) => [...$attempt, 'cached' => true],
+                $known['attempts'] ?? [],
+            );
+
+            return $this->miss($format, 'story_unavailable');
+        }
+
         $clients = $account->graphClients();
+        $this->names = $this->tokenNames($account);
 
         if ($clients === []) {
             Log::warning('Meta ad preview has no usable token', ['ad_id' => (string) $adId, 'account_id' => (string) $account->id]);
@@ -94,12 +125,17 @@ class AdPreviewResolver
         // Trust it and skip the search and the validation fetch — but still ask
         // Meta for a fresh src, because the `d=` token in it is short-lived and
         // never cached.
-        if (is_array($known) && isset($clients[$known['client']])) {
+        if (is_array($known) && isset($known['client'], $clients[$known['client']])) {
             $src = $this->fetchSrc($clients[$known['client']], $adId, $known['format']);
 
             if ($src !== null) {
+                // Not re-validated: the pair passed the check when cached.
+                $this->attempt($known['client'], $known['format'], 'rendered', true);
+
                 return $this->hit($src, $known['format'], $format);
             }
+
+            $this->attempt($known['client'], $known['format'], 'no_iframe');
 
             Cache::forget($cacheKey);
         }
@@ -114,14 +150,20 @@ class AdPreviewResolver
             $src = $this->fetchSrc($clients[$primary], $adId, $candidate);
 
             if ($src === null) {
+                $this->attempt($primary, $candidate, 'no_iframe');
+
                 continue;
             }
 
             $sawIframe = true;
 
             if ($this->renders($src)) {
+                $this->attempt($primary, $candidate, 'rendered');
+
                 return $this->remember($cacheKey, $src, $candidate, $format, $primary);
             }
+
+            $this->attempt($primary, $candidate, 'story_unavailable');
         }
 
         // Phase two — the same ad through the account's other tokens, requested
@@ -133,12 +175,16 @@ class AdPreviewResolver
             $src = $this->fetchSrc($clients[$ref], $adId, $format);
 
             if ($src === null) {
+                $this->attempt($ref, $format, 'no_iframe');
+
                 continue;
             }
 
             $sawIframe = true;
 
             if ($this->renders($src)) {
+                $this->attempt($ref, $format, 'rendered');
+
                 Log::info('Meta ad preview recovered through an alternate token', [
                     'ad_id' => (string) $adId,
                     'account_id' => (string) $account->id,
@@ -147,9 +193,15 @@ class AdPreviewResolver
 
                 return $this->remember($cacheKey, $src, $format, $format, $ref);
             }
+
+            $this->attempt($ref, $format, 'story_unavailable');
         }
 
-        Cache::put($cacheKey, self::NONE, (int) config('metaads.preview.unavailable_ttl', 900));
+        Cache::put(
+            $cacheKey,
+            ['none' => true, 'attempts' => $this->attempts],
+            (int) config('metaads.preview.unavailable_ttl', 900),
+        );
 
         return $this->miss($format, $sawIframe ? 'story_unavailable' : 'no_preview');
     }
@@ -167,6 +219,35 @@ class AdPreviewResolver
         $refs = array_values(array_diff(array_keys($clients), [$primary]));
 
         return array_slice($refs, 0, $limit);
+    }
+
+    /**
+     * Display names for the account's tokens, keyed the way graphClients()
+     * keys them. Reuses the relation graphClients() already loaded.
+     *
+     * @return array<string, string>
+     */
+    private function tokenNames(AdAccount $account): array
+    {
+        $names = [self::SYSTEM_REF => 'Business Manager system user'];
+
+        foreach ($account->metaUsers as $metaUser) {
+            $names[(string) $metaUser->id] = $metaUser->name ?: 'Meta user '.$metaUser->id;
+        }
+
+        return $names;
+    }
+
+    /** Note one request: whose token signed it, the format, and what came back. */
+    private function attempt(string $ref, string $format, string $result, bool $cached = false): void
+    {
+        $this->attempts[] = [
+            'user_id' => $ref === self::SYSTEM_REF ? null : $ref,
+            'user_name' => $this->names[$ref] ?? 'Meta user '.$ref,
+            'format' => $format,
+            'result' => $result,
+            'cached' => $cached,
+        ];
     }
 
     /** Cache the (token, format) pair that rendered, then return it. */
@@ -272,7 +353,6 @@ class AdPreviewResolver
         return "metaads:preview-format:{$adId}:{$format}";
     }
 
-    /** @return array{src: string, format: string, requested_format: string, reason: null} */
     private function hit(string $src, string $format, string $requested): array
     {
         return [
@@ -280,10 +360,10 @@ class AdPreviewResolver
             'format' => $format,
             'requested_format' => $requested,
             'reason' => null,
+            'attempts' => $this->attempts,
         ];
     }
 
-    /** @return array{src: null, format: null, requested_format: string, reason: string} */
     private function miss(string $requested, string $reason): array
     {
         return [
@@ -291,6 +371,7 @@ class AdPreviewResolver
             'format' => null,
             'requested_format' => $requested,
             'reason' => $reason,
+            'attempts' => $this->attempts,
         ];
     }
 }

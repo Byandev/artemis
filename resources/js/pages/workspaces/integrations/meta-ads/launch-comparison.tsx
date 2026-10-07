@@ -100,7 +100,7 @@ const NON_ADDITIVE = new Set([
 
 const METRIC_OPTIONS = INSIGHTS_OPTIONS.filter((o) => !NON_ADDITIVE.has(o.id));
 
-const DEFAULT_METRICS = ['spend', 'purchases', 'cost_per_purchase', 'roas'];
+const DEFAULT_METRICS = ['spend', 'roas'];
 
 /** A past day with no delivery is a real 0, unlike the grid's em-dash. */
 function formatValue(metric: string, value: number): string {
@@ -264,9 +264,8 @@ interface Series {
 
 /**
  * One row per launch. Columns are grouped by day — Day 1 → Day N across the
- * top — and each day splits into its calendar date plus one column per
- * metric. The date sits in the row because Day N lands on a different date
- * for each launch. Future days show their date, muted, and no values.
+ * top — and each day splits into one column per metric. Future days show no
+ * values.
  */
 function ComparisonTable({
     metrics,
@@ -312,7 +311,7 @@ function ComparisonTable({
                         {dayIdx.map((i) => (
                             <th
                                 key={i}
-                                colSpan={metrics.length + 1}
+                                colSpan={metrics.length}
                                 className={clsx(
                                     groupStart,
                                     'px-3 py-2 text-center font-medium whitespace-nowrap text-gray-700 dark:text-gray-200',
@@ -323,25 +322,19 @@ function ComparisonTable({
                         ))}
                     </tr>
                     <tr className="border-b border-black/6 dark:border-white/6">
-                        {dayIdx.map((i) => [
-                            <th
-                                key={`${i}-date`}
-                                className={clsx(
-                                    groupStart,
-                                    'px-3 py-1.5 text-left font-normal whitespace-nowrap text-gray-400 dark:text-gray-500',
-                                )}
-                            >
-                                Date
-                            </th>,
-                            ...metrics.map((m) => (
+                        {dayIdx.map((i) =>
+                            metrics.map((m, j) => (
                                 <th
                                     key={`${i}-${m}`}
-                                    className="px-3 py-1.5 text-right font-normal whitespace-nowrap text-gray-500 dark:text-gray-400"
+                                    className={clsx(
+                                        j === 0 && groupStart,
+                                        'px-3 py-1.5 text-right font-normal whitespace-nowrap text-gray-500 dark:text-gray-400',
+                                    )}
                                 >
                                     {metricLabel(m)}
                                 </th>
                             )),
-                        ])}
+                        )}
                     </tr>
                 </thead>
                 <tbody>
@@ -384,35 +377,19 @@ function ComparisonTable({
                             {dayIdx.map((i) => {
                                 const p = s.points[i];
 
-                                return [
+                                return metrics.map((m, j) => (
                                     <td
-                                        key={`${i}-date`}
+                                        key={`${i}-${m}`}
                                         className={clsx(
-                                            groupStart,
-                                            'px-3 py-1.5 whitespace-nowrap',
-                                            p
-                                                ? 'text-gray-600 dark:text-gray-300'
-                                                : 'text-gray-400 dark:text-gray-500',
+                                            j === 0 && groupStart,
+                                            'px-3 py-1.5 text-right whitespace-nowrap text-gray-800 tabular-nums dark:text-gray-100',
                                         )}
                                     >
-                                        {longDate(
-                                            addDays(s.item.start_date, i),
-                                        )}
-                                    </td>,
-                                    ...metrics.map((m) => (
-                                        <td
-                                            key={`${i}-${m}`}
-                                            className="px-3 py-1.5 text-right whitespace-nowrap text-gray-800 tabular-nums dark:text-gray-100"
-                                        >
-                                            {p
-                                                ? formatValue(
-                                                      m,
-                                                      metricValue(p, m),
-                                                  )
-                                                : ''}
-                                        </td>
-                                    )),
-                                ];
+                                        {p
+                                            ? formatValue(m, metricValue(p, m))
+                                            : ''}
+                                    </td>
+                                ));
                             })}
                         </tr>
                     ))}

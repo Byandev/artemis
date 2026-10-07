@@ -88,10 +88,9 @@ final class RtsRate
     public function perShop(int $workspaceId, array $date_range, array $filter)
     {
         if ($this->source === MetricSource::LIVE) {
-            return $this->liveBaseQuery($workspaceId, $date_range, $filter, forceJoinPages: true)
-                ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            return $this->liveBaseQuery($workspaceId, $date_range, $filter)
+                ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
                 ->selectRaw('shops.id AS shop_id, shops.name AS shop_name, '.$this->liveRatioSql().' AS value')
-                ->whereNotNull('pages.shop_id')
                 ->groupBy('shops.id', 'shops.name')
                 ->orderByDesc('value')
                 ->get();

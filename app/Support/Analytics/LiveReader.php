@@ -202,7 +202,7 @@ class LiveReader
     {
         $spec = self::spec($column);
 
-        return self::baseQuery($workspaceId, $dateRange, $filter, $spec, forceJoinPages: true)
+        return self::baseQuery($workspaceId, $dateRange, $filter, $spec, forceJoinPages: false)
             ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
             ->selectRaw('
                 shops.id AS shop_id,
@@ -254,8 +254,8 @@ class LiveReader
     {
         [$num, $den, $spec] = self::pairExprs($numeratorCol, $denominatorCol);
 
-        return self::baseQuery($workspaceId, $dateRange, $filter, $spec, forceJoinPages: true)
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+        return self::baseQuery($workspaceId, $dateRange, $filter, $spec, forceJoinPages: false)
+            ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
             ->selectRaw("
                 shops.id AS shop_id,
                 shops.name AS shop_name,
@@ -265,7 +265,6 @@ class LiveReader
                     2
                 ) AS value
             ")
-            ->whereNotNull('pages.shop_id')
             ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
             ->get();

@@ -13,12 +13,13 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import * as rolesRoute from '@/routes/roles';
+import rolesApi from '@/routes/api/workspaces/roles';
 import { PaginatedData } from '@/types';
 import { Role } from '@/types/models/Role';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import axios from 'axios';
 import { omit } from 'lodash';
 import {
     AlertTriangle,
@@ -30,21 +31,27 @@ import {
     Search,
     ShieldCheck,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 
+type FetchParams = {
+    sort?: string | null;
+    search?: string;
+    page?: number | string;
+    per_page?: number | string;
+};
+
 interface Props {
-    roles: PaginatedData<Role>;
     workspace: Workspace;
     query?: {
         sort?: string | null;
-        perPage?: number | string;
+        per_page?: number | string;
         page?: number | string;
         filter?: { search?: string };
     };
 }
 
-export default function Index({ roles, workspace, query }: Props) {
+export default function Index({ workspace, query }: Props) {
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
@@ -63,26 +70,80 @@ export default function Index({ roles, workspace, query }: Props) {
     const canManagePerms = usePermission(PERMISSIONS.ManageRolePermissions);
     const showActions = canEdit || canArchive || canManagePerms;
 
+    const [roles, setRoles] = useState<PaginatedData<Role> | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    // The params of the last fetch, so a refetch after a save or archive keeps
+    // the page, sort and search the user was looking at.
+    const paramsRef = useRef<FetchParams>({
+        sort: query?.sort ?? null,
+        search: query?.filter?.search ?? '',
+        page: query?.page ?? 1,
+        per_page: query?.per_page,
+    });
+    // Drops responses from fetches a newer one has superseded.
+    const requestIdRef = useRef(0);
+
+    const fetchRoles = useCallback(
+        async (next: FetchParams = {}) => {
+            const params = { ...paramsRef.current, ...next };
+            paramsRef.current = params;
+
+            const queryParams = {
+                sort: params.sort || undefined,
+                'filter[search]': params.search || undefined,
+                page: params.page || undefined,
+                per_page: params.per_page || undefined,
+            };
+
+            // Mirror the params into the address bar so a reload lands on the
+            // same view.
+            const pageUrl = new URL(window.location.href);
+            pageUrl.search = '';
+            Object.entries(queryParams).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    pageUrl.searchParams.set(key, String(value));
+                }
+            });
+            window.history.replaceState(window.history.state, '', pageUrl);
+
+            const requestId = ++requestIdRef.current;
+            setLoading(true);
+            try {
+                const res = await axios.get<PaginatedData<Role>>(
+                    rolesApi.index.url({ workspace }),
+                    { params: queryParams },
+                );
+                if (requestId === requestIdRef.current) {
+                    setRoles(res.data);
+                }
+            } catch {
+                if (requestId === requestIdRef.current) {
+                    toast.error('Failed to load roles.');
+                }
+            } finally {
+                if (requestId === requestIdRef.current) {
+                    setLoading(false);
+                }
+            }
+        },
+        [workspace],
+    );
+
+    const isFirstSearch = useRef(true);
     useEffect(() => {
+        // The first run loads the initial page; later runs are the debounced
+        // search, which resets to page 1.
+        if (isFirstSearch.current) {
+            isFirstSearch.current = false;
+            fetchRoles();
+            return;
+        }
         const timer = setTimeout(() => {
-            router.get(
-                rolesRoute.index(workspace).url,
-                {
-                    sort: query?.sort,
-                    'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : (query?.page ?? 1),
-                    per_page: query?.perPage ?? roles.per_page,
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['roles'],
-                },
-            );
+            fetchRoles({ search: searchValue, page: 1 });
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchValue]);
+    }, [searchValue, fetchRoles]);
 
     const handleConfirmArchive = () => {
         if (!selectedRole) return;
@@ -90,10 +151,20 @@ export default function Index({ roles, workspace, query }: Props) {
             `/workspaces/${workspace.slug}/roles/${selectedRole.id}`,
             {
                 preserveScroll: true,
+                // Keep the page mounted; it refetches the list itself.
+                preserveState: true,
                 onSuccess: () => {
                     toast.success(`${selectedRole.name} has been archived.`);
                     setIsArchiveModalOpen(false);
                     setSelectedRole(undefined);
+                    // Step back a page when the last row on it went.
+                    fetchRoles(
+                        roles &&
+                            roles.data.length === 1 &&
+                            roles.current_page > 1
+                            ? { page: roles.current_page - 1 }
+                            : {},
+                    );
                 },
             },
         );
@@ -219,6 +290,7 @@ export default function Index({ roles, workspace, query }: Props) {
                         if (!open) setSelectedRole(undefined);
                     }}
                     role={selectedRole}
+                    onSaved={() => fetchRoles()}
                 />
             )}
 
@@ -269,28 +341,17 @@ export default function Index({ roles, workspace, query }: Props) {
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
-                        data={roles.data || []}
+                        data={roles?.data ?? []}
                         enableInternalPagination={false}
                         initialSorting={initialSorting}
-                        meta={{ ...omit(roles, ['data']) }}
+                        meta={roles ? omit(roles, ['data']) : undefined}
+                        loading={loading}
                         onFetch={(params) => {
-                            router.get(
-                                rolesRoute.index(workspace).url,
-                                {
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    page: params?.page ?? 1,
-                                    per_page:
-                                        params?.per_page ??
-                                        query?.perPage ??
-                                        roles.per_page,
-                                },
-                                {
-                                    preserveState: true,
-                                    replace: true,
-                                    preserveScroll: true,
-                                },
-                            );
+                            fetchRoles({
+                                sort: params?.sort as string | null,
+                                page: params?.page ?? 1,
+                                per_page: params?.per_page ?? undefined,
+                            });
                         }}
                     />
                 </div>

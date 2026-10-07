@@ -4,6 +4,8 @@ namespace Modules\Pancake\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\Page;
+use App\Models\Shop;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -15,8 +17,10 @@ use Modules\Pancake\Filters\CustomerRtsReportFilter;
 use Modules\Pancake\Filters\IgnoredFilter;
 use Modules\Pancake\Filters\OrderDateFilter;
 use Modules\Pancake\Filters\OrderIdFilter;
+use Modules\Pancake\Filters\OrderPageFilter;
 use Modules\Pancake\Filters\OrderRiderFilter;
 use Modules\Pancake\Filters\OrderSearchFilter;
+use Modules\Pancake\Filters\OrderShopFilter;
 use Modules\Pancake\Filters\OrderStatusFilter;
 use Modules\Pancake\Jobs\ImportOrderShippingFees;
 use Modules\Pancake\Models\Order;
@@ -102,6 +106,8 @@ class OrderController extends Controller
             AllowedFilter::custom('date_to', new OrderDateFilter($dateColumn, '<=')),
             AllowedFilter::custom('date_type', new IgnoredFilter),
             AllowedFilter::custom('rider', new OrderRiderFilter),
+            AllowedFilter::custom('page', new OrderPageFilter),
+            AllowedFilter::custom('shop', new OrderShopFilter),
             AllowedFilter::custom('status', $withStatus ? new OrderStatusFilter : new IgnoredFilter),
             AllowedFilter::custom('report', new CustomerRtsReportFilter(
                 (string) $request->input('filter.rts_op'),
@@ -168,8 +174,24 @@ class OrderController extends Controller
             ->groupBy('status_name')
             ->pluck('total', 'status_name');
 
+        // The Page and Shop filters' options: the workspace's own, narrowed to
+        // the user's teams under the same rule as the rows themselves.
+        $options = fn ($query) => $query
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->visibleTo($request->user(), $workspace),
+            )
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        $pages = $options(Page::ofWorkspace($workspace));
+        $shops = $options(Shop::where('workspace_id', $workspace->id));
+
         return Inertia::render('workspaces/pancake/orders/index', [
             'workspace' => $workspace,
+            'pages' => $pages,
+            'shops' => $shops,
             'orders' => $orders,
             'statusCounts' => $statusCounts,
             'totalCount' => (int) $statusCounts->sum(),

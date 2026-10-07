@@ -22,12 +22,14 @@ interface DeleteTeamDialogProps {
     workspace: Workspace;
     team: Team | null;
     onClose: () => void;
+    onDeleted?: () => void;
 }
 
 export function DeleteTeamDialog({
     team,
     workspace,
     onClose,
+    onDeleted,
 }: DeleteTeamDialogProps) {
     const { delete: destroy, processing } = useForm({});
 
@@ -35,9 +37,13 @@ export function DeleteTeamDialog({
         if (!team) return;
 
         destroy(workspaces.teams.destroy.url({ workspace, team }), {
+            preserveScroll: true,
+            // Keep the page mounted; it refetches the list itself.
+            preserveState: true,
             onSuccess: () => {
                 toast.success(`Team deleted successfully`);
                 onClose();
+                onDeleted?.();
             },
         });
     };

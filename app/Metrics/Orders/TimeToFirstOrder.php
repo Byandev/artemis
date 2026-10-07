@@ -133,7 +133,7 @@ final class TimeToFirstOrder
         $users = DB::table('users')
             ->join('pages', 'pages.owner_id', '=', 'users.id')
             ->where('pages.workspace_id', $workspaceId)
-            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter, null))
             ->select('users.id', 'users.name')
             ->distinct()
             ->get();
@@ -200,7 +200,7 @@ final class TimeToFirstOrder
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter, 'pancake_orders'))
             ->groupBy('pages.id', 'pages.name', 'pancake_orders.customer_id')
             ->selectRaw('
                 pages.id as page_id,
@@ -216,14 +216,13 @@ final class TimeToFirstOrder
     private function firstOrderPerCustomerPerStoreQuery(int $workspaceId, array $filter): Builder
     {
         return DB::table('pancake_orders')
-            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->leftJoin('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
             ->where('pancake_orders.workspace_id', $workspaceId)
             ->whereNotNull('pancake_orders.customer_id')
             ->whereNotNull('pancake_orders.confirmed_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter))
-            ->whereNotNull('pages.shop_id')
+            ->tap(fn ($q) => OrdersFilter::applyToJoined($q, $filter, 'pancake_orders'))
             ->groupBy('shops.id', 'shops.name', 'pancake_orders.customer_id')
             ->selectRaw('
                 shops.id as shop_id,

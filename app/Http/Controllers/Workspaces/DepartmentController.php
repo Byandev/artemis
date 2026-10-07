@@ -11,8 +11,6 @@ use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\QueryBuilder;
 
 class DepartmentController extends Controller
 {
@@ -22,22 +20,10 @@ class DepartmentController extends Controller
     {
         $this->authorize(Permission::ViewDepartments->value, $workspace);
 
-        $departments = QueryBuilder::for(
-            Department::ofWorkspace($workspace)
-                ->withCount('users')
-        )
-            ->allowedFilters([
-                AllowedFilter::partial('search', 'name'),
-                AllowedFilter::exact('is_active'),
-            ])
-            ->allowedSorts(['name', 'code', 'is_active', 'created_at', 'users_count'])
-            ->defaultSort('-created_at')
-            ->paginate($request->integer('per_page', 10))
-            ->withQueryString();
-
+        // The list itself loads from the browser API so the page renders
+        // without waiting on the query — see API\Workspace\DepartmentController.
         return Inertia::render('workspaces/departments/index', [
             'workspace' => $workspace,
-            'departments' => $departments,
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),

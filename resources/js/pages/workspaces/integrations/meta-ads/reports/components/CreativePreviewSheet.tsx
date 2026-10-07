@@ -12,6 +12,7 @@ import {
     PREVIEW_FORMAT_LABELS,
     type ReportRow,
 } from '../types';
+import { PreviewAttempts } from './PreviewAttempts';
 
 /** Right-side drawer with Meta's signed creative preview + dimensions. */
 export function CreativePreviewSheet({
@@ -121,6 +122,8 @@ export function CreativePreviewSheet({
                             preview.
                         </p>
                     )}
+
+                    <PreviewAttempts attempts={preview?.attempts} />
 
                     <p className="mt-5 mb-1 text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                         Dimensions
