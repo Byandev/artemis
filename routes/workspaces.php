@@ -839,7 +839,9 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
 
-Route::prefix('/workspaces/{workspace:slug}')->group(function () {
+// Role management. Behind `auth` — each action also checks its own role
+// permission in RoleController.
+Route::middleware(['auth'])->prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
     Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
         ->withTrashed()
