@@ -22,12 +22,14 @@ interface DeleteDepartmentDialogProps {
     workspace: Workspace;
     department: Department | null;
     onClose: () => void;
+    onDeleted?: () => void;
 }
 
 export function DeleteDepartmentDialog({
     department,
     workspace,
     onClose,
+    onDeleted,
 }: DeleteDepartmentDialogProps) {
     const { delete: destroy, processing } = useForm({});
 
@@ -41,9 +43,12 @@ export function DeleteDepartmentDialog({
             }),
             {
                 preserveScroll: true,
+                // Keep the page mounted; it refetches the list itself.
+                preserveState: true,
                 onSuccess: () => {
                     toast.success('Department deleted successfully');
                     onClose();
+                    onDeleted?.();
                 },
             },
         );

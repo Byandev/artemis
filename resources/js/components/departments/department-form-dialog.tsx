@@ -25,6 +25,7 @@ interface DepartmentFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     department?: Department | null;
+    onSaved?: () => void;
 }
 
 const inputClass =
@@ -38,6 +39,7 @@ export function DepartmentFormDialog({
     open,
     onOpenChange,
     department,
+    onSaved,
 }: DepartmentFormDialogProps) {
     const isEditing = !!department;
 
@@ -67,6 +69,8 @@ export function DepartmentFormDialog({
 
         const options = {
             preserveScroll: true,
+            // Keep the page mounted; it refetches the list itself.
+            preserveState: true,
             onSuccess: () => {
                 toast.success(
                     isEditing
@@ -75,6 +79,7 @@ export function DepartmentFormDialog({
                 );
                 reset();
                 onOpenChange(false);
+                onSaved?.();
             },
         };
 
