@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\API\Admin\ActivityLogController as AdminActivityLogController;
+use App\Http\Controllers\API\Workspace\ActivityLogController;
 use App\Http\Controllers\API\Workspace\AnalyticsController;
 use App\Http\Controllers\API\Workspace\CSRController;
 use App\Http\Controllers\API\Workspace\CsrDashboardController;
@@ -233,6 +235,17 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/calendar', [WelleStatsController::class, 'calendar'])->name('calendar');
             Route::get('/daily-log', [WelleStatsController::class, 'dailyLog'])->name('daily-log');
         });
+
+        // Workspace activity log (audit trail) — the table and the stat cards
+        // load separately. Gated to workspace admins in the controller.
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
+        Route::get('/activity-logs/summary', [ActivityLogController::class, 'summary'])->name('activity-logs.summary');
+    });
+
+    // Global, cross-workspace activity log. Super admins only, checked in the controller.
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])->name('activity-logs.index');
+        Route::get('/activity-logs/summary', [AdminActivityLogController::class, 'summary'])->name('activity-logs.summary');
     });
 });
 
