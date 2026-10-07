@@ -186,6 +186,7 @@ class PageController extends Controller
     {
         $this->authorize(Permission::EditPageDailyBudgetRecords->value, $workspace);
 
+        abort_unless($workspace->meta_ads_module_enabled, 404);
         abort_unless($page->workspace_id === $workspace->id, 404);
 
         $data = $request->validate([
