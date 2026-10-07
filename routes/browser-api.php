@@ -3,6 +3,7 @@
 use App\Http\Controllers\API\Admin\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\API\Workspace\ActivityLogController;
 use App\Http\Controllers\API\Workspace\AnalyticsController;
+use App\Http\Controllers\API\Workspace\ChecklistController;
 use App\Http\Controllers\API\Workspace\CSRController;
 use App\Http\Controllers\API\Workspace\CsrDashboardController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
@@ -118,6 +119,10 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         // The roles page's list. Create/edit/archive stay on the Inertia
         // routes in routes/workspaces.php.
         Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+
+        // The checklist page's list. Create/edit/delete stay on the Inertia
+        // routes in routes/workspaces.php.
+        Route::get('/checklist', [ChecklistController::class, 'index'])->name('checklist.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
         Route::get('/pages', [PageController::class, 'index'])->name('pages.index');

@@ -4,15 +4,11 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Http\Sorts\Checklist\TargetSort;
-use App\Http\Sorts\Checklist\TitleNaturalSort;
 use App\Models\Workspace;
 use App\Models\WorkspaceChecklist;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Spatie\QueryBuilder\AllowedSort;
-use Spatie\QueryBuilder\QueryBuilder;
 
 class ChecklistController extends Controller
 {
@@ -26,24 +22,12 @@ class ChecklistController extends Controller
 
         $this->authorize(Permission::ViewChecklist->value, $workspace);
 
-        $perPage = $request->integer('per_page', 10);
-
-        $checklists = QueryBuilder::for(WorkspaceChecklist::query()->where('workspace_id', $workspace->id))
-            ->allowedSorts([
-                AllowedSort::custom('title', new TitleNaturalSort),
-                AllowedSort::custom('target', new TargetSort),
-                'required',
-                'created_at',
-            ])
-            ->paginate($perPage)
-            ->withQueryString();
-
+        // The list itself loads from the browser API so the page renders
+        // without waiting on the query — see API\Workspace\ChecklistController.
         return Inertia::render('workspaces/checklist/index', [
             'workspace' => $workspace,
-            'checklists' => $checklists,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
-                'perPage' => $request->input('per_page', $request->input('perPage')),
+                ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
         ]);
