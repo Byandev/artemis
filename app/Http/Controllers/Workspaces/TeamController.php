@@ -8,13 +8,10 @@ use App\Models\Team;
 use App\Models\Workspace;
 use App\Rules\DiscordWebhookUrl;
 use App\Services\PostHogService;
-use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\QueryBuilder;
 
 class TeamController extends Controller
 {
@@ -24,23 +21,8 @@ class TeamController extends Controller
     {
         $this->authorize(Permission::ViewTeams->value, $workspace);
 
-        $teams = QueryBuilder::for(
-            Team::ofWorkspace($workspace)
-                ->when(
-                    ! TeamVisibility::isUnrestricted($request->user(), $workspace),
-                    fn ($q) => $q->whereHas('members', fn ($m) => $m->where('users.id', $request->user()->id)),
-                )
-                ->withCount('members')
-                ->with(['members:id,name,email'])
-        )
-            ->allowedFilters([
-                AllowedFilter::partial('search', 'name'),
-            ])
-            ->allowedSorts(['name', 'created_at', 'members_count'])
-            ->defaultSort('-created_at')
-            ->paginate($request->integer('per_page', 10))
-            ->withQueryString();
-
+        // The list itself loads from the browser API so the page renders
+        // without waiting on the query — see API\Workspace\TeamController.
         $workspaceMembers = $workspace->users()
             ->select('users.id', 'users.name', 'users.email')
             ->get();
@@ -49,11 +31,10 @@ class TeamController extends Controller
 
         return Inertia::render('workspaces/teams/index', [
             'workspace' => $workspace,
-            'teams' => $teams,
             'workspaceMembers' => $workspaceMembers,
             'isAdmin' => $isAdmin,
             'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
+                ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
             ],
         ]);
