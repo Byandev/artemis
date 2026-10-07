@@ -16,6 +16,8 @@ use App\Http\Controllers\PublicApi\ShopScanReturnController;
 use App\Http\Controllers\PublicApi\TransactionHistoryController;
 use App\Http\Controllers\PublicApi\UserController;
 use Modules\Creatives\Http\Controllers\Api\AssignedCreativesController;
+use Modules\Creatives\Http\Controllers\Api\PushTokenController;
+use Modules\Creatives\Http\Controllers\Api\ReminderSettingController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Api\InternController as GencysInternApiController;
 use Modules\GencysERP\Http\Controllers\Api\InternDailyRecordController as GencysInternDailyRecordApiController;
@@ -126,5 +128,11 @@ Route::group(['prefix' => 'v1/creatives-tracker', 'as' => 'api.v1.creatives-trac
         Route::post('/logout', [MobileAuthController::class, 'logout'])->name('logout');
 
         Route::get('/creatives/assigned', [AssignedCreativesController::class, 'index'])->name('creatives.assigned');
+
+        Route::post('/push-token', [PushTokenController::class, 'store'])->name('push-token.store');
+        Route::delete('/push-token', [PushTokenController::class, 'destroy'])->name('push-token.destroy');
+
+        Route::get('/reminder-settings', [ReminderSettingController::class, 'show'])->name('reminder-settings.show');
+        Route::put('/reminder-settings', [ReminderSettingController::class, 'update'])->name('reminder-settings.update');
     });
 });

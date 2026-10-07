@@ -334,6 +334,24 @@ return [
             'timeout' => 660,
             'nice' => 0,
         ],
+        // Creatives Tracker app pushes. Own worker so a backlog on `default`
+        // never holds up a "new creative to review" notification.
+        'push' => [
+            'connection' => 'redis',
+            'queue' => ['push'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 2,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 3,
+            // One Expo request is capped at 15s; a few chunks fit well inside.
+            'timeout' => 60,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [

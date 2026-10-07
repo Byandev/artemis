@@ -104,4 +104,10 @@ return [
         'device_name' => env('WELLE_DEVICE_NAME', 'Artemis'),
     ],
 
+    // Push notifications to the Creatives Tracker app. Only needed when
+    // "enhanced push security" is on for the Expo project.
+    'expo' => [
+        'access_token' => env('EXPO_ACCESS_TOKEN'),
+    ],
+
 ];
