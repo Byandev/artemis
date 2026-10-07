@@ -57,6 +57,8 @@ use Modules\Courses\Http\Controllers\CourseLessonController;
 use Modules\Courses\Http\Controllers\CourseModuleController;
 use Modules\Courses\Http\Controllers\CourseProgressController;
 use Modules\Courses\Http\Controllers\CoursesController;
+use Modules\Creatives\Http\Controllers\CreativeMediaController;
+use Modules\Creatives\Http\Controllers\CreativeReviewController;
 use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
@@ -764,11 +766,22 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/create', [CreativesController::class, 'create'])->name('create');
         Route::post('/', [CreativesController::class, 'store'])->name('store');
         Route::post('/bulk-reviewers', [CreativesController::class, 'bulkAssignReviewers'])->name('reviewers.bulk');
+        // Presigned direct-to-S3: the browser PUTs the file to the bucket and
+        // only hands the key to store/update, so nginx and PHP never see the bytes.
+        Route::post('/media/presign', [CreativeMediaController::class, 'presign'])->name('media.presign');
+        // An upload that was never saved (swapped, cleared, or the form was left).
+        Route::delete('/media/pending', [CreativeMediaController::class, 'discardPending'])->name('media.pending.destroy');
+        // The bucket is private; this redirects to a short-lived signed URL.
+        Route::get('/{creative}/media', [CreativeMediaController::class, 'show'])->name('media.show');
         Route::get('/{creative}/edit', [CreativesController::class, 'edit'])->name('edit');
+        Route::get('/{creative}/review', [CreativeReviewController::class, 'show'])->name('review');
         Route::put('/{creative}', [CreativesController::class, 'update'])->name('update');
         Route::delete('/{creative}', [CreativesController::class, 'destroy'])->name('destroy');
-        Route::post('/{creative}/reviews', [CreativesController::class, 'addReview'])->name('reviews.store');
-        Route::put('/{creative}/reviews/{review}', [CreativesController::class, 'updateReview'])->name('reviews.update');
+        Route::post('/{creative}/reviews', [CreativeReviewController::class, 'store'])->name('reviews.store');
+        Route::put('/{creative}/reviews/{review}', [CreativeReviewController::class, 'update'])->name('reviews.update');
+        Route::delete('/{creative}/reviews/{review}', [CreativeReviewController::class, 'destroy'])->name('reviews.destroy');
+        // A review's voice message; redirects to a signed URL (private bucket).
+        Route::get('/{creative}/reviews/{review}/voice', [CreativeReviewController::class, 'voice'])->name('reviews.voice');
         Route::put('/{creative}/ads-campaign', [CreativesController::class, 'updateAdsCampaign'])->name('ads-campaign.update');
     });
 

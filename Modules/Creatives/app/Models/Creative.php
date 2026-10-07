@@ -10,9 +10,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Products\Models\Product;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Creative extends Model
+class Creative extends Model implements HasMedia
 {
+    use InteractsWithMedia;
+
+    /** The image or video uploaded straight into Artemis, as opposed to a link. */
+    public const MEDIA_COLLECTION = 'media';
+
     protected $guarded = [];
 
     protected $casts = [
@@ -36,6 +44,13 @@ class Creative extends Model
         static::creating(function (Creative $creative) {
             $creative->code ??= static::generateCode();
         });
+
+        // Reviews go with the creative through a cascading foreign key, which
+        // skips model events — so their voice messages would be left in the
+        // bucket. Deleting them as models first takes the files with them.
+        static::deleting(function (Creative $creative) {
+            $creative->reviews()->each(fn (CreativeReview $review) => $review->delete());
+        });
     }
 
     /** A random 10-character code not yet used by any creative. */
@@ -51,6 +66,20 @@ class Creative extends Model
         } while (static::where('code', $code)->exists());
 
         return $code;
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(static::MEDIA_COLLECTION)
+            // One file per creative: uploading again replaces the old object
+            // rather than leaving an orphan in the bucket.
+            ->singleFile()
+            ->useDisk(config('filesystems.creative_media_disk'));
+    }
+
+    public function mediaFile(): ?Media
+    {
+        return $this->getFirstMedia(static::MEDIA_COLLECTION);
     }
 
     /** Calendar-date label for the planned creative date (timezone-safe). */
