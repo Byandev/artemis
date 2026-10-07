@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MobileApi\AuthController as MobileAuthController;
 use App\Http\Controllers\PublicApi\CallLogController;
 use App\Http\Controllers\PublicApi\CallLogV2Controller;
 use App\Http\Controllers\PublicApi\CsrDailyRecordController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\PublicApi\ShopController;
 use App\Http\Controllers\PublicApi\ShopScanReturnController;
 use App\Http\Controllers\PublicApi\TransactionHistoryController;
 use App\Http\Controllers\PublicApi\UserController;
+use Modules\Creatives\Http\Controllers\Api\AssignedCreativesController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Api\InternController as GencysInternApiController;
 use Modules\GencysERP\Http\Controllers\Api\InternDailyRecordController as GencysInternDailyRecordApiController;
@@ -109,4 +111,20 @@ Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' =>
     Route::get('/call-logs/kpi', [CallLogV2Controller::class, 'kpi'])->name('call-logs.kpi');
     Route::get('/call-logs/list', [CallLogV2Controller::class, 'list'])->name('call-logs.list');
     Route::get('/call-logs/summary', [CallLogV2Controller::class, 'summary'])->name('call-logs.summary');
+});
+
+// Creatives Tracker mobile app — per-user Sanctum tokens, not workspace API keys. The
+// app logs in with email + password (+ 2FA code) and sends the returned
+// token as `Authorization: Bearer <token>`.
+Route::group(['prefix' => 'v1/creatives-tracker', 'as' => 'api.v1.creatives-tracker.'], function () {
+    Route::post('/login', [MobileAuthController::class, 'login'])
+        ->middleware('throttle:creatives-tracker-login')
+        ->name('login');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/me', [MobileAuthController::class, 'me'])->name('me');
+        Route::post('/logout', [MobileAuthController::class, 'logout'])->name('logout');
+
+        Route::get('/creatives/assigned', [AssignedCreativesController::class, 'index'])->name('creatives.assigned');
+    });
 });
