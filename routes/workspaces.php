@@ -611,6 +611,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [OrderController::class, 'index'])->name('index');
         Route::post('/shipping-fees/import', [OrderController::class, 'importShippingFees'])->name('shipping-fees.import');
         Route::get('/shipping-fees/import/status', [OrderController::class, 'shippingFeeImportStatus'])->name('shipping-fees.status');
+        // Throttled: each press is a Pancake call plus a paid AI call.
+        Route::post('/{order}/extract-address', [OrderController::class, 'extractAddress'])
+            ->middleware('throttle:30,1')
+            ->whereNumber('order')
+            ->name('extract-address');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {

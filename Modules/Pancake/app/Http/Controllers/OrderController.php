@@ -12,6 +12,8 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Modules\Pancake\Actions\ExtractOrderAddressAction;
+use Modules\Pancake\Exceptions\AddressExtractionFailed;
 use Modules\Pancake\Filters\CustomerOrdersFilter;
 use Modules\Pancake\Filters\CustomerRtsReportFilter;
 use Modules\Pancake\Filters\IgnoredFilter;
@@ -246,5 +248,29 @@ class OrderController extends Controller
         return response()->json([
             'import' => ShippingFeeImportStatus::get($workspace->id),
         ]);
+    }
+
+    /**
+     * Read the order's Messenger conversation and pull out the delivery
+     * address, matched to Pancake's province / district / commune ids.
+     * Read-only — nothing is saved or pushed to Pancake.
+     */
+    public function extractAddress(Request $request, Workspace $workspace, int $order, ExtractOrderAddressAction $action)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewOrders->value, $workspace);
+
+        $order = Order::ofWorkspace($workspace)
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->visibleTo($request->user(), $workspace),
+            )
+            ->findOrFail($order);
+
+        try {
+            return response()->json($action->execute($order));
+        } catch (AddressExtractionFailed $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

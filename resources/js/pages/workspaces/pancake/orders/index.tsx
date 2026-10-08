@@ -25,10 +25,11 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
-import { Loader2, Search, Upload, X } from 'lucide-react';
+import { Loader2, MapPin, Search, Upload, X } from 'lucide-react';
 import moment from 'moment';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import ExtractAddressDialog from './partials/ExtractAddressDialog';
 import DateOption = flatpickr.Options.DateOption;
 
 interface OrderItem {
@@ -58,6 +59,8 @@ interface Order {
     shipping_fee: string | number | null;
     inserted_at: string | null;
     updated_at: string | null;
+    /** The Messenger conversation id; null/blank for Webcake orders. */
+    fb_id: string | null;
     shipping_address: ShippingAddress | null;
     items: OrderItem[];
     tags: OrderTag[];
@@ -612,6 +615,9 @@ export default function PancakeOrdersIndex({
         return [...known, ...extras];
     }, [statusCounts]);
 
+    // "Get address": the order whose conversation is being read, if any.
+    const [addressOrder, setAddressOrder] = useState<Order | null>(null);
+
     const columns: ColumnDef<Order>[] = [
         {
             accessorKey: 'order_number',
@@ -666,12 +672,26 @@ export default function PancakeOrdersIndex({
                 </span>
             ),
             cell: ({ row }) => (
-                <span
-                    className="block max-w-[220px] truncate text-[12px] text-gray-600 dark:text-gray-400"
-                    title={row.original.shipping_address?.full_address ?? ''}
-                >
-                    {row.original.shipping_address?.full_address ?? '—'}
-                </span>
+                <div className="flex max-w-[260px] items-center gap-1.5">
+                    <span
+                        className="block truncate text-[12px] text-gray-600 dark:text-gray-400"
+                        title={
+                            row.original.shipping_address?.full_address ?? ''
+                        }
+                    >
+                        {row.original.shipping_address?.full_address ?? '—'}
+                    </span>
+                    {row.original.fb_id && (
+                        <button
+                            type="button"
+                            onClick={() => setAddressOrder(row.original)}
+                            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-emerald-700 dark:hover:bg-white/5 dark:hover:text-emerald-400"
+                            title="Get address from conversation"
+                        >
+                            <MapPin className="size-3.5" />
+                        </button>
+                    )}
+                </div>
             ),
         },
         {
@@ -1114,6 +1134,15 @@ export default function PancakeOrdersIndex({
                     />
                 </div>
             </div>
+
+            {addressOrder && (
+                <ExtractAddressDialog
+                    url={`${baseUrl}/${addressOrder.id}/extract-address`}
+                    orderLabel={`#${addressOrder.order_number ?? addressOrder.id}`}
+                    open
+                    onOpenChange={(open) => !open && setAddressOrder(null)}
+                />
+            )}
         </AppLayout>
     );
 }

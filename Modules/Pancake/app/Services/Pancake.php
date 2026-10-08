@@ -54,6 +54,22 @@ class Pancake
     }
 
     /**
+     * Public API: GET /pages/{page_id}/conversations/{conversation_id}/messages
+     *
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public static function listConversationMessages(string $pageId, string $conversationId, string $pageAccessToken): array
+    {
+        return Http::timeout(15)
+            ->get("https://pages.fm/api/public_api/v1/pages/{$pageId}/conversations/{$conversationId}/messages", [
+                'page_access_token' => $pageAccessToken,
+            ])
+            ->throw()
+            ->json('messages') ?? [];
+    }
+
+    /**
      * Public API (no key): GET /geo/provinces
      *
      * @throws RequestException
