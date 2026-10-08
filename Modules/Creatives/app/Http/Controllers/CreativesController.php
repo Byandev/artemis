@@ -17,6 +17,7 @@ use Modules\Creatives\Http\Controllers\Concerns\GuardsCreatives;
 use Modules\Creatives\Http\Presenters\CreativePresenter;
 use Modules\Creatives\Http\Requests\StoreCreativeRequest;
 use Modules\Creatives\Http\Requests\UpdateCreativeRequest;
+use Modules\Creatives\Jobs\SendCreativeAssignedPush;
 use Modules\Creatives\Models\Creative;
 use Modules\Creatives\Services\CreativeMediaStorage;
 use Modules\Products\Models\Product;
@@ -187,7 +188,7 @@ class CreativesController extends Controller
             'creator_id' => $request->user()->id,
         ]);
 
-        $creative->assignedReviewers()->sync($reviewerIds);
+        SendCreativeAssignedPush::forSync($creative, $creative->assignedReviewers()->sync($reviewerIds));
 
         $this->storage->attachFromRequest($request, $creative);
 
@@ -221,11 +222,12 @@ class CreativesController extends Controller
 
         DB::transaction(function () use ($creatives, $validated) {
             foreach ($creatives as $creative) {
-                if ($validated['mode'] === 'replace') {
-                    $creative->assignedReviewers()->sync($validated['reviewer_ids']);
-                } else {
-                    $creative->assignedReviewers()->syncWithoutDetaching($validated['reviewer_ids']);
-                }
+                $changes = $validated['mode'] === 'replace'
+                    ? $creative->assignedReviewers()->sync($validated['reviewer_ids'])
+                    : $creative->assignedReviewers()->syncWithoutDetaching($validated['reviewer_ids']);
+
+                // Queued after the transaction commits.
+                SendCreativeAssignedPush::forSync($creative, $changes);
             }
         });
 
@@ -297,7 +299,7 @@ class CreativesController extends Controller
         $creative->update($data);
 
         if ($reviewerIds !== null) {
-            $creative->assignedReviewers()->sync($reviewerIds);
+            SendCreativeAssignedPush::forSync($creative, $creative->assignedReviewers()->sync($reviewerIds));
         }
 
         $this->storage->attachFromRequest($request, $creative);
