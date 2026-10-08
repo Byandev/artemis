@@ -616,6 +616,10 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('throttle:30,1')
             ->whereNumber('order')
             ->name('extract-address');
+        Route::post('/{order}/push-address', [OrderController::class, 'pushAddress'])
+            ->middleware('throttle:30,1')
+            ->whereNumber('order')
+            ->name('push-address');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {

@@ -369,6 +369,7 @@ export default function PancakeOrdersIndex({
     );
 
     const canImportFees = usePermission(PERMISSIONS.ImportOrderShippingFees);
+    const canUpdateAddress = usePermission(PERMISSIONS.UpdateOrderAddress);
     const { flash } = usePage().props as {
         flash?: { success?: string; error?: string };
     };
@@ -1138,9 +1139,15 @@ export default function PancakeOrdersIndex({
             {addressOrder && (
                 <ExtractAddressDialog
                     url={`${baseUrl}/${addressOrder.id}/extract-address`}
+                    pushUrl={
+                        canUpdateAddress
+                            ? `${baseUrl}/${addressOrder.id}/push-address`
+                            : undefined
+                    }
                     orderLabel={`#${addressOrder.order_number ?? addressOrder.id}`}
                     open
                     onOpenChange={(open) => !open && setAddressOrder(null)}
+                    onPushed={() => router.reload({ only: ['orders'] })}
                 />
             )}
         </AppLayout>

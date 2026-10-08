@@ -8,8 +8,9 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import axios from 'axios';
-import { Check, Copy, Loader2, RefreshCw } from 'lucide-react';
+import { Check, Copy, Loader2, RefreshCw, Upload } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 type MatchStatus = 'complete' | 'partial' | 'not_found';
 
@@ -51,32 +52,46 @@ const STATUS_LABELS: Record<MatchStatus, string> = {
 /**
  * "Get address" on a Pancake order: reads the order's Messenger conversation,
  * pulls out the address the customer typed and matches it to Pancake's
- * province / district / commune ids. Read-only — nothing is saved yet.
+ * province / district / commune ids. With `pushUrl` (the user may update
+ * order addresses) the result can then be written to the order in Pancake.
  */
 export default function ExtractAddressDialog({
     url,
+    pushUrl,
     orderLabel,
     open,
     onOpenChange,
+    onPushed,
 }: {
     url: string;
+    /** Omitted when the user may not update order addresses. */
+    pushUrl?: string;
     orderLabel: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onPushed?: () => void;
 }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<AddressExtraction | null>(null);
     const [copied, setCopied] = useState(false);
+    // The address line as it will be sent — prefilled from the chat, editable.
+    const [addressLine, setAddressLine] = useState('');
+    const [confirming, setConfirming] = useState(false);
+    const [pushing, setPushing] = useState(false);
+    const [pushed, setPushed] = useState(false);
 
     const run = useCallback(async () => {
         setLoading(true);
         setError(null);
         setResult(null);
+        setConfirming(false);
+        setPushed(false);
 
         try {
             const response = await axios.post<AddressExtraction>(url);
             setResult(response.data);
+            setAddressLine(response.data.address);
         } catch (e) {
             const message = axios.isAxiosError(e)
                 ? (e.response?.data?.message ??
@@ -94,6 +109,41 @@ export default function ExtractAddressDialog({
         if (open) run();
     }, [open, run]);
 
+    // The commune fixes its district and province, so it is all that has to match.
+    const canPush =
+        !!pushUrl &&
+        !!result?.found &&
+        !!result.commune.id &&
+        addressLine.trim() !== '' &&
+        !pushed;
+
+    const push = async () => {
+        if (!canPush || !result?.commune.id) return;
+        setPushing(true);
+        setError(null);
+
+        try {
+            await axios.post(pushUrl, {
+                commune_id: result.commune.id,
+                address: addressLine.trim(),
+            });
+            setPushed(true);
+            setConfirming(false);
+            toast.success(`Order ${orderLabel} updated in Pancake.`);
+            onPushed?.();
+        } catch (e) {
+            const message = axios.isAxiosError(e)
+                ? (e.response?.data?.message ??
+                  (e.response?.status === 429
+                      ? 'Too many tries in a row — wait a minute.'
+                      : null))
+                : null;
+            setError(message ?? 'Could not update the order in Pancake.');
+        } finally {
+            setPushing(false);
+        }
+    };
+
     const copy = async () => {
         if (!result?.formatted_address) return;
         await navigator.clipboard.writeText(result.formatted_address);
@@ -108,7 +158,10 @@ export default function ExtractAddressDialog({
                     <DialogTitle>Address from conversation</DialogTitle>
                     <DialogDescription>
                         Order {orderLabel} — read from the customer's Messenger
-                        chat. Nothing is changed in Pancake.
+                        chat.{' '}
+                        {pushUrl
+                            ? 'Nothing changes in Pancake until you press Update.'
+                            : 'Nothing is changed in Pancake.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -169,9 +222,23 @@ export default function ExtractAddressDialog({
                                         <span className="text-[12px] text-gray-500">
                                             Address
                                         </span>
-                                        <span className="text-[12px] text-gray-800 dark:text-gray-200">
-                                            {result.address || '—'}
-                                        </span>
+                                        {pushUrl && !pushed ? (
+                                            <input
+                                                type="text"
+                                                value={addressLine}
+                                                onChange={(e) =>
+                                                    setAddressLine(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="Street, purok or landmark"
+                                                className="h-8 w-full rounded-md border border-black/10 bg-white px-2 text-[12px] text-gray-800 outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-200"
+                                            />
+                                        ) : (
+                                            <span className="text-[12px] text-gray-800 dark:text-gray-200">
+                                                {addressLine || '—'}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
@@ -201,12 +268,62 @@ export default function ExtractAddressDialog({
                     </div>
                 )}
 
+                {pushed && (
+                    <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                        Updated in Pancake.
+                    </p>
+                )}
+
+                {confirming && canPush && result && (
+                    <p className="rounded-md bg-amber-50 px-3 py-2 text-[12px] text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                        This replaces the order's address in Pancake with{' '}
+                        <strong>
+                            {[
+                                addressLine.trim(),
+                                result.commune.name,
+                                result.district.name,
+                                result.province.name,
+                            ]
+                                .filter(Boolean)
+                                .join(', ')}
+                        </strong>
+                        . Name and phone stay as they are.
+                    </p>
+                )}
+
                 <DialogFooter>
-                    <Button variant="outline" onClick={run} disabled={loading}>
+                    <Button
+                        variant="outline"
+                        onClick={run}
+                        disabled={loading || pushing}
+                    >
                         <RefreshCw className="size-4" />
                         Read again
                     </Button>
-                    <Button onClick={() => onOpenChange(false)}>Close</Button>
+                    {canPush && !loading && (
+                        <Button
+                            onClick={() =>
+                                confirming ? push() : setConfirming(true)
+                            }
+                            disabled={pushing}
+                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                            {pushing ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Upload className="size-4" />
+                            )}
+                            {confirming
+                                ? 'Confirm update'
+                                : 'Update in Pancake'}
+                        </Button>
+                    )}
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        Close
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

@@ -12,6 +12,7 @@ use Modules\Pancake\Actions\ExtractOrderAddressAction;
 use Modules\Pancake\Exceptions\AddressExtractionFailed;
 use Modules\Pancake\Models\AddressAutofill;
 use Modules\Pancake\Services\Pancake;
+use Modules\Pancake\Support\PancakeShippingAddress;
 use Throwable;
 
 /**
@@ -111,22 +112,15 @@ class AutoFillOrderAddress implements ShouldQueue
         $this->finish(AddressAutofill::FAILED, mb_substr((string) $e?->getMessage(), 0, 250));
     }
 
-    /**
-     * The order's shipping address with the location filled in. Name, phone and
-     * anything else Pancake already had are carried over, so the update never
-     * blanks them.
-     */
     private function shippingAddress(array $result): array
     {
-        $existing = (array) data_get($this->record->payload, 'shipping_address', []);
-
-        return array_filter([
-            ...array_intersect_key($existing, array_flip(['full_name', 'phone_number', 'country_code', 'post_code'])),
-            'address' => $result['address'],
-            'province_id' => $result['province']['id'],
-            'district_id' => $result['district']['id'],
-            'commune_id' => $result['commune']['id'],
-        ], fn ($v) => $v !== null && $v !== '');
+        return PancakeShippingAddress::build(
+            (array) data_get($this->record->payload, 'shipping_address', []),
+            $result['address'],
+            $result['province']['id'],
+            $result['district']['id'],
+            $result['commune']['id'],
+        );
     }
 
     private function finish(string $status, ?string $reason, ?array $result = null): void
