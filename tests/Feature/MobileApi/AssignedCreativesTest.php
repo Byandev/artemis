@@ -89,22 +89,27 @@ test('hides creatives from workspaces the user is no longer a member of', functi
         ->assertJsonPath('total', 0);
 });
 
-test('leaves out creatives the user already reviewed, even if someone else has not', function () {
+test('keeps creatives the user already reviewed, marked with my_review', function () {
     $workspace = mobileCreativesWorkspace();
     $reviewer = mobileReviewer($workspace);
     $otherReviewer = mobileReviewer($workspace);
 
-    $reviewedByMe = mobileCreative($workspace, [$reviewer, $otherReviewer]);
-    $reviewedByOther = mobileCreative($workspace, [$reviewer, $otherReviewer]);
-    $untouched = mobileCreative($workspace, [$reviewer]);
+    $reviewedByMe = mobileCreative($workspace, [$reviewer, $otherReviewer], ['creative_date' => '2026-07-03']);
+    $reviewedByOther = mobileCreative($workspace, [$reviewer, $otherReviewer], ['creative_date' => '2026-07-02']);
+    $untouched = mobileCreative($workspace, [$reviewer], ['creative_date' => '2026-07-01']);
 
     CreativeReview::create(['creative_id' => $reviewedByMe->id, 'reviewer_id' => $reviewer->id, 'status' => 'approved']);
     CreativeReview::create(['creative_id' => $reviewedByOther->id, 'reviewer_id' => $otherReviewer->id, 'status' => 'revision']);
 
-    $response = $this->getJson('/api/v1/creatives-tracker/creatives/assigned', mobileHeaders($reviewer))->assertOk();
-
-    expect(collect($response->json('data'))->pluck('id')->sort()->values()->all())
-        ->toBe(collect([$reviewedByOther->id, $untouched->id])->sort()->values()->all());
+    $this->getJson('/api/v1/creatives-tracker/creatives/assigned', mobileHeaders($reviewer))
+        ->assertOk()
+        ->assertJsonPath('total', 3)
+        ->assertJsonPath('to_review', 2)
+        ->assertJsonPath('data.0.id', $reviewedByMe->id)
+        ->assertJsonPath('data.0.my_review.status', 'approved')
+        ->assertJsonPath('data.1.id', $reviewedByOther->id)
+        ->assertJsonPath('data.1.my_review', null)
+        ->assertJsonPath('data.2.id', $untouched->id);
 });
 
 test('only lists creatives that are still for approval', function () {
@@ -195,7 +200,7 @@ test('next_cursor walks the whole list without repeats, newest first', function 
     expect($seen)->toBe($ids->reverse()->values()->all());
 });
 
-test('reviewing an item on page one does not make page two skip one', function () {
+test('an item leaving for-approval on page one does not make page two skip one', function () {
     $workspace = mobileCreativesWorkspace();
     $reviewer = mobileReviewer($workspace);
     $headers = mobileHeaders($reviewer);
@@ -206,7 +211,7 @@ test('reviewing an item on page one does not make page two skip one', function (
 
     $first = $this->getJson('/api/v1/creatives-tracker/creatives/assigned?per_page=2', $headers)->assertOk();
 
-    CreativeReview::create(['creative_id' => $ids[0], 'reviewer_id' => $reviewer->id, 'status' => 'approved']);
+    Creative::whereKey($ids[0])->update(['final_status' => 'approved']);
 
     $second = $this->getJson('/api/v1/creatives-tracker/creatives/assigned?per_page=2&cursor='.$first->json('next_cursor'), $headers)
         ->assertOk();

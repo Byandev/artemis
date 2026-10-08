@@ -147,17 +147,15 @@ class Creative extends Model implements HasMedia
     }
 
     /**
-     * Creatives waiting on this user's review: still for approval, they are an
-     * assigned reviewer, they have not reviewed it yet, and it is in a
-     * workspace they belong to with the Creatives module on. The mobile app's
-     * list and its daily push reminder both count from this.
+     * Creatives this user reviews: still for approval, they are an assigned
+     * reviewer, and it is in a workspace they belong to with the Creatives
+     * module on. The mobile app's list shows these, reviewed or not.
      */
-    public function scopeAwaitingReviewBy(Builder $query, User $user): Builder
+    public function scopeAssignedForApprovalTo(Builder $query, User $user): Builder
     {
         return $query
             ->where('final_status', 'for_approval')
             ->whereHas('assignedReviewers', fn ($q) => $q->where('users.id', $user->id))
-            ->whereDoesntHave('reviews', fn ($q) => $q->where('reviewer_id', $user->id))
             ->whereHas('workspace', function (Builder $q) use ($user) {
                 $q->where('creatives_module_enabled', true);
 
@@ -168,5 +166,16 @@ class Creative extends Model implements HasMedia
                         ->orWhereHas('users', fn ($m) => $m->where('users.id', $user->id)));
                 }
             });
+    }
+
+    /**
+     * The ones above the user has not reviewed yet — what the daily push
+     * reminder counts.
+     */
+    public function scopeAwaitingReviewBy(Builder $query, User $user): Builder
+    {
+        return $query
+            ->assignedForApprovalTo($user)
+            ->whereDoesntHave('reviews', fn ($q) => $q->where('reviewer_id', $user->id));
     }
 }

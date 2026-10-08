@@ -217,6 +217,21 @@ it('streams the review video through CloudFront when a distribution is configure
         ->assertInertia(fn ($page) => $page->where('creative.reviews.0.voice.url', fn ($url) => str_starts_with($url, 'https://d123.cloudfront.net/')));
 });
 
+it('serves plain CloudFront URLs when the distribution has no key pair', function () {
+    Storage::fake('s3');
+    config(['filesystems.creative_media_disk' => 's3']);
+    config(['filesystems.creative_cdn' => ['url' => 'https://d123.cloudfront.net/', 'key_pair_id' => null, 'private_key' => null]]);
+
+    ['user' => $user, 'workspace' => $workspace] = actingAsWorkspaceOwner();
+    $creative = makeReviewableCreative($workspace, $user);
+    $media = $creative->addMedia(UploadedFile::fake()->create('final cut.mp4', 100, 'video/mp4'))
+        ->toMediaCollection(Creative::MEDIA_COLLECTION);
+    $media->update(['file_name' => 'final cut.mp4']);
+
+    $this->get("/workspaces/{$workspace->slug}/creatives/{$creative->id}/review")
+        ->assertInertia(fn ($page) => $page->where('creative.media.url', "https://d123.cloudfront.net/{$media->id}/final%20cut.mp4"));
+});
+
 it('signs the same URL for a file all hour, so the browser can cache it', function () {
     Storage::fake('s3');
     config(['filesystems.creative_media_disk' => 's3']);

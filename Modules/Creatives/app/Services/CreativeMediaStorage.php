@@ -119,15 +119,19 @@ class CreativeMediaStorage
 
         $cdn = config('filesystems.creative_cdn');
 
-        if (filled($cdn['url'] ?? null) && filled($cdn['key_pair_id'] ?? null) && filled($cdn['private_key'] ?? null)) {
+        if (filled($cdn['url'] ?? null)) {
             // The object key, percent-encoded per segment: file names keep
             // the browser's spaces and parentheses.
             $path = collect(explode('/', $media->getPathRelativeToRoot()))->map(rawurlencode(...))->implode('/');
+            $url = rtrim($cdn['url'], '/').'/'.$path;
 
-            return (new UrlSigner($cdn['key_pair_id'], $cdn['private_key']))->getSignedUrl(
-                rtrim($cdn['url'], '/').'/'.$path,
-                $expires->getTimestamp(),
-            );
+            // A distribution that restricts viewers needs a signed URL; one
+            // without a key pair configured serves the plain URL.
+            if (filled($cdn['key_pair_id'] ?? null) && filled($cdn['private_key'] ?? null)) {
+                return (new UrlSigner($cdn['key_pair_id'], $cdn['private_key']))->getSignedUrl($url, $expires->getTimestamp());
+            }
+
+            return $url;
         }
 
         $disk = Storage::disk($media->disk);

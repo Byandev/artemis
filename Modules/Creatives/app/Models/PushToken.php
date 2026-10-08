@@ -6,10 +6,10 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** An Expo push token for one phone running the Creatives Tracker app. */
+/** An Expo push token for one phone running the Creatives Tracker app (table `device_tokens`). */
 class PushToken extends Model
 {
-    protected $table = 'creatives_tracker_push_tokens';
+    protected $table = 'device_tokens';
 
     protected $guarded = [];
 
