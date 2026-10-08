@@ -2,7 +2,9 @@
 
 namespace Modules\Pancake\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Pancake\Models\Commune;
 use Modules\Pancake\Models\District;
@@ -18,6 +20,11 @@ use Modules\Pancake\Models\Province;
  * left empty rather than guessed. Each level falls back on the one below it:
  * a barangay that only exists in one district of the province names that
  * district, and a city that only exists in one province names the province.
+ *
+ * Every row carries its names pre-normalised (search_key / search_key_en), so
+ * an exact match is a single indexed lookup; only when that finds nothing are
+ * the candidates loaded and scored for a near match. Changing normalize()
+ * means running refreshSearchKeys() — `pancake:sync-geo` does.
  */
 class GeoMatcher
 {
@@ -59,9 +66,7 @@ class GeoMatcher
         $provinceKey = $this->normalize((string) $province);
         $provinceKey = self::PROVINCE_ALIASES[$provinceKey] ?? $provinceKey;
 
-        $matchedProvince = $provinceKey === ''
-            ? null
-            : $this->best(Province::where('country_code', $countryCode)->get(), $provinceKey);
+        $matchedProvince = $this->best(Province::where('country_code', $countryCode), $provinceKey);
 
         $matchedDistrict = null;
         // Districts that tie on the city name — Pancake lists a few twice
@@ -72,7 +77,7 @@ class GeoMatcher
             $cityKey = $this->normalize($city);
 
             if ($matchedProvince) {
-                $leaders = $this->leaders($matchedProvince->districts()->get(), $cityKey);
+                $leaders = $this->leaders(District::where('province_id', $matchedProvince->id), $cityKey);
                 $matchedDistrict = $leaders->count() === 1 ? $leaders->first() : null;
                 $tiedDistricts = $leaders->count() > 1 ? $leaders : collect();
             }
@@ -81,12 +86,12 @@ class GeoMatcher
             // only one province settles both.
             if (! $matchedDistrict && $tiedDistricts->isEmpty()) {
                 $matchedDistrict = $this->best(
-                    District::whereIn('province_id', Province::where('country_code', $countryCode)->select('id'))->get(),
+                    District::whereIn('province_id', Province::where('country_code', $countryCode)->select('id')),
                     $cityKey,
                 );
 
                 if ($matchedDistrict) {
-                    $matchedProvince = $matchedDistrict->province;
+                    $matchedProvince = Province::find($matchedDistrict->province_id);
                 }
             }
         }
@@ -94,29 +99,45 @@ class GeoMatcher
         $matchedCommune = null;
 
         if (filled($barangay)) {
-            $barangayKey = $this->normalize($barangay);
-
             if ($matchedDistrict) {
-                $matchedCommune = $this->best($matchedDistrict->communes()->get(), $barangayKey);
+                $matchedCommune = $this->communeIn($matchedDistrict, $barangay);
             } elseif ($matchedProvince) {
                 // The city was missing or ambiguous: a barangay found in only one
                 // of the candidate districts names the district.
                 $communes = $tiedDistricts->isNotEmpty()
-                    ? Commune::whereIn('district_id', $tiedDistricts->pluck('id'))->get()
-                    : $matchedProvince->communes()->get();
+                    ? Commune::whereIn('district_id', $tiedDistricts->pluck('id'))
+                    : Commune::where('province_id', $matchedProvince->id);
 
-                $matchedCommune = $this->best($communes, $barangayKey);
-                $matchedDistrict = $matchedCommune?->district;
+                $matchedCommune = $this->best($communes, $this->normalize($barangay));
+                $matchedDistrict = $matchedCommune ? District::find($matchedCommune->district_id) : null;
             }
         }
 
-        $found = array_filter([$matchedProvince, $matchedDistrict, $matchedCommune]);
+        return $this->result($matchedProvince, $matchedDistrict, $matchedCommune);
+    }
 
+    /** The district in a province that a typed city name means, if exactly one. */
+    public function districtIn(Province $province, ?string $city): ?District
+    {
+        return $this->best(District::where('province_id', $province->id), $this->normalize((string) $city));
+    }
+
+    /** The commune in a district that a typed barangay name means, if exactly one. */
+    public function communeIn(District $district, ?string $barangay): ?Commune
+    {
+        return $this->best(Commune::where('district_id', $district->id), $this->normalize((string) $barangay));
+    }
+
+    /**
+     * @return array{province: ?Province, district: ?District, commune: ?Commune, status: 'complete'|'partial'|'not_found'}
+     */
+    public function result(?Province $province, ?District $district, ?Commune $commune): array
+    {
         return [
-            'province' => $matchedProvince,
-            'district' => $matchedDistrict,
-            'commune' => $matchedCommune,
-            'status' => match (count($found)) {
+            'province' => $province,
+            'district' => $district,
+            'commune' => $commune,
+            'status' => match (count(array_filter([$province, $district, $commune]))) {
                 3 => 'complete',
                 0 => 'not_found',
                 default => 'partial',
@@ -137,15 +158,63 @@ class GeoMatcher
     }
 
     /**
+     * Province and city names, normalised — what AddressMessageFilter looks for
+     * to tell a message that names a place. Names under five letters are left
+     * out: too many of them are ordinary words.
+     *
+     * @return list<string>
+     */
+    public function placeNames(): array
+    {
+        static $names = null;
+
+        return $names ??= collect([Province::query(), District::query()])
+            ->flatMap(fn (Builder $q) => $q->get(['search_key', 'search_key_en'])->flatMap(fn ($p) => [$p->search_key, $p->search_key_en]))
+            ->filter(fn (?string $key) => $key !== null && strlen($key) >= 5)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Recompute every row's search keys from its names. One UPDATE per
+     * thousand rows, so the whole list (≈45k) takes a few seconds.
+     */
+    public function refreshSearchKeys(): void
+    {
+        foreach (['pancake_provinces', 'pancake_districts', 'pancake_communes'] as $table) {
+            DB::table($table)->select('id', 'name', 'name_en')->orderBy('id')->chunk(1000, function ($rows) use ($table) {
+                $ids = [];
+                $keyCases = $enCases = '';
+                $keyBindings = $enBindings = [];
+
+                foreach ($rows as $row) {
+                    $ids[] = $row->id;
+                    $keyCases .= ' WHEN ? THEN ?';
+                    $enCases .= ' WHEN ? THEN ?';
+                    array_push($keyBindings, $row->id, $this->normalize((string) $row->name));
+                    array_push($enBindings, $row->id, $row->name_en === null ? null : $this->normalize($row->name_en));
+                }
+
+                DB::update(
+                    "UPDATE {$table} SET search_key = CASE id{$keyCases} END, search_key_en = CASE id{$enCases} END"
+                    .' WHERE id IN ('.implode(',', array_fill(0, count($ids), '?')).')',
+                    [...$keyBindings, ...$enBindings, ...$ids],
+                );
+            });
+        }
+    }
+
+    /**
      * The one candidate that matches best, or null when nothing clears the
      * threshold or two different places tie for first.
      *
      * @template T of Province|District|Commune
      *
-     * @param  Collection<int, T>  $candidates
+     * @param  Builder<T>  $candidates
      * @return T|null
      */
-    private function best(Collection $candidates, string $key)
+    private function best(Builder $candidates, string $key)
     {
         $leaders = $this->leaders($candidates, $key);
 
@@ -154,19 +223,29 @@ class GeoMatcher
 
     /**
      * Every candidate sharing the top score, as long as it clears the threshold.
+     * Exact matches come straight from the index; only without one are the
+     * candidates loaded and scored.
      *
      * @template T of Province|District|Commune
      *
-     * @param  Collection<int, T>  $candidates
+     * @param  Builder<T>  $candidates
      * @return Collection<int, T>
      */
-    private function leaders(Collection $candidates, string $key): Collection
+    private function leaders(Builder $candidates, string $key): Collection
     {
-        if ($key === '' || $candidates->isEmpty()) {
+        if ($key === '') {
             return collect();
         }
 
-        $scored = $candidates
+        $exact = (clone $candidates)
+            ->where(fn (Builder $q) => $q->where('search_key', $key)->orWhere('search_key_en', $key))
+            ->get();
+
+        if ($exact->isNotEmpty()) {
+            return $exact;
+        }
+
+        $scored = $candidates->get()
             ->map(fn ($c) => ['place' => $c, 'score' => $this->score($c, $key)])
             ->filter(fn (array $s) => $s['score'] >= self::THRESHOLD);
 
@@ -182,9 +261,14 @@ class GeoMatcher
     {
         $best = 0.0;
 
-        foreach (array_unique(array_filter([$place->name, $place->name_en])) as $name) {
-            $candidate = $this->normalize($name);
+        // Falls back to normalising on the spot for a row synced before the
+        // search keys existed.
+        $candidates = array_unique(array_filter([
+            $place->search_key ?? $this->normalize((string) $place->name),
+            $place->search_key_en ?? ($place->name_en === null ? null : $this->normalize($place->name_en)),
+        ]));
 
+        foreach ($candidates as $candidate) {
             if ($candidate === $key) {
                 return 100.0;
             }

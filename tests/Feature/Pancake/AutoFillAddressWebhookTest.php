@@ -9,6 +9,7 @@ use Modules\Pancake\Models\AddressAutofill;
 use Modules\Pancake\Models\Commune;
 use Modules\Pancake\Models\District;
 use Modules\Pancake\Models\Province;
+use Modules\Pancake\Support\GeoMatcher;
 
 /**
  * Pancake's order webhook → AutoFillOrderAddress: new orders from shops with
@@ -66,22 +67,50 @@ function autofillAiAnswer(array $overrides = []): array
     ])]]], 'usage' => ['prompt_tokens' => 2840, 'completion_tokens' => 120, 'total_tokens' => 2960, 'cost' => 0.000498]];
 }
 
-/** A queued record plus the page, chat and AI the job will hit. */
-function queuedAutofill(Shop $shop, array $ai = [], int $posStatus = 200): AddressAutofill
+/**
+ * A queued record plus the page, chat, AI and Pancake the job will hit.
+ *
+ * @param  array  $ai  overrides for the extraction answer
+ * @param  array  $orderNow  overrides for the order as Pancake returns it when the job reloads it
+ * @param  ?array  $chat  the conversation; defaults to one message holding the address
+ * @param  string  $pick  the shortlist call's answer ('' = none)
+ */
+function queuedAutofill(Shop $shop, array $ai = [], int $posStatus = 200, array $orderNow = [], ?array $chat = null, string $pick = ''): AddressAutofill
 {
     Page::factory()->forWorkspace($shop->workspace)->create(['id' => 777, 'pancake_token' => 'page-token']);
 
     Province::create(['id' => '63_108', 'country_code' => 63, 'name' => 'Batangas', 'name_en' => 'Batangas']);
     District::create(['id' => '63_108_lipa', 'province_id' => '63_108', 'name' => 'Lipa-city', 'name_en' => 'Lipa']);
     Commune::create(['id' => '63_108_lipa_1', 'province_id' => '63_108', 'district_id' => '63_108_lipa', 'name' => 'Sabang', 'name_en' => 'Sabang']);
+    Commune::create(['id' => '63_108_lipa_2', 'province_id' => '63_108', 'district_id' => '63_108_lipa', 'name' => 'Marawoy', 'name_en' => 'Marawoy']);
+    app(GeoMatcher::class)->refreshSearchKeys();
 
-    Http::fake([
-        'pages.fm/api/public_api/v1/pages/*' => Http::response(['messages' => [
-            ['from' => ['id' => '555'], 'original_message' => 'Purok 3, Brgy Sabang, Lipa City, Batangas', 'inserted_at' => '2026-10-08T01:05:00'],
-        ]]),
-        'openrouter.ai/*' => Http::response(autofillAiAnswer($ai)),
-        'pos.pages.fm/api/v1/shops/*/orders/*' => Http::response(['success' => $posStatus === 200], $posStatus),
-    ]);
+    $chat ??= [
+        ['from' => ['id' => '777'], 'original_message' => 'Hi po! Pa send po ng address.', 'inserted_at' => '2026-10-08T01:00:00'],
+        ['from' => ['id' => '555'], 'original_message' => 'Purok 3, Brgy Sabang, Lipa City, Batangas', 'inserted_at' => '2026-10-08T01:05:00'],
+    ];
+
+    Http::fake(function ($request) use ($shop, $ai, $posStatus, $orderNow, $chat, $pick) {
+        $url = $request->url();
+
+        if (str_contains($url, 'pos.pages.fm')) {
+            return $request->method() === 'GET'
+                ? Http::response(['success' => true, 'data' => array_replace_recursive(newOrderPayload($shop), $orderNow)])
+                : Http::response(['success' => $posStatus === 200], $posStatus);
+        }
+
+        if (str_contains($url, 'pages.fm/api/public_api')) {
+            return Http::response(['messages' => $chat]);
+        }
+
+        if (str_contains($url, 'openrouter.ai')) {
+            return data_get($request->data(), 'response_format.json_schema.name') === 'pick_place'
+                ? Http::response(['choices' => [['message' => ['content' => json_encode(['id' => $pick])]]], 'usage' => ['prompt_tokens' => 300, 'completion_tokens' => 10, 'cost' => 0.0001]])
+                : Http::response(autofillAiAnswer($ai));
+        }
+
+        return Http::response([], 404);
+    });
 
     return AddressAutofill::create([
         'shop_id' => $shop->id,
@@ -118,7 +147,9 @@ describe('webhook', function () {
             ->pancake_order_id->toBe('9001')
             ->conversation_id->toBe('777_555');
 
-        Queue::assertPushed(AutoFillOrderAddress::class, fn ($job) => $job->record->is($record));
+        // Read a few minutes later, not straight away.
+        Queue::assertPushed(AutoFillOrderAddress::class, fn ($job) => $job->record->is($record)
+            && $job->delay->between(now()->addMinutes(4), now()->addMinutes(6)));
     });
 
     it('accepts the order wrapped in data', function () {
@@ -168,6 +199,9 @@ describe('webhook', function () {
 });
 
 describe('job', function () {
+    // The retry is dispatched from inside the job; faked so it does not run inline.
+    beforeEach(fn () => Queue::fake());
+
     it('records what it would send in dry-run, without calling Pancake', function () {
         config(['pancake.auto_fill_address.dry_run' => true]);
         $record = runAutofill(queuedAutofill(autofillShop()));
@@ -216,6 +250,10 @@ describe('job', function () {
         expect($record->status)->toBe(AddressAutofill::NEEDS_REVIEW)
             ->and($record->reason)->toBe('Not every level matched a Pancake location.');
 
+        // The shortlist check was asked, and its answer ("none") respected.
+        Http::assertSent(fn ($request) => data_get($request->data(), 'response_format.json_schema.name') === 'pick_place'
+            && str_contains($request['messages'][1]['content'], '63_108_lipa_2: Marawoy'));
+
         Http::assertNotSent(fn ($request) => $request->method() === 'PUT');
     });
 
@@ -227,12 +265,79 @@ describe('job', function () {
         Http::assertNotSent(fn ($request) => $request->method() === 'PUT');
     });
 
-    it('records no_address when the customer has not sent one', function () {
+    it('reads again later when there is no address yet, then settles on no_address', function () {
         $record = runAutofill(queuedAutofill(autofillShop(), ['found' => false, 'confidence' => 0]));
 
-        // The AI was still called, so the cost is still recorded.
-        expect($record->status)->toBe(AddressAutofill::NO_ADDRESS)
-            ->and($record->ai_cost_usd)->toBe(0.000498);
+        expect($record)
+            ->status->toBe(AddressAutofill::QUEUED)
+            ->attempts->toBe(1)
+            ->reason->toContain('Reading again at');
+        Queue::assertPushed(AutoFillOrderAddress::class, fn ($job) => $job->delay->between(now()->addMinutes(24), now()->addMinutes(26)));
+
+        $record = runAutofill($record);
+
+        // Two reads, two AI calls: the cost adds up.
+        expect($record)
+            ->status->toBe(AddressAutofill::NO_ADDRESS)
+            ->attempts->toBe(2)
+            ->ai_cost_usd->toBe(0.000996);
+    });
+
+    it('does not call the AI when no customer message looks like an address', function () {
+        $record = runAutofill(queuedAutofill(autofillShop(), chat: [
+            ['from' => ['id' => '777'], 'original_message' => 'Hello po! Ano po order nila?', 'inserted_at' => '2026-10-08T01:00:00'],
+            ['from' => ['id' => '555'], 'original_message' => 'Magkano po 2 box?', 'inserted_at' => '2026-10-08T01:05:00'],
+        ]));
+
+        expect($record)
+            ->status->toBe(AddressAutofill::QUEUED)
+            ->reason->toContain('No message in the chat looks like an address')
+            ->ai_cost_usd->toBeNull();
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'openrouter.ai'));
+    });
+
+    it('sends the AI only the messages that look like an address', function () {
+        runAutofill(queuedAutofill(autofillShop(), chat: [
+            ['from' => ['id' => '555'], 'original_message' => 'Magkano po?', 'inserted_at' => '2026-10-08T00:50:00'],
+            ['from' => ['id' => '777'], 'original_message' => '499 po. Pa send po ng complete address.', 'inserted_at' => '2026-10-08T01:00:00'],
+            ['from' => ['id' => '555'], 'original_message' => 'Purok 3, Brgy Sabang, Lipa City', 'inserted_at' => '2026-10-08T01:05:00'],
+            ['from' => ['id' => '555'], 'original_message' => 'Salamat po', 'inserted_at' => '2026-10-08T01:06:00'],
+        ]));
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'openrouter.ai')
+            && str_contains($request['messages'][1]['content'], 'Customer: Purok 3')
+            && str_contains($request['messages'][1]['content'], 'Page: 499 po')
+            && ! str_contains($request['messages'][1]['content'], 'Magkano')
+            && ! str_contains($request['messages'][1]['content'], 'Salamat'));
+    });
+
+    it('fills a level from the shortlist when the name did not match', function () {
+        config(['pancake.auto_fill_address.dry_run' => true]);
+        $record = runAutofill(queuedAutofill(autofillShop(), ['barangay' => 'Marawoi Proper'], pick: '63_108_lipa_2'));
+
+        expect($record->status)->toBe(AddressAutofill::DRY_RUN)
+            ->and($record->result['commune']['id'])->toBe('63_108_lipa_2')
+            ->and($record->result['picked_by_ai'])->toBe(['commune'])
+            // Both AI calls are counted.
+            ->and($record->ai_cost_usd)->toBe(0.000598);
+    });
+
+    it('skips an order that is no longer new or got its address meanwhile', function (array $orderNow, string $reason) {
+        $record = runAutofill(queuedAutofill(autofillShop(), orderNow: $orderNow));
+
+        expect($record)->status->toBe(AddressAutofill::SKIPPED)->reason->toBe($reason);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'openrouter.ai'));
+    })->with([
+        'confirmed' => [['status' => 1], 'The order is no longer new.'],
+        'address filled' => [['shipping_address' => ['commune_id' => '63_1']], 'The address was filled in meanwhile.'],
+    ]);
+
+    it('builds the update on the order as Pancake has it now', function () {
+        config(['pancake.auto_fill_address.dry_run' => false]);
+        runAutofill(queuedAutofill(autofillShop(), orderNow: ['shipping_address' => ['phone_number' => '09998887777']]));
+
+        Http::assertSent(fn ($request) => $request->method() === 'PUT'
+            && $request['shipping_address']['phone_number'] === '09998887777');
     });
 
     it('skips when the page has no Pancake token', function () {

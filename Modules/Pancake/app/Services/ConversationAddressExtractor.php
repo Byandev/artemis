@@ -56,8 +56,95 @@ class ConversationAddressExtractor
             ->map(fn (array $m) => ($m['from'] === 'customer' ? 'Customer' : 'Page').': '.$m['text'])
             ->implode("\n");
 
+        [$decoded, $usage] = $this->complete($this->payload($transcript));
+
+        $result = [];
+
+        foreach (self::FIELDS as $field) {
+            $result[$field] = match ($field) {
+                'found' => (bool) ($decoded['found'] ?? false),
+                'confidence' => max(0.0, min(1.0, (float) ($decoded['confidence'] ?? 0))),
+                default => trim((string) ($decoded[$field] ?? '')),
+            };
+        }
+
+        $result['usage'] = $usage;
+
+        return $result;
+    }
+
+    /**
+     * The second check: when what the customer typed matched no Pancake name,
+     * ask which of the real options they meant. The answer is limited to the
+     * ids given (or none), so the model can only pick, never invent.
+     *
+     * Never throws — a failed pick just leaves the level unmatched.
+     *
+     * @param  'province'|'city or municipality'|'barangay'  $level
+     * @param  array<string, string>  $options  id => name
+     * @return array{id: ?string, usage: array{cost_usd: ?float, input_tokens: ?int, output_tokens: ?int}}
+     */
+    public function pick(string $level, string $typed, string $addressText, array $options): array
+    {
+        $none = ['id' => null, 'usage' => $this->usage([])];
+
+        if (! self::isConfigured() || $options === [] || trim($typed) === '') {
+            return $none;
+        }
+
+        $list = collect($options)->map(fn (string $name, string $id) => "{$id}: {$name}")->implode("\n");
+
         try {
-            $response = $this->request()->post('/chat/completions', $this->payload($transcript));
+            [$decoded, $usage] = $this->complete([
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => implode(' ', [
+                        "A Philippine customer typed a {$level} name that is misspelled, abbreviated, a nickname or a local name.",
+                        'Pick the official place from the list that they mean. Use the full address for context.',
+                        'Only pick when you are confident; otherwise answer with an empty id.',
+                    ])],
+                    ['role' => 'user', 'content' => "Typed {$level}: {$typed}\nFull address: {$addressText}\n\nOptions (id: name):\n{$list}"],
+                ],
+                'temperature' => 0,
+                'max_tokens' => 60,
+                'response_format' => [
+                    'type' => 'json_schema',
+                    'json_schema' => [
+                        'name' => 'pick_place',
+                        'strict' => true,
+                        'schema' => [
+                            'type' => 'object',
+                            'additionalProperties' => false,
+                            'required' => ['id'],
+                            'properties' => [
+                                'id' => ['type' => 'string', 'enum' => [...array_map('strval', array_keys($options)), '']],
+                            ],
+                        ],
+                    ],
+                ],
+                'provider' => ['require_parameters' => true],
+                'usage' => ['include' => true],
+            ]);
+        } catch (AddressExtractionFailed) {
+            return $none;
+        }
+
+        $id = (string) ($decoded['id'] ?? '');
+
+        return ['id' => array_key_exists($id, $options) ? $id : null, 'usage' => $usage];
+    }
+
+    /**
+     * Send one chat completion and decode its JSON answer.
+     *
+     * @return array{0: array, 1: array{cost_usd: ?float, input_tokens: ?int, output_tokens: ?int}}
+     *
+     * @throws AddressExtractionFailed
+     */
+    private function complete(array $payload): array
+    {
+        try {
+            $response = $this->request()->post('/chat/completions', $payload);
         } catch (ConnectionException $e) {
             Log::warning('Order address extraction: could not reach the provider.', ['reason' => $e->getMessage()]);
 
@@ -83,19 +170,7 @@ class ConversationAddressExtractor
             throw AddressExtractionFailed::aiUnusableAnswer();
         }
 
-        $result = [];
-
-        foreach (self::FIELDS as $field) {
-            $result[$field] = match ($field) {
-                'found' => (bool) ($decoded['found'] ?? false),
-                'confidence' => max(0.0, min(1.0, (float) ($decoded['confidence'] ?? 0))),
-                default => trim((string) ($decoded[$field] ?? '')),
-            };
-        }
-
-        $result['usage'] = $this->usage((array) data_get($response->json(), 'usage', []));
-
-        return $result;
+        return [$decoded, $this->usage((array) data_get($response->json(), 'usage', []))];
     }
 
     /**
@@ -104,7 +179,7 @@ class ConversationAddressExtractor
      *
      * @return array{cost_usd: ?float, input_tokens: ?int, output_tokens: ?int}
      */
-    private function usage(array $usage): array
+    public function usage(array $usage): array
     {
         return [
             'cost_usd' => isset($usage['cost']) ? (float) $usage['cost'] : null,

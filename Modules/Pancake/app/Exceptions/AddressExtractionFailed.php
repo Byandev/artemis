@@ -42,6 +42,11 @@ class AddressExtractionFailed extends Exception
         return (new self('The conversation has no customer messages yet.'))->withOutcome('no_address');
     }
 
+    public static function noAddressLikeMessage(): self
+    {
+        return (new self('No message in the chat looks like an address yet.'))->withOutcome('no_address');
+    }
+
     public static function aiNotConfigured(): self
     {
         return (new self('The address reader is not set up (no OpenRouter key).'))->withOutcome('skipped');

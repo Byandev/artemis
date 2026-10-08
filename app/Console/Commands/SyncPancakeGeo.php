@@ -7,6 +7,7 @@ use Modules\Pancake\Models\Commune;
 use Modules\Pancake\Models\District;
 use Modules\Pancake\Models\Province;
 use Modules\Pancake\Services\Pancake;
+use Modules\Pancake\Support\GeoMatcher;
 
 class SyncPancakeGeo extends Command
 {
@@ -85,6 +86,9 @@ class SyncPancakeGeo extends Command
             $districtCount += count($districts);
             $communeCount += count($communes);
         });
+
+        // The pre-normalised names GeoMatcher looks rows up by.
+        app(GeoMatcher::class)->refreshSearchKeys();
 
         $this->newLine();
         $this->info(sprintf('Saved %d provinces, %d districts, %d communes.', count($provinces), $districtCount, $communeCount));

@@ -32,6 +32,8 @@ export interface AddressExtraction {
     /** Street / purok / house number, plus the landmark when given. */
     address: string;
     formatted_address: string;
+    /** Levels the names alone could not match, picked from the real list by the AI. */
+    picked_by_ai: Array<'province' | 'district' | 'commune'>;
     messages_read: number;
 }
 
@@ -209,14 +211,23 @@ export default function ExtractAddressDialog({
                                     <LevelRow
                                         label="Province"
                                         level={result.province}
+                                        picked={result.picked_by_ai?.includes(
+                                            'province',
+                                        )}
                                     />
                                     <LevelRow
                                         label="District"
                                         level={result.district}
+                                        picked={result.picked_by_ai?.includes(
+                                            'district',
+                                        )}
                                     />
                                     <LevelRow
                                         label="Commune"
                                         level={result.commune}
+                                        picked={result.picked_by_ai?.includes(
+                                            'commune',
+                                        )}
                                     />
                                     <div className="grid grid-cols-[110px_1fr] gap-2 px-3 py-2">
                                         <span className="text-[12px] text-gray-500">
@@ -348,7 +359,15 @@ function Section({
 }
 
 /** Pancake's matched name and id, with what the customer typed underneath. */
-function LevelRow({ label, level }: { label: string; level: Level }) {
+function LevelRow({
+    label,
+    level,
+    picked,
+}: {
+    label: string;
+    level: Level;
+    picked?: boolean;
+}) {
     return (
         <div className="grid grid-cols-[110px_1fr] gap-2 border-b border-black/6 px-3 py-2 dark:border-white/10">
             <span className="text-[12px] text-gray-500">{label}</span>
@@ -359,6 +378,14 @@ function LevelRow({ label, level }: { label: string; level: Level }) {
                         <span className="font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
                             {level.id}
                         </span>
+                        {picked && (
+                            <span
+                                className="ml-1.5 rounded bg-violet-50 px-1.5 py-px text-[10px] text-violet-700 dark:bg-violet-500/10 dark:text-violet-300"
+                                title="The typed name matched nothing exactly, so the AI picked this from the real list. Worth a look."
+                            >
+                                picked by AI
+                            </span>
+                        )}
                     </div>
                 ) : (
                     <div className="text-amber-600 dark:text-amber-400">

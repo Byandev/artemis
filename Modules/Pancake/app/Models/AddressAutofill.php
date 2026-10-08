@@ -44,6 +44,7 @@ class AddressAutofill extends Model
         'result' => 'array',
         'payload' => 'array',
         'processed_at' => 'datetime',
+        'attempts' => 'integer',
         'ai_cost_usd' => 'float',
         'input_tokens' => 'integer',
         'output_tokens' => 'integer',

@@ -54,6 +54,23 @@ class Pancake
     }
 
     /**
+     * GET /shops/{shop_id}/orders/{order_id} — one order as Pancake has it now.
+     *
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public function getOrder(string $orderId): array
+    {
+        $body = Http::timeout(15)
+            ->get('https://pos.pages.fm/api/v1/shops/'.$this->shop_id.'/orders/'.$orderId, ['api_key' => $this->api_key])
+            ->throw()
+            ->json() ?? [];
+
+        // Sent wrapped in `data`, or as the order itself.
+        return is_array($body['data'] ?? null) ? $body['data'] : $body;
+    }
+
+    /**
      * PUT /shops/{shop_id}/orders/{order_id} — change fields on one order.
      *
      * @throws RequestException

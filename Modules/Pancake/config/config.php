@@ -17,10 +17,19 @@ return [
     | min_confidence: below this AI confidence (0–1) an order is left for a
     | person ("needs review") even when every level matched.
     |
+    | delay_minutes: how long after the order arrives the chat is first read.
+    | Orders are often created before the customer has typed the address.
+    |
+    | retry_minutes / max_attempts: when there is still no address, read again
+    | this much later, up to this many reads in all.
+    |
     */
 
     'auto_fill_address' => [
         'dry_run' => (bool) env('PANCAKE_AUTO_FILL_DRY_RUN', true),
         'min_confidence' => (float) env('PANCAKE_AUTO_FILL_MIN_CONFIDENCE', 0.7),
+        'delay_minutes' => (int) env('PANCAKE_AUTO_FILL_DELAY_MINUTES', 3),
+        'retry_minutes' => (int) env('PANCAKE_AUTO_FILL_RETRY_MINUTES', 10),
+        'max_attempts' => (int) env('PANCAKE_AUTO_FILL_MAX_ATTEMPTS', 2),
     ],
 ];
