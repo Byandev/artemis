@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\DB;
 use Modules\TaskManagement\Database\Factories\SpaceFactory;
 use Modules\TaskManagement\Enums\SpaceRole;
 use Modules\TaskManagement\Models\Concerns\BelongsToTaskWorkspace;
-use Modules\TaskManagement\Support\TicketCodes;
 
 /**
  * The top layer of the Space > Folder > List > Task hierarchy. A space lives
@@ -27,8 +26,6 @@ use Modules\TaskManagement\Support\TicketCodes;
  * @property int $workspace_id
  * @property int $owner_id
  * @property string $name
- * @property string|null $code
- * @property int $last_ticket_number
  * @property string|null $description
  * @property string|null $color
  * @property int $position
@@ -42,7 +39,7 @@ class Space extends Model implements BelongsToTaskWorkspace
 
     protected $table = 'task_spaces';
 
-    protected $fillable = ['name', 'code', 'description', 'color', 'position', 'metadata'];
+    protected $fillable = ['name', 'description', 'color', 'position', 'metadata'];
 
     /**
      * Mirror the database default so a freshly created space reports its position
@@ -58,15 +55,6 @@ class Space extends Model implements BelongsToTaskWorkspace
         'metadata' => 'array',
         'archived_at' => 'datetime',
     ];
-
-    protected static function booted(): void
-    {
-        // Every space numbers the tasks in its loose lists under its own code
-        // (Artemis -> ART-1), so one is chosen as it is created when none was.
-        static::creating(function (Space $space): void {
-            $space->code ??= TicketCodes::firstFreeFor($space->workspace_id, $space->name);
-        });
-    }
 
     protected static function newFactory(): SpaceFactory
     {

@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Modules\TaskManagement\Models\Folder;
 use Modules\TaskManagement\Models\Space;
-use Modules\TaskManagement\Support\TicketCodes;
 
 class StoreFolderRequest extends FormRequest
 {
@@ -22,8 +21,7 @@ class StoreFolderRequest extends FormRequest
     }
 
     /**
-     * Fill in the code the name derives to when the user did not choose one,
-     * moving to the first free variant (ART2, ART3) when it is taken.
+     * Fill in the code the name derives to when the user did not choose one.
      *
      * Doing it here rather than in the controller means a derived code that is
      * already taken fails the same unique rule a typed one would, so the user is
@@ -36,9 +34,7 @@ class StoreFolderRequest extends FormRequest
         $name = $this->string('name')->trim()->toString();
 
         if ($code === '' && $name !== '') {
-            /** @var Space $space */
-            $space = $this->route('space');
-            $code = TicketCodes::firstFreeFor($space->workspace_id, $name);
+            $code = Folder::deriveCodeFrom($name);
         }
 
         if ($code !== '') {
@@ -61,7 +57,9 @@ class StoreFolderRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'code' => [
                 'required', 'string', 'max:10', 'regex:/^[A-Z][A-Z0-9]*$/',
-                TicketCodes::availableRule($space->workspace_id),
+                Rule::notIn([Folder::UNASSIGNED_CODE]),
+                Rule::unique('task_folders', 'code')->where('workspace_id', $space->workspace_id),
+                Rule::unique('tasks', 'ticket_code')->where('workspace_id', $space->workspace_id),
             ],
             'description' => ['nullable', 'string', 'max:2000'],
             'position' => ['sometimes', 'integer', 'min:0'],
@@ -77,6 +75,8 @@ class StoreFolderRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'code.unique' => 'That project code is already in use, or has already numbered tickets. Choose another one.',
+            'code.not_in' => 'That project code is reserved. Choose another one.',
             'code.regex' => 'A project code is letters and digits, starting with a letter.',
         ];
     }

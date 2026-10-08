@@ -23,7 +23,6 @@ class SpaceResource extends JsonResource
             'workspace_id' => $this->workspace_id,
             'owner_id' => $this->owner_id,
             'name' => $this->name,
-            'code' => $this->code,
             'description' => $this->description,
             'color' => $this->color,
             'position' => $this->position,

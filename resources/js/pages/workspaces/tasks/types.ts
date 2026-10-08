@@ -11,8 +11,6 @@ export type Space = {
     workspace_id: number;
     owner_id: number;
     name: string;
-    /** Prefix tasks in the space's loose lists are numbered with, e.g. `ART`. */
-    code: string | null;
     description: string | null;
     color: string | null;
     position: number;

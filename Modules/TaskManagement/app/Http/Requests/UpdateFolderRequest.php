@@ -3,11 +3,12 @@
 namespace Modules\TaskManagement\Http\Requests;
 
 use Illuminate\Auth\Access\Response;
+use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Modules\TaskManagement\Models\Folder;
-use Modules\TaskManagement\Support\TicketCodes;
 
 class UpdateFolderRequest extends FormRequest
 {
@@ -30,7 +31,15 @@ class UpdateFolderRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255'],
             'code' => [
                 'sometimes', 'string', 'max:10', 'regex:/^[A-Z][A-Z0-9]*$/',
-                TicketCodes::availableRule($this->folder()->workspace_id, $this->folder()),
+                Rule::notIn([Folder::UNASSIGNED_CODE]),
+                Rule::unique('task_folders', 'code')
+                    ->where('workspace_id', $this->folder()->workspace_id)
+                    ->ignore($this->route('folder')),
+                Rule::unique('tasks', 'ticket_code')->where(
+                    fn (Builder $query) => $query
+                        ->where('workspace_id', $this->folder()->workspace_id)
+                        ->whereNot('ticket_code', $this->folder()->code),
+                ),
             ],
             'description' => ['nullable', 'string', 'max:2000'],
             'position' => ['sometimes', 'integer', 'min:0'],
@@ -70,6 +79,8 @@ class UpdateFolderRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'code.unique' => 'That project code is already in use, or has already numbered tickets. Choose another one.',
+            'code.not_in' => 'That project code is reserved. Choose another one.',
             'code.regex' => 'A project code is letters and digits, starting with a letter.',
         ];
     }

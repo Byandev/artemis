@@ -49,12 +49,7 @@ class FolderCodeTest extends TestCase
             ->assertJsonPath('data.code', 'ART');
     }
 
-    /**
-     * Artemis has no field for typing a code, so a derived code that is taken
-     * moves to the next free variant rather than failing. A typed one that is
-     * taken is still refused.
-     */
-    public function test_a_derived_code_that_is_taken_moves_to_the_next_free_variant(): void
+    public function test_a_derived_code_that_is_taken_is_refused_and_the_user_is_told(): void
     {
         $user = User::factory()->create();
         $space = $this->spaceOwnedBy($user);
@@ -62,13 +57,10 @@ class FolderCodeTest extends TestCase
 
         $this->actingAs($user)
             ->postJson($this->tmRoute('spaces.folders.store', $space), ['name' => 'Artemis V2'])
-            ->assertCreated()
-            ->assertJsonPath('data.code', 'ART2');
-
-        $this->actingAs($user)
-            ->postJson($this->tmRoute('spaces.folders.store', $space), ['name' => 'Artemis V3', 'code' => 'ART'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('code');
+
+        $this->assertSame(1, Folder::query()->where('code', 'ART')->count());
     }
 
     public function test_a_code_is_unique_across_spaces_not_only_within_one(): void
@@ -78,7 +70,7 @@ class FolderCodeTest extends TestCase
         $other = $this->spaceWhereUserIs($user, SpaceRole::Admin);
 
         $this->actingAs($user)
-            ->postJson($this->tmRoute('spaces.folders.store', $other), ['name' => 'Artemis', 'code' => 'ART'])
+            ->postJson($this->tmRoute('spaces.folders.store', $other), ['name' => 'Artemis'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('code');
     }

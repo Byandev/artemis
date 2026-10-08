@@ -36,79 +36,12 @@ class TaskTicketIdentifierTest extends TestCase
         $this->assertSame('MAT-1', $second->ticketIdentifier());
     }
 
-    public function test_a_task_outside_any_project_takes_its_spaces_code(): void
+    public function test_a_task_outside_any_project_takes_the_reserved_code(): void
     {
-        $space = Space::factory()->withDefaultStatuses()->create(['name' => 'Artemis']);
+        $space = $this->spaceOwnedBy(User::factory()->create());
         $loose = TaskList::factory()->create(['space_id' => $space->id, 'folder_id' => null]);
 
-        $this->assertSame('ART', $space->code);
-        $this->assertSame(['ART-1', 'ART-2'], [
-            $this->taskIn($loose)->ticketIdentifier(),
-            $this->taskIn($loose)->ticketIdentifier(),
-        ]);
-    }
-
-    public function test_a_space_created_through_the_api_derives_its_code_from_its_name(): void
-    {
-        $user = User::factory()->create();
-
-        $this->actingAs($user)
-            ->postJson($this->tmRoute('spaces.store'), ['name' => 'Artemis'])
-            ->assertCreated()
-            ->assertJsonPath('data.code', 'ART');
-    }
-
-    public function test_a_taken_code_moves_to_the_next_free_variant_instead_of_failing(): void
-    {
-        $user = User::factory()->create();
-        Space::factory()->create(['name' => 'Artemis']);
-
-        $this->actingAs($user)
-            ->postJson($this->tmRoute('spaces.store'), ['name' => 'Artist'])
-            ->assertCreated()
-            ->assertJsonPath('data.code', 'ART2');
-
-        // Folders share the namespace with spaces.
-        $this->actingAs($user)
-            ->postJson($this->tmRoute('spaces.folders.store', $this->spaceOwnedBy($user)), ['name' => 'Arts'])
-            ->assertCreated()
-            ->assertJsonPath('data.code', 'ART3');
-    }
-
-    public function test_a_typed_space_code_must_be_free(): void
-    {
-        $user = User::factory()->create();
-        Folder::factory()->create(['space_id' => $this->spaceOwnedBy($user)->id, 'code' => 'OPS']);
-
-        $this->actingAs($user)
-            ->postJson($this->tmRoute('spaces.store'), ['name' => 'Operations', 'code' => 'ops'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('code');
-
-        $this->actingAs($user)
-            ->postJson($this->tmRoute('spaces.store'), ['name' => 'Fallback', 'code' => 'TSK'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('code');
-    }
-
-    public function test_renaming_a_space_keeps_its_code_and_existing_tickets(): void
-    {
-        $user = User::factory()->create();
-        $space = Space::factory()->withDefaultStatuses()->create(['name' => 'Artemis', 'owner_id' => $user->id]);
-        $task = $this->taskIn($this->listIn($space));
-
-        $this->actingAs($user)
-            ->patchJson($this->tmRoute('spaces.update', $space), ['name' => 'Zephyr'])
-            ->assertOk()
-            ->assertJsonPath('data.code', 'ART');
-
-        $this->actingAs($user)
-            ->patchJson($this->tmRoute('spaces.update', $space), ['code' => 'ZEP'])
-            ->assertOk()
-            ->assertJsonPath('data.code', 'ZEP');
-
-        $this->assertSame('ART-1', $task->fresh()->ticketIdentifier());
-        $this->assertSame('ZEP-2', $this->taskIn($this->listIn($space))->ticketIdentifier());
+        $this->assertSame(Folder::UNASSIGNED_CODE.'-1', $this->taskIn($loose)->ticketIdentifier());
     }
 
     public function test_the_identifier_survives_a_rename_a_move_and_an_archive(): void

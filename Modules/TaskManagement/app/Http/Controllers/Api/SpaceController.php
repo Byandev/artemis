@@ -45,7 +45,7 @@ class SpaceController extends Controller
     public function store(Workspace $workspace, StoreSpaceRequest $request): JsonResponse
     {
         $space = DB::transaction(function () use ($request, $workspace): Space {
-            $space = new Space($request->safe()->only(['name', 'code', 'description', 'color', 'position', 'metadata']));
+            $space = new Space($request->safe()->only(['name', 'description', 'color', 'position', 'metadata']));
             $space->workspace_id = $workspace->id;
             $space->owner_id = $request->user()->id;
             $space->save();
@@ -75,7 +75,7 @@ class SpaceController extends Controller
      */
     public function update(Workspace $workspace, UpdateSpaceRequest $request, Space $space): SpaceResource
     {
-        $space->fill($request->safe()->only(['name', 'code', 'description', 'color', 'position', 'metadata']));
+        $space->fill($request->safe()->only(['name', 'description', 'color', 'position', 'metadata']));
 
         if ($request->has('archived')) {
             $space->archived_at = $request->boolean('archived') ? now() : null;
