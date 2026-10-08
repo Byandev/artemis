@@ -27,15 +27,17 @@ class CallLogController extends Controller
         $workspace = $request->attributes->get('workspace');
         $now = now();
 
-        // A call the handset reported no number for is dropped rather than
-        // stored: there is nothing to match it to a delivery or an order on,
-        // and phone_number is part of the upsert key, so every re-sync of the
-        // same numberless call would land as another row. The rest of the
-        // batch still syncs — one such entry no longer rejects the payload.
-        $logs = array_values(array_filter(
+        // A call the handset reported no number for (private / unknown caller)
+        // is stored with an empty string, never null: phone_number is part of
+        // the upsert key and MySQL treats nulls as distinct, so a null would
+        // land as another row on every re-sync, while '' dedupes. It has to be
+        // stored at all because the app marks a call synced only when /list
+        // returns it — dropping it left the call "Not Synced" forever and the
+        // app's unsynced count could never reach zero.
+        $logs = array_map(
+            fn ($log) => ['phone_number' => (string) ($log['phone_number'] ?? '')] + $log,
             $request->input('call_logs'),
-            fn ($log) => filled($log['phone_number'] ?? null),
-        ));
+        );
 
         $rows = array_map(function ($log) use ($workspace, $request, $now) {
             // Normalize to the app timezone (Asia/Singapore) so call_date/call_time
