@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
@@ -28,6 +30,8 @@ export function TaskRow({
 }: Props) {
     const routes = useTaskRoutes();
     const [busy, setBusy] = useState(false);
+    // Without Manage Tasks the row is read-only: pickers show, but do nothing.
+    const canManage = usePermission(PERMISSIONS.ManageTasks);
 
     const due = dueMeta(task.due_at, task.completed);
     const status = statuses.find((item) => item.id === task.status_id);
@@ -54,7 +58,7 @@ export function TaskRow({
             <StatusPicker
                 statuses={statuses}
                 value={task.status_id}
-                disabled={busy}
+                disabled={busy || !canManage}
                 align="start"
                 onChange={(statusId) =>
                     void run(() => onUpdate(task, { status_id: statusId }))
@@ -110,7 +114,7 @@ export function TaskRow({
                 <AssigneePicker
                     task={task}
                     members={members}
-                    disabled={busy}
+                    disabled={busy || !canManage}
                     onChange={(payload) =>
                         void run(() => onUpdate(task, payload))
                     }
@@ -125,7 +129,7 @@ export function TaskRow({
             <div className="hidden w-20 shrink-0 justify-end sm:flex">
                 <DuePicker
                     task={task}
-                    disabled={busy}
+                    disabled={busy || !canManage}
                     onChange={(payload) =>
                         void run(() => onUpdate(task, payload))
                     }
@@ -140,7 +144,7 @@ export function TaskRow({
             <div className="flex w-6 shrink-0 justify-center">
                 <PriorityPicker
                     task={task}
-                    disabled={busy}
+                    disabled={busy || !canManage}
                     onChange={(payload) =>
                         void run(() => onUpdate(task, payload))
                     }
@@ -152,15 +156,17 @@ export function TaskRow({
                 />
             </div>
 
-            <button
-                type="button"
-                disabled={busy}
-                onClick={() => void run(() => onDelete(task))}
-                aria-label={`Delete ${task.name}`}
-                className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-all duration-200 ease-out group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100"
-            >
-                <Trash2 className="size-3.5" />
-            </button>
+            {canManage && (
+                <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void run(() => onDelete(task))}
+                    aria-label={`Delete ${task.name}`}
+                    className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-all duration-200 ease-out group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100"
+                >
+                    <Trash2 className="size-3.5" />
+                </button>
+            )}
         </div>
     );
 }

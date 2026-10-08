@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import { cn } from '@/lib/utils';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -23,6 +25,7 @@ export function TaskGroupAdder({
     onCreate,
     onError,
 }: Props) {
+    const canManage = usePermission(PERMISSIONS.ManageTasks);
     const [open, setOpen] = useState(false);
     const [name, setName] = useState('');
     const [saving, setSaving] = useState(false);
@@ -51,6 +54,11 @@ export function TaskGroupAdder({
         } finally {
             setSaving(false);
         }
+    }
+
+    // Disabled reads as "not yet"; without Manage Tasks it is "never", so hide.
+    if (!canManage) {
+        return null;
     }
 
     if (!open) {

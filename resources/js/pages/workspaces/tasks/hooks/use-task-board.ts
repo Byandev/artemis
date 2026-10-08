@@ -1,3 +1,5 @@
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import { router } from '@inertiajs/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -68,6 +70,12 @@ export type BoardOptions = {
  * integration uses, so the UI never depends on a second, page-only data path.
  */
 export function useTaskBoard(routes: TaskRoutes, options: BoardOptions) {
+    /**
+     * "View Tasks" alone is read-only; every change also needs "Manage Tasks".
+     * The server enforces it -- this only keeps the controls from offering
+     * what would be refused.
+     */
+    const canManageTasks = usePermission(PERMISSIONS.ManageTasks);
     const { showsTasks, initialSpaceId = null, initialListId = null } = options;
     const { spaces, tasks, lists } = routes;
     const folderRoutes = routes.folders;
@@ -257,6 +265,10 @@ export function useTaskBoard(routes: TaskRoutes, options: BoardOptions) {
      * a dead, unexplained button in the toolbar.
      */
     const addTaskBlockedReason = useMemo((): string | null => {
+        if (!canManageTasks) {
+            return 'You need the Manage Tasks permission to add tasks.';
+        }
+
         if (loadingSpaces || loadingSpace) {
             return 'Loading workspace…';
         }
@@ -270,7 +282,13 @@ export function useTaskBoard(routes: TaskRoutes, options: BoardOptions) {
         }
 
         return null;
-    }, [loadingSpaces, loadingSpace, composeListId, statuses.length]);
+    }, [
+        canManageTasks,
+        loadingSpaces,
+        loadingSpace,
+        composeListId,
+        statuses.length,
+    ]);
 
     const canAddTask = addTaskBlockedReason === null;
 
@@ -698,6 +716,7 @@ export function useTaskBoard(routes: TaskRoutes, options: BoardOptions) {
     );
 
     return {
+        canManageTasks,
         spaces: allSpaces,
         spaceId,
         setSpaceId,

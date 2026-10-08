@@ -213,6 +213,7 @@ enum Permission: string
 
     // Task Management
     case ViewTasks = 'View Tasks';
+    case ManageTasks = 'Manage Tasks';
 
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
@@ -398,7 +399,8 @@ enum Permission: string
             self::EditCourses,
             self::DeleteCourses => 'Courses',
 
-            self::ViewTasks => 'Task Management',
+            self::ViewTasks,
+            self::ManageTasks => 'Task Management',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,

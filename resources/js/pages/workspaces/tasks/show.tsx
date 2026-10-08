@@ -113,10 +113,12 @@ function Description({
 
 function Subtasks({
     task,
+    readOnly,
     onAdd,
     onToggle,
 }: {
     task: Task;
+    readOnly: boolean;
     onAdd: (name: string) => void;
     onToggle: (subtask: Task) => void;
 }) {
@@ -147,7 +149,7 @@ function Subtasks({
                         status={subtask.status}
                         complete={subtask.completed}
                         onClick={() => onToggle(subtask)}
-                        disabled={false}
+                        disabled={readOnly}
                         label={
                             subtask.completed
                                 ? `Reopen ${subtask.name}`
@@ -167,26 +169,28 @@ function Subtasks({
                 </div>
             ))}
 
-            <form
-                onSubmit={(event) => {
-                    event.preventDefault();
+            {!readOnly && (
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault();
 
-                    if (name.trim() !== '') {
-                        onAdd(name.trim());
-                        setName('');
-                    }
-                }}
-                className="flex items-center gap-2 px-5 py-3"
-            >
-                <Plus className="size-3.5 shrink-0 text-muted-foreground" />
-                <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Add a subtask, then Enter"
-                    aria-label="New subtask"
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
-                />
-            </form>
+                        if (name.trim() !== '') {
+                            onAdd(name.trim());
+                            setName('');
+                        }
+                    }}
+                    className="flex items-center gap-2 px-5 py-3"
+                >
+                    <Plus className="size-3.5 shrink-0 text-muted-foreground" />
+                    <input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="Add a subtask, then Enter"
+                        aria-label="New subtask"
+                        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
+                    />
+                </form>
+            )}
         </section>
     );
 }
@@ -253,6 +257,9 @@ function TaskDetail({ taskId }: { taskId: number }) {
     const canManageAttachments = role === 'owner' || role === 'admin';
     const canAttachFiles = canManageAttachments || role === 'member';
 
+    /** Without Manage Tasks the whole page is read-only. */
+    const canManage = workspace.canManageTasks;
+
     return (
         <>
             <Head title={task.name} />
@@ -273,16 +280,18 @@ function TaskDetail({ taskId }: { taskId: number }) {
                         </Link>
                     </Button>
 
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirming(true)}
-                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                        <Trash2 />
-                        Delete task
-                    </Button>
+                    {canManage && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setConfirming(true)}
+                            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                            <Trash2 />
+                            Delete task
+                        </Button>
+                    )}
                 </div>
 
                 <header className="flex flex-col gap-3">
@@ -311,7 +320,9 @@ function TaskDetail({ taskId }: { taskId: number }) {
                             <StatusPicker
                                 statuses={workspace.statuses}
                                 value={task.status_id}
-                                disabled={!spaceReady || detail.saving}
+                                disabled={
+                                    !spaceReady || detail.saving || !canManage
+                                }
                                 align="start"
                                 onChange={(statusId) =>
                                     void detail.update({ status_id: statusId })
@@ -360,6 +371,7 @@ function TaskDetail({ taskId }: { taskId: number }) {
                                     setName(task.name);
                                 }
                             }}
+                            readOnly={!canManage}
                             aria-label="Task name"
                             className={cn(
                                 '-mx-2 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-[22px] leading-tight font-semibold tracking-tight text-gray-800 outline-none focus-visible:border-black/12 dark:text-gray-100 dark:focus-visible:border-white/12',
@@ -375,7 +387,7 @@ function TaskDetail({ taskId }: { taskId: number }) {
                     <div className="flex flex-col gap-5">
                         <Description
                             task={task}
-                            disabled={detail.saving}
+                            disabled={detail.saving || !canManage}
                             onSave={(description) =>
                                 void detail.update({ description })
                             }
@@ -383,6 +395,7 @@ function TaskDetail({ taskId }: { taskId: number }) {
 
                         <Subtasks
                             task={task}
+                            readOnly={!canManage}
                             onAdd={(value) => void detail.addSubtask(value)}
                             onToggle={(subtask) => {
                                 const target = subtask.completed
@@ -399,13 +412,14 @@ function TaskDetail({ taskId }: { taskId: number }) {
 
                         <TaskAttachments
                             taskId={task.id}
-                            canAttach={canAttachFiles}
-                            canManage={canManageAttachments}
+                            canAttach={canManage && canAttachFiles}
+                            canManage={canManage && canManageAttachments}
                             onError={detail.report}
                         />
 
                         <TaskComments
                             taskId={task.id}
+                            readOnly={!canManage}
                             onError={detail.report}
                         />
                     </div>
@@ -415,7 +429,7 @@ function TaskDetail({ taskId }: { taskId: number }) {
                             <StatusPicker
                                 statuses={workspace.statuses}
                                 value={task.status_id}
-                                disabled={!spaceReady}
+                                disabled={!spaceReady || !canManage}
                                 align="start"
                                 onChange={(statusId) =>
                                     void detail.update({ status_id: statusId })
@@ -450,7 +464,9 @@ function TaskDetail({ taskId }: { taskId: number }) {
                             <AssigneePicker
                                 task={task}
                                 members={workspace.members}
-                                disabled={detail.saving || !spaceReady}
+                                disabled={
+                                    detail.saving || !spaceReady || !canManage
+                                }
                                 onChange={(payload) =>
                                     void detail.update(payload)
                                 }
@@ -461,7 +477,7 @@ function TaskDetail({ taskId }: { taskId: number }) {
                         <Field label="Priority">
                             <PriorityPicker
                                 task={task}
-                                disabled={detail.saving}
+                                disabled={detail.saving || !canManage}
                                 onChange={(payload) =>
                                     void detail.update(payload)
                                 }
@@ -471,7 +487,7 @@ function TaskDetail({ taskId }: { taskId: number }) {
                         <Field label="Due">
                             <DuePicker
                                 task={task}
-                                disabled={detail.saving}
+                                disabled={detail.saving || !canManage}
                                 onChange={(payload) =>
                                     void detail.update(payload)
                                 }
@@ -483,7 +499,7 @@ function TaskDetail({ taskId }: { taskId: number }) {
                             <input
                                 type="date"
                                 value={toDateInput(task.start_at)}
-                                disabled={detail.saving}
+                                disabled={detail.saving || !canManage}
                                 aria-label="Start date"
                                 onChange={(event) =>
                                     void detail.update({
@@ -505,7 +521,7 @@ function TaskDetail({ taskId }: { taskId: number }) {
                                 min={0}
                                 step={15}
                                 defaultValue={task.estimate_minutes ?? ''}
-                                disabled={detail.saving}
+                                disabled={detail.saving || !canManage}
                                 aria-label="Estimate in minutes"
                                 placeholder="Minutes"
                                 onBlur={(event) => {
@@ -532,7 +548,9 @@ function TaskDetail({ taskId }: { taskId: number }) {
                             <LabelPicker
                                 task={task}
                                 labels={workspace.labels}
-                                disabled={detail.saving || !spaceReady}
+                                disabled={
+                                    detail.saving || !spaceReady || !canManage
+                                }
                                 onChange={(payload) =>
                                     void detail.update(payload)
                                 }

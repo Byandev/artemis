@@ -23,7 +23,8 @@ use Modules\TaskManagement\Models\TaskStatus;
  * Matrix had no workspaces: any account could own or join a space. To keep its
  * tests about what they were about -- space roles -- each test gets one
  * workspace with the module switched on, every space a factory makes is pinned
- * to it, and every user the test creates joins it holding "View Tasks". A test
+ * to it, and every user the test creates joins it holding "View Tasks" and
+ * "Manage Tasks". A test
  * that needs someone outside the workspace makes them with outsider().
  */
 trait InteractsWithSpaces
@@ -37,11 +38,7 @@ trait InteractsWithSpaces
         $this->taskWorkspace = Workspace::factory()->create(['task_management_module_enabled' => true]);
 
         $this->taskRole = Role::create(['workspace_id' => $this->taskWorkspace->id, 'name' => 'Task user']);
-        $permission = Permission::firstOrCreate(
-            ['name' => PermissionEnum::ViewTasks->value],
-            ['category' => 'Task Management'],
-        );
-        DB::table('role_permissions')->insert(['role_id' => $this->taskRole->id, 'permission_id' => $permission->id]);
+        $this->grantTaskPermissions($this->taskRole, [PermissionEnum::ViewTasks, PermissionEnum::ManageTasks]);
 
         SpaceFactory::$workspaceId = $this->taskWorkspace->id;
 
@@ -57,7 +54,40 @@ trait InteractsWithSpaces
     }
 
     /**
-     * Add a user to the test workspace with a role holding "View Tasks".
+     * @param  list<PermissionEnum>  $permissions
+     */
+    protected function grantTaskPermissions(Role $role, array $permissions): void
+    {
+        foreach ($permissions as $name) {
+            $permission = Permission::firstOrCreate(['name' => $name->value], ['category' => 'Task Management']);
+            DB::table('role_permissions')->insert(['role_id' => $role->id, 'permission_id' => $permission->id]);
+        }
+    }
+
+    /**
+     * A workspace member whose role holds "View Tasks" but not "Manage Tasks".
+     */
+    protected function viewOnlyUser(): User
+    {
+        $role = Role::create(['workspace_id' => $this->taskWorkspace->id, 'name' => 'Task viewer']);
+        $this->grantTaskPermissions($role, [PermissionEnum::ViewTasks]);
+
+        $user = $this->outsider();
+        DB::table('workspace_user')->insert([
+            'workspace_id' => $this->taskWorkspace->id,
+            'user_id' => $user->id,
+            'role' => 'member',
+            'role_id' => $role->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $user;
+    }
+
+    /**
+     * Add a user to the test workspace with a role holding "View Tasks" and
+     * "Manage Tasks", so what a test exercises is the user's space role.
      */
     protected function joinTaskWorkspace(User $user): void
     {

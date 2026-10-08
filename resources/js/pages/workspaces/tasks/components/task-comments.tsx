@@ -158,9 +158,12 @@ function CommentRow({
  */
 export function TaskComments({
     taskId,
+    readOnly = false,
     onError,
 }: {
     taskId: number;
+    /** Without Manage Tasks: comments can be read, not posted or changed. */
+    readOnly?: boolean;
     onError: (cause: unknown) => void;
 }) {
     const { auth } = usePage<SharedData>().props;
@@ -207,35 +210,37 @@ export function TaskComments({
                     <CommentRow
                         key={comment.id}
                         comment={comment}
-                        mine={comment.user_id === auth.user.id}
+                        mine={!readOnly && comment.user_id === auth.user.id}
                         onEdit={(body) => edit(comment, body)}
                         onDelete={() => void remove(comment)}
                     />
                 ))
             )}
 
-            <div className="flex flex-col gap-2 border-t border-black/6 px-5 py-4 dark:border-white/6">
-                <textarea
-                    value={draft}
-                    disabled={posting}
-                    rows={3}
-                    aria-label="Add a comment"
-                    placeholder="Add a comment"
-                    onChange={(event) => setDraft(event.target.value)}
-                    className="w-full rounded-lg border border-black/8 bg-white px-3 py-2 text-sm outline-none focus-visible:border-emerald-500 focus-visible:ring-4 focus-visible:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-900"
-                />
-                <div className="flex justify-end">
-                    <Button
-                        type="button"
-                        size="sm"
-                        disabled={posting || draft.trim() === ''}
-                        onClick={() => void submit()}
-                        className={cn(posting && 'opacity-60')}
-                    >
-                        Comment
-                    </Button>
+            {!readOnly && (
+                <div className="flex flex-col gap-2 border-t border-black/6 px-5 py-4 dark:border-white/6">
+                    <textarea
+                        value={draft}
+                        disabled={posting}
+                        rows={3}
+                        aria-label="Add a comment"
+                        placeholder="Add a comment"
+                        onChange={(event) => setDraft(event.target.value)}
+                        className="w-full rounded-lg border border-black/8 bg-white px-3 py-2 text-sm outline-none focus-visible:border-emerald-500 focus-visible:ring-4 focus-visible:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-900"
+                    />
+                    <div className="flex justify-end">
+                        <Button
+                            type="button"
+                            size="sm"
+                            disabled={posting || draft.trim() === ''}
+                            onClick={() => void submit()}
+                            className={cn(posting && 'opacity-60')}
+                        >
+                            Comment
+                        </Button>
+                    </div>
                 </div>
-            </div>
+            )}
         </section>
     );
 }

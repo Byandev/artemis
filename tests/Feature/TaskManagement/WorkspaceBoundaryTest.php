@@ -152,4 +152,56 @@ class WorkspaceBoundaryTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.code', 'ART');
     }
+
+    public function test_view_tasks_alone_can_read_but_not_change_anything(): void
+    {
+        $owner = User::factory()->create();
+        $space = $this->spaceOwnedBy($owner);
+        $list = $this->listIn($space);
+        $task = $this->taskIn($list);
+
+        // Even as the owner of a space, View Tasks alone is read-only.
+        $viewer = $this->viewOnlyUser();
+        $space->members()->attach($viewer, ['role' => SpaceRole::Admin->value]);
+
+        $this->actingAs($viewer)->getJson($this->tmRoute('spaces.index'))->assertOk();
+        $this->actingAs($viewer)->getJson($this->tmRoute('tasks.show', $task))->assertOk();
+        $this->actingAs($viewer)->getJson($this->tmRoute('tasks.comments.index', $task))->assertOk();
+        $this->actingAs($viewer)->get($this->tmPage('show', $task))->assertOk();
+
+        $writes = [
+            ['postJson', $this->tmRoute('spaces.store'), ['name' => 'Ops']],
+            ['patchJson', $this->tmRoute('spaces.update', $space), ['name' => 'Renamed']],
+            ['postJson', $this->tmRoute('spaces.lists.store', $space), ['name' => 'Backlog']],
+            ['postJson', $this->tmRoute('lists.tasks.store', $list), ['name' => 'New']],
+            ['patchJson', $this->tmRoute('tasks.update', $task), ['name' => 'Renamed']],
+            ['deleteJson', $this->tmRoute('tasks.destroy', $task), []],
+            ['postJson', $this->tmRoute('tasks.comments.store', $task), ['body' => 'Hi']],
+        ];
+
+        foreach ($writes as [$method, $url, $body]) {
+            $this->actingAs($viewer)->{$method}($url, $body)
+                ->assertForbidden()
+                ->assertJsonPath('message', 'You need the Manage Tasks permission to make changes.');
+        }
+
+        $this->assertSame(1, Space::query()->count());
+        $this->assertNotSame('Renamed', $task->fresh()->name);
+        $this->assertSame(0, $task->comments()->count());
+    }
+
+    public function test_manage_tasks_does_not_override_the_space_role(): void
+    {
+        $owner = User::factory()->create();
+        $space = $this->spaceOwnedBy($owner);
+        $list = $this->listIn($space);
+
+        // Holds Manage Tasks (every test user does) but is only a viewer here.
+        $viewer = User::factory()->create();
+        $space->members()->attach($viewer, ['role' => SpaceRole::Viewer->value]);
+
+        $this->actingAs($viewer)
+            ->postJson($this->tmRoute('lists.tasks.store', $list), ['name' => 'New'])
+            ->assertForbidden();
+    }
 }

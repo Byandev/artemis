@@ -197,7 +197,9 @@ export function TaskAttachments({
                         key={attachment.id}
                         attachment={attachment}
                         removable={
-                            canManage || attachment.uploaded_by === auth.user.id
+                            canManage ||
+                            (canAttach &&
+                                attachment.uploaded_by === auth.user.id)
                         }
                         onRemove={() => void remove(attachment)}
                     />

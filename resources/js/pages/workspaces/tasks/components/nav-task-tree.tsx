@@ -100,12 +100,23 @@ export function NavTaskTree() {
     const memberRole = board.spaces.find(
         (item) => item.id === memberTarget,
     )?.role;
-    const canManageMembers = memberRole === 'owner' || memberRole === 'admin';
+    const canManageMembers =
+        board.canManageTasks &&
+        (memberRole === 'owner' || memberRole === 'admin');
+
+    /** Without Manage Tasks the tree is for navigating only. */
+    const canManage = board.canManageTasks;
 
     /** Open the tree menu at the pointer, suppressing the browser's own. */
     function openMenu(event: React.MouseEvent, target: MenuTarget) {
         event.preventDefault();
         event.stopPropagation();
+
+        // A folder or list menu holds nothing but changes.
+        if (!canManage && target.kind !== 'space') {
+            return;
+        }
+
         setMenu({ target, x: event.clientX, y: event.clientY });
     }
 
@@ -211,15 +222,17 @@ export function NavTaskTree() {
                 <span className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                     Spaces
                 </span>
-                <button
-                    type="button"
-                    title="New space"
-                    onClick={() => start('space')}
-                    className={ROW_ICON}
-                >
-                    <Plus className="size-3.5" />
-                    <span className="sr-only">New space</span>
-                </button>
+                {canManage && (
+                    <button
+                        type="button"
+                        title="New space"
+                        onClick={() => start('space')}
+                        className={ROW_ICON}
+                    >
+                        <Plus className="size-3.5" />
+                        <span className="sr-only">New space</span>
+                    </button>
+                )}
             </div>
 
             <ul className="flex flex-col gap-0.5">
@@ -383,23 +396,28 @@ export function NavTaskTree() {
                                                     </span>
                                                 </button>
 
-                                                <button
-                                                    type="button"
-                                                    title={`New list in ${folder.name}`}
-                                                    onClick={() =>
-                                                        start('list', folder.id)
-                                                    }
-                                                    className={cn(
-                                                        ROW_ICON,
-                                                        'absolute top-0.5 right-1 opacity-0 group-hover/folder:opacity-100 focus-visible:opacity-100',
-                                                    )}
-                                                >
-                                                    <Plus className="size-3.5" />
-                                                    <span className="sr-only">
-                                                        New list in{' '}
-                                                        {folder.name}
-                                                    </span>
-                                                </button>
+                                                {canManage && (
+                                                    <button
+                                                        type="button"
+                                                        title={`New list in ${folder.name}`}
+                                                        onClick={() =>
+                                                            start(
+                                                                'list',
+                                                                folder.id,
+                                                            )
+                                                        }
+                                                        className={cn(
+                                                            ROW_ICON,
+                                                            'absolute top-0.5 right-1 opacity-0 group-hover/folder:opacity-100 focus-visible:opacity-100',
+                                                        )}
+                                                    >
+                                                        <Plus className="size-3.5" />
+                                                        <span className="sr-only">
+                                                            New list in{' '}
+                                                            {folder.name}
+                                                        </span>
+                                                    </button>
+                                                )}
 
                                                 {isOpen &&
                                                     children.length > 0 && (
@@ -459,16 +477,20 @@ export function NavTaskTree() {
                                             <li>{draftForm('List name')}</li>
                                         )}
 
-                                    <li className="flex flex-wrap items-center gap-1 pt-1">
-                                        <TreeAction
-                                            label="Folder"
-                                            onClick={() => start('folder')}
-                                        />
-                                        <TreeAction
-                                            label="List"
-                                            onClick={() => start('list', null)}
-                                        />
-                                    </li>
+                                    {canManage && (
+                                        <li className="flex flex-wrap items-center gap-1 pt-1">
+                                            <TreeAction
+                                                label="Folder"
+                                                onClick={() => start('folder')}
+                                            />
+                                            <TreeAction
+                                                label="List"
+                                                onClick={() =>
+                                                    start('list', null)
+                                                }
+                                            />
+                                        </li>
+                                    )}
                                 </ul>
                             )}
                         </li>
@@ -479,7 +501,9 @@ export function NavTaskTree() {
 
                 {!board.loadingSpaces && board.spaces.length === 0 && (
                     <li className="mx-1 my-1 rounded-lg border border-dashed border-black/12 px-3 py-3 text-xs leading-relaxed text-muted-foreground dark:border-white/12">
-                        No spaces yet — create one to start organising work.
+                        {canManage
+                            ? 'No spaces yet — create one to start organising work.'
+                            : 'You have not been added to any space yet.'}
                     </li>
                 )}
             </ul>
@@ -514,6 +538,7 @@ export function NavTaskTree() {
                     {target?.kind === 'space' && (
                         <SpaceMenuItems
                             space={target.space}
+                            canManage={canManage}
                             onNewList={() =>
                                 inSpace(target.space.id, () =>
                                     start('list', null),
@@ -652,6 +677,7 @@ function TreeAction({
 
 function SpaceMenuItems({
     space,
+    canManage,
     onNewList,
     onNewFolder,
     onStatuses,
@@ -659,12 +685,23 @@ function SpaceMenuItems({
     onDelete,
 }: {
     space: Space;
+    canManage: boolean;
     onNewList: () => void;
     onNewFolder: () => void;
     onStatuses: () => void;
     onMembers: () => void;
     onDelete: () => void;
 }) {
+    // Without Manage Tasks the members roster is the only thing left to see.
+    if (!canManage) {
+        return (
+            <DropdownMenuItem onSelect={onMembers}>
+                <Users />
+                Members
+            </DropdownMenuItem>
+        );
+    }
+
     return (
         <>
             <DropdownMenuItem onSelect={onNewList}>

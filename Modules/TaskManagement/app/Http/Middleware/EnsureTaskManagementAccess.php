@@ -15,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  * Space roles (owner/admin/member/viewer) decide what someone may do inside a
  * space, through the policies. This decides whether they reach the module at
  * all: the workspace must have it switched on, and the user must belong to the
- * workspace and hold "View Tasks". The module toggle is checked here as well as
+ * workspace and hold "View Tasks" -- plus "Manage Tasks" for anything that
+ * writes. The module toggle is checked here as well as
  * in the sidebar because workspace owners hold every permission.
  *
  * Records are addressed by id under the workspace prefix (`/tasks/{task}`), so
@@ -35,6 +36,15 @@ class EnsureTaskManagementAccess
 
         abort_unless($user->isMemberOf($workspace), 403);
         abort_unless($user->hasPermission(Permission::ViewTasks, $workspace), 403);
+
+        // "View Tasks" is read-only. Every change -- a space, list, status,
+        // member, task, comment or file -- also needs "Manage Tasks", on top
+        // of whatever the user's role in that space allows.
+        abort_if(
+            ! $request->isMethodSafe() && ! $user->hasPermission(Permission::ManageTasks, $workspace),
+            403,
+            'You need the Manage Tasks permission to make changes.',
+        );
 
         foreach ($request->route()->parameters() as $parameter) {
             if ($parameter instanceof BelongsToTaskWorkspace && $parameter->taskWorkspaceId() !== $workspace->id) {
