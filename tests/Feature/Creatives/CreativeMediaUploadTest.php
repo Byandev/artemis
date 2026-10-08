@@ -181,6 +181,31 @@ it('rejects an upload key whose object is not in the bucket', function () {
     ]))->assertStatus(422);
 });
 
+it('refuses a file that does not match the creative format', function (string $format, string $ext) {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $this->post("/workspaces/{$workspace->slug}/creatives", creativePayload($workspace, [
+        'format' => $format,
+        'media_key' => pendingCreativeKey($workspace, $ext),
+    ]))->assertSessionHasErrors('media_key');
+
+    expect(Creative::where('workspace_id', $workspace->id)->count())->toBe(0);
+})->with([
+    'image key on a video creative' => ['video', 'jpg'],
+    'video key on an image creative' => ['image', 'mp4'],
+]);
+
+it('refuses a posted image on a video creative', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $this->post("/workspaces/{$workspace->slug}/creatives", creativePayload($workspace, [
+        'format' => 'video',
+        'media_file' => UploadedFile::fake()->image('static.jpg'),
+    ]))->assertSessionHasErrors('media_file');
+
+    expect(Creative::where('workspace_id', $workspace->id)->count())->toBe(0);
+});
+
 // ─── update ─────────────────────────────────────────────────────────────────
 
 it('replaces the uploaded file when a new key is sent on update', function () {
@@ -195,6 +220,18 @@ it('replaces the uploaded file when a new key is sent on update', function () {
 
     expect($creative->fresh()->getMedia(Creative::MEDIA_COLLECTION))->toHaveCount(1)
         ->and($creative->fresh()->mediaFile()->file_name)->toBe('new.jpg');
+});
+
+it('checks a new upload against the saved format when the update leaves it out', function () {
+    ['user' => $user, 'workspace' => $workspace] = actingAsWorkspaceOwner();
+    $creative = makeUploadCreative($workspace, $user, ['format' => 'image']);
+
+    $this->put("/workspaces/{$workspace->slug}/creatives/{$creative->id}", [
+        'media_key' => pendingCreativeKey($workspace, 'mp4'),
+        'media_name' => 'clip.mp4',
+    ])->assertSessionHasErrors('media_key');
+
+    expect($creative->fresh()->mediaFile())->toBeNull();
 });
 
 it('removes the uploaded file when a link remains', function () {

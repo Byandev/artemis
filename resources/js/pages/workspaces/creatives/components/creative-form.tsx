@@ -112,9 +112,16 @@ export function CreativeForm({
     });
     const saved = { onSuccess: uploadGuard.markSaved };
 
+    // A file picked before the format was switched no longer fits it; the
+    // media field explains why, and the user has to replace it.
+    const stagedMismatch =
+        !!data.media_file &&
+        !!data.format &&
+        !data.media_file.type.startsWith(`${data.format}/`);
+
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (uploading) return;
+        if (uploading || stagedMismatch) return;
 
         // The file itself is only sent when there's no bucket key for it, i.e.
         // the disk couldn't sign an upload. That makes the request multipart,
@@ -341,6 +348,7 @@ export function CreativeForm({
                             Upload the file, paste a link to it, or both.
                         </p>
                         <CreativeMediaField
+                            format={data.format}
                             presignUrl={`${baseUrl}/media/presign`}
                             file={data.media_file}
                             onFileChange={(file) => {
@@ -549,7 +557,7 @@ export function CreativeForm({
                     </button>
                     <button
                         type="submit"
-                        disabled={processing || uploading}
+                        disabled={processing || uploading || stagedMismatch}
                         className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {processing && (

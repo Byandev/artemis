@@ -6,10 +6,13 @@ use App\Models\Workspace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use Modules\Creatives\Http\Requests\Concerns\ChecksMediaMatchesFormat;
 use Modules\Creatives\Models\Creative;
 
 class UpdateCreativeRequest extends FormRequest
 {
+    use ChecksMediaMatchesFormat;
+
     public function authorize(): bool
     {
         return true;
@@ -71,6 +74,11 @@ class UpdateCreativeRequest extends FormRequest
      */
     public function withValidator(Validator $validator): void
     {
+        $validator->after(fn (Validator $validator) => $this->checkMediaMatchesFormat(
+            $validator,
+            $this->input('format', $this->route('creative')?->format),
+        ));
+
         $validator->after(function (Validator $validator) {
             if (! $this->has('picture_url') && ! $this->boolean('remove_media')) {
                 return;

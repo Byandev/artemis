@@ -5,9 +5,13 @@ namespace Modules\Creatives\Http\Requests;
 use App\Models\Workspace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
+use Modules\Creatives\Http\Requests\Concerns\ChecksMediaMatchesFormat;
 
 class StoreCreativeRequest extends FormRequest
 {
+    use ChecksMediaMatchesFormat;
+
     public function authorize(): bool
     {
         return true;
@@ -55,6 +59,11 @@ class StoreCreativeRequest extends FormRequest
             'headline' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(fn (Validator $validator) => $this->checkMediaMatchesFormat($validator, $this->input('format')));
     }
 
     public function messages(): array
