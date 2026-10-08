@@ -8,7 +8,8 @@ use Illuminate\Support\Carbon;
 use Modules\Creatives\Models\Creative;
 use Modules\Creatives\Models\PushToken;
 use Modules\Creatives\Models\ReminderSetting;
-use Modules\Creatives\Services\ExpoPush;
+use Modules\Creatives\Models\WebPushSubscription;
+use Modules\Creatives\Services\ReviewerPush;
 
 /**
  * Daily push to every Creatives Tracker user who still has creatives waiting
@@ -27,15 +28,18 @@ class SendReviewRemindersCommand extends Command
 
     protected $description = 'Push a reminder to reviewers with creatives waiting on them';
 
-    public function handle(ExpoPush $push): int
+    public function handle(ReviewerPush $push): int
     {
         $now = Carbon::now(ReminderSetting::TIMEZONE);
         $today = $now->toDateString();
-        $userIds = PushToken::distinct()->pluck('user_id');
+        // Anyone with push on somewhere: the phone app or the web app.
+        $userIds = PushToken::distinct()->pluck('user_id')
+            ->merge(WebPushSubscription::distinct()->pluck('user_id'))
+            ->unique();
         $settings = ReminderSetting::whereIn('user_id', $userIds)->get()->keyBy('user_id');
-        $messages = [];
+        $sent = 0;
 
-        User::whereIn('id', $userIds)->each(function (User $user) use ($settings, $now, $today, &$messages) {
+        User::whereIn('id', $userIds)->each(function (User $user) use ($push, $settings, $now, $today, &$sent) {
             $setting = $settings->get($user->id) ?? new ReminderSetting(['user_id' => $user->id]);
 
             if (! $this->isDue($setting, $now, $today)) {
@@ -55,21 +59,16 @@ class SendReviewRemindersCommand extends Command
 
             $noun = $count === 1 ? 'creative' : 'creatives';
 
-            foreach (PushToken::where('user_id', $user->id)->pluck('token') as $token) {
-                $messages[] = [
-                    'to' => $token,
-                    'title' => 'Creatives waiting for review',
-                    'body' => "You have {$count} {$noun} waiting for your review.",
-                    'sound' => 'default',
-                    'channelId' => 'reviews',
-                    'data' => ['type' => 'pending_reminder', 'count' => $count],
-                ];
-            }
+            $push->sendToUsers(
+                [$user->id],
+                'Creatives waiting for review',
+                "You have {$count} {$noun} waiting for your review.",
+                ['type' => 'pending_reminder', 'count' => $count],
+            );
+            $sent++;
         });
 
-        $push->send($messages);
-
-        $this->info('Sent '.count($messages).' reminder(s).');
+        $this->info("Reminded {$sent} user(s).");
 
         return self::SUCCESS;
     }

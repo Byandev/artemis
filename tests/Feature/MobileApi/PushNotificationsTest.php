@@ -10,7 +10,7 @@ use Modules\Creatives\Models\Creative;
 use Modules\Creatives\Models\CreativeReview;
 use Modules\Creatives\Models\PushToken;
 use Modules\Creatives\Models\ReminderSetting;
-use Modules\Creatives\Services\ExpoPush;
+use Modules\Creatives\Services\ReviewerPush;
 
 const EXPO_SEND_URL = 'https://exp.host/--/api/v2/push/send';
 
@@ -146,7 +146,7 @@ test('the assigned push goes to every token of the reviewer', function () {
     $creative = pushCreative($workspace, ['name' => 'UGC 01']);
     $creative->assignedReviewers()->sync([$reviewer->id]);
 
-    (new SendCreativeAssignedPush($creative->id, [$reviewer->id]))->handle(app(ExpoPush::class));
+    (new SendCreativeAssignedPush($creative->id, [$reviewer->id]))->handle(app(ReviewerPush::class));
 
     Http::assertSent(function (Request $request) use ($creative) {
         $messages = $request->data();
@@ -167,7 +167,7 @@ test('the assigned push is skipped once the reviewer is unassigned', function ()
     $reviewer = pushReviewer($workspace, 'ExponentPushToken[phone]');
     $creative = pushCreative($workspace);
 
-    (new SendCreativeAssignedPush($creative->id, [$reviewer->id]))->handle(app(ExpoPush::class));
+    (new SendCreativeAssignedPush($creative->id, [$reviewer->id]))->handle(app(ReviewerPush::class));
 
     Http::assertNothingSent();
 });
@@ -179,7 +179,7 @@ test('tokens Expo reports as not registered are deleted', function () {
     $creative = pushCreative($workspace);
     $creative->assignedReviewers()->sync([$reviewer->id]);
 
-    (new SendCreativeAssignedPush($creative->id, [$reviewer->id]))->handle(app(ExpoPush::class));
+    (new SendCreativeAssignedPush($creative->id, [$reviewer->id]))->handle(app(ReviewerPush::class));
 
     expect(PushToken::count())->toBe(0);
 });

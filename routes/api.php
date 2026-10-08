@@ -18,6 +18,7 @@ use App\Http\Controllers\PublicApi\UserController;
 use Modules\Creatives\Http\Controllers\Api\AssignedCreativesController;
 use Modules\Creatives\Http\Controllers\Api\PushTokenController;
 use Modules\Creatives\Http\Controllers\Api\ReminderSettingController;
+use Modules\Creatives\Http\Controllers\Api\WebPushSubscriptionController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Api\InternController as GencysInternApiController;
 use Modules\GencysERP\Http\Controllers\Api\InternDailyRecordController as GencysInternDailyRecordApiController;
@@ -131,6 +132,11 @@ Route::group(['prefix' => 'v1/creatives-tracker', 'as' => 'api.v1.creatives-trac
 
         Route::post('/push-token', [PushTokenController::class, 'store'])->name('push-token.store');
         Route::delete('/push-token', [PushTokenController::class, 'destroy'])->name('push-token.destroy');
+
+        // Same, for the installed web app (PWA) through Web Push.
+        Route::get('/web-push/key', [WebPushSubscriptionController::class, 'key'])->name('web-push.key');
+        Route::post('/web-push/subscription', [WebPushSubscriptionController::class, 'store'])->name('web-push.subscription.store');
+        Route::delete('/web-push/subscription', [WebPushSubscriptionController::class, 'destroy'])->name('web-push.subscription.destroy');
 
         Route::get('/reminder-settings', [ReminderSettingController::class, 'show'])->name('reminder-settings.show');
         Route::put('/reminder-settings', [ReminderSettingController::class, 'update'])->name('reminder-settings.update');
