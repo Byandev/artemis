@@ -66,17 +66,18 @@ it('flags every sheet row and auto-tags confirmed, delivered and returned', func
         ->assertJsonPath('data.tagged', 3)
         ->assertJsonPath('data.unmatched', ['JT999']);
 
-    $synced = collect($this->postJson('/api/v1/public/rmo-orders/external-team', [
-        'rows' => [['tracking_number' => 'JT001', 'status' => 'Confirmed']],
-    ], ['Authorization' => "Bearer {$this->apiKey}"])->json('data.synced'));
+    // A re-run still matches the row, but doesn't count it as freshly tagged.
+    $this->withToken($this->apiKey)
+        ->postJson('/api/v1/public/rmo-orders/external-team', [
+            'rows' => [['tracking_number' => 'JT001', 'status' => 'Confirmed']],
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.matched', 1)
+        ->assertJsonPath('data.tagged', 0)
+        ->assertJsonMissingPath('data.synced');
 
     // Untouched settings tag the default rider statuses by name.
     $rider = $this->workspace->rmoRiderStatuses()->pluck('id', 'name');
-
-    // A re-run still reports the row as synced, but not as freshly tagged.
-    expect($synced->all())->toBe([
-        ['tracking_number' => 'JT001', 'rmo_status' => 'RIDER OTW', 'cx_status_id' => null, 'rider_status_id' => $rider['RIDER OTW'], 'tagged' => false],
-    ]);
 
     expect($confirmed->fresh()->rider_status_id)->toBe($rider['RIDER OTW'])
         ->and($delivered->fresh()->rider_status_id)->toBe($rider['DELIVERED'])

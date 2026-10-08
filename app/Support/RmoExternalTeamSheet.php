@@ -92,11 +92,8 @@ class RmoExternalTeamSheet
     }
 
     /**
-     * Besides the counts, the result lists the matched rows by tracking number
-     * with the RMO status they ended on, so n8n can mark them in the sheet.
-     *
      * @param  array<int, array{tracking_number?: string|null, status?: string|null}>  $rows
-     * @return array{received: int, matched: int, flagged: int, tagged: int, synced: array<int, array{tracking_number: string, rmo_status: string, cx_status_id: int|null, rider_status_id: int|null, tagged: bool}>, unmatched: array<int, string>}
+     * @return array{received: int, matched: int, flagged: int, tagged: int, unmatched: array<int, string>}
      */
     public static function apply(Workspace $workspace, string $date, array $rows): array
     {
@@ -127,7 +124,6 @@ class RmoExternalTeamSheet
         $flagged = 0;
         $tagged = 0;
         $matched = [];
-        $synced = [];
 
         foreach ($deliveries as $delivery) {
             $code = strtoupper(trim((string) $delivery->order?->tracking_code));
@@ -152,20 +148,11 @@ class RmoExternalTeamSheet
                 $flagged++;
             }
 
-            $statusChanged = $delivery->isDirty(['status', 'cx_status_id', 'rider_status_id']);
-            if ($statusChanged) {
+            if ($delivery->isDirty(['status', 'cx_status_id', 'rider_status_id'])) {
                 $tagged++;
             }
 
             $delivery->save();
-
-            $synced[] = [
-                'tracking_number' => $code,
-                'rmo_status' => $delivery->status,
-                'cx_status_id' => $delivery->cx_status_id,
-                'rider_status_id' => $delivery->rider_status_id,
-                'tagged' => $statusChanged,
-            ];
         }
 
         return [
@@ -173,7 +160,6 @@ class RmoExternalTeamSheet
             'matched' => count($matched),
             'flagged' => $flagged,
             'tagged' => $tagged,
-            'synced' => $synced,
             'unmatched' => $statuses->keys()->reject(fn ($code) => isset($matched[$code]))->values()->all(),
         ];
     }
