@@ -296,35 +296,6 @@ export default function CreativeReview({
                                     }
                                     className="absolute inset-0 h-full w-full cursor-pointer object-contain"
                                 />
-
-                                {/* The note(s) at this moment, over the video */}
-                                {active.length > 0 && (
-                                    <div className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1.5 px-4">
-                                        {active.map((r) => (
-                                            <div
-                                                key={r.id}
-                                                className="max-w-[min(560px,100%)] rounded-lg bg-black/75 px-3 py-2 text-[13px] leading-snug shadow-lg backdrop-blur"
-                                            >
-                                                <span className="mr-1.5 font-mono text-[11px] font-semibold text-violet-300">
-                                                    {formatClock(
-                                                        r.timestamp_seconds,
-                                                    )}
-                                                </span>
-                                                <span className="font-semibold">
-                                                    {r.reviewer?.name ??
-                                                        'Unknown'}
-                                                    :
-                                                </span>{' '}
-                                                {r.feedback ??
-                                                    (r.voice
-                                                        ? '🎤 Voice message'
-                                                        : REVIEW_STATUS_LABELS[
-                                                              r.status
-                                                          ])}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
                             </>
                         ) : isImage ? (
                             <>
@@ -797,6 +768,7 @@ function Composer({
 }) {
     const [pinned, setPinned] = useState(true);
     const [voice, setVoice] = useState<VoiceClip | null>(null);
+    const [recording, setRecording] = useState(false);
     const { data, setData, post, transform, processing, errors, reset } =
         useForm({
             status: 'revision' as ReviewStatus,
@@ -807,6 +779,8 @@ function Composer({
 
     const submit = (e?: React.FormEvent) => {
         e?.preventDefault();
+        // Stop first, or the comment goes out without the clip being recorded.
+        if (recording) return;
         transform((d) => ({
             ...d,
             timestamp_seconds: attachTime ? readTime() : null,
@@ -921,6 +895,7 @@ function Composer({
                 value={voice}
                 onChange={setVoice}
                 onStart={onFocus}
+                onRecordingChange={setRecording}
             />
             {(() => {
                 // The server keys these by API field, not by the form's own.
@@ -942,7 +917,8 @@ function Composer({
             })()}
             <button
                 type="submit"
-                disabled={processing}
+                disabled={processing || recording}
+                title={recording ? 'Stop recording to comment' : undefined}
                 className="flex h-8 w-full items-center justify-center rounded-lg bg-violet-600 font-mono! text-[12px]! font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
             >
                 {attachTime

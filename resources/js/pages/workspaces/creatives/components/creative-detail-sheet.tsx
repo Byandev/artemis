@@ -426,9 +426,12 @@ function ReviewsTab({
     );
 
     const [voice, setVoice] = useState<VoiceClip | null>(null);
+    const [recording, setRecording] = useState(false);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        // Stop first, or the review goes out without the clip being recorded.
+        if (recording) return;
         transform(({ timestamp, ...d }) => ({
             ...d,
             timestamp_seconds: timestampPayload(timestamp),
@@ -452,6 +455,8 @@ function ReviewsTab({
     const closeForm = () => {
         reset();
         setVoice(null);
+        // Unmounting the recorder stops it without reporting back.
+        setRecording(false);
         setShowForm(false);
     };
 
@@ -614,6 +619,7 @@ function ReviewsTab({
                                 value={voice}
                                 onChange={setVoice}
                                 onStart={() => playerRef.current?.pause()}
+                                onRecordingChange={setRecording}
                             />
                             {(errors as Record<string, string>).voice && (
                                 <p className="font-mono text-[11px] text-red-500">
@@ -634,7 +640,12 @@ function ReviewsTab({
                             <div className="flex gap-2">
                                 <button
                                     type="submit"
-                                    disabled={processing}
+                                    disabled={processing || recording}
+                                    title={
+                                        recording
+                                            ? 'Stop recording to submit'
+                                            : undefined
+                                    }
                                     className="flex h-8 flex-1 items-center justify-center rounded-lg bg-emerald-600 font-mono! text-[12px]! font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
                                 >
                                     Submit Review

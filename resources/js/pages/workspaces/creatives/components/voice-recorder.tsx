@@ -47,11 +47,14 @@ export function VoiceRecorder({
     value,
     onChange,
     onStart,
+    onRecordingChange,
 }: {
     value: VoiceClip | null;
     onChange: (clip: VoiceClip | null) => void;
     /** Called as recording begins — e.g. to pause the video under review. */
     onStart?: () => void;
+    /** Fires as recording starts and stops — e.g. to hold the submit button. */
+    onRecordingChange?: (recording: boolean) => void;
 }) {
     const t = TONE;
     const [recording, setRecording] = useState(false);
@@ -84,6 +87,10 @@ export function VoiceRecorder({
         },
         [],
     );
+
+    useEffect(() => {
+        onRecordingChange?.(recording);
+    }, [recording, onRecordingChange]);
 
     useEffect(() => {
         if (!recording) return;
