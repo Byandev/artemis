@@ -52,4 +52,46 @@ class Pancake
             'order_by' => $orderBy,
         ])->throw()->json();
     }
+
+    /**
+     * Public API (no key): GET /geo/provinces
+     *
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public static function listProvinces(int $countryCode = 63): array
+    {
+        return Http::retry(3, 1000)
+            ->get('https://pos.pages.fm/api/v1/geo/provinces', ['country_code' => $countryCode])
+            ->throw()
+            ->json('data') ?? [];
+    }
+
+    /**
+     * Public API (no key): GET /geo/districts
+     *
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public static function listDistricts(string $provinceId): array
+    {
+        return Http::retry(3, 1000)
+            ->get('https://pos.pages.fm/api/v1/geo/districts', ['province_id' => $provinceId])
+            ->throw()
+            ->json('data') ?? [];
+    }
+
+    /**
+     * Public API (no key): GET /geo/communes — every commune in the province.
+     *
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public static function listCommunes(string $provinceId): array
+    {
+        return Http::retry(3, 1000)
+            ->get('https://pos.pages.fm/api/v1/geo/communes', ['province_id' => $provinceId])
+            ->throw()
+            ->json('data') ?? [];
+    }
 }
