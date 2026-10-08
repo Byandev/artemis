@@ -95,6 +95,7 @@ use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
 use Modules\MetaAds\Http\Controllers\RemoveFbAccountController;
 use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
+use Modules\Pancake\Http\Controllers\AddressAutofillController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use Modules\Pancake\Http\Controllers\OrderController;
 use Modules\Products\Http\Controllers\AnalyticsController;
@@ -606,6 +607,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
     });
+
+    Route::get('/workspaces/{workspace}/pancake/address-autofill', [AddressAutofillController::class, 'index'])
+        ->name('workspaces.pancake.address-autofill.index');
 
     Route::prefix('/workspaces/{workspace}/pancake/orders')->name('workspaces.pancake.orders.')->group(function () {
         Route::get('/', [OrderController::class, 'index'])->name('index');

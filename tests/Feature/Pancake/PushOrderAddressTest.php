@@ -55,9 +55,8 @@ it('writes the address to Pancake and to our copy', function () {
 
     Http::assertSent(fn ($request) => $request->method() === 'PUT'
         && str_contains($request->url(), "pos.pages.fm/api/v1/shops/{$order->shop_id}/orders/9001?api_key=pos-123")
+        // Name and phone are never sent.
         && $request['shipping_address'] == [
-            'full_name' => 'Juan Dela Cruz',
-            'phone_number' => '09171234567',
             'address' => 'Purok 3, near the chapel',
             'province_id' => '63_108',
             'district_id' => '63_108_lipa',

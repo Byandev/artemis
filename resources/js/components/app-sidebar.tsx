@@ -47,8 +47,8 @@ import {
     Megaphone,
     MessageSquare,
     Package,
-    PhoneCall,
     Palette,
+    PhoneCall,
     PieChart,
     ReceiptText,
     RotateCcw,
@@ -273,6 +273,12 @@ export function AppSidebar() {
             title: 'Orders',
             href: `/workspaces/${slug}/pancake/orders`,
             icon: ShoppingCart,
+            permission: PERMISSIONS.ViewOrders,
+        },
+        {
+            title: 'Address Auto-fill',
+            href: `/workspaces/${slug}/pancake/address-autofill`,
+            icon: MapPin,
             permission: PERMISSIONS.ViewOrders,
         },
         {

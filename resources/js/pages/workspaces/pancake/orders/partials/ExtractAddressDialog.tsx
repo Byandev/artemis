@@ -298,7 +298,7 @@ export default function ExtractAddressDialog({
                                 .filter(Boolean)
                                 .join(', ')}
                         </strong>
-                        . Name and phone stay as they are.
+                        . Name and phone are not sent.
                     </p>
                 )}
 

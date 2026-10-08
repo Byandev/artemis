@@ -33,7 +33,7 @@ class PushOrderAddressAction
         }
 
         $shippingAddress = PancakeShippingAddress::build(
-            $order->shippingAddress?->only(['full_name', 'phone_number']) ?? [],
+            [],
             $address,
             $commune->province_id,
             $commune->district_id,

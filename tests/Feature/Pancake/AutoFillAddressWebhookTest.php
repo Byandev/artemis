@@ -149,7 +149,10 @@ describe('webhook', function () {
 
         // Read a few minutes later, not straight away.
         Queue::assertPushed(AutoFillOrderAddress::class, fn ($job) => $job->record->is($record)
-            && $job->delay->between(now()->addMinutes(4), now()->addMinutes(6)));
+            && $job->delay->between(
+                now()->addMinutes(config('pancake.auto_fill_address.delay_minutes'))->subSeconds(30),
+                now()->addMinutes(config('pancake.auto_fill_address.delay_minutes'))->addSeconds(30),
+            ));
     });
 
     it('accepts the order wrapped in data', function () {
@@ -218,8 +221,6 @@ describe('job', function () {
         expect($record->status)->toBe(AddressAutofill::DRY_RUN)
             // Stored as JSON, which does not keep key order.
             ->and($record->result['would_send']['shipping_address'])->toEqualCanonicalizing([
-                'full_name' => 'Juan Dela Cruz',
-                'phone_number' => '09171234567',
                 'address' => 'Purok 3, near the chapel',
                 'province_id' => '63_108',
                 'district_id' => '63_108_lipa',
@@ -239,8 +240,7 @@ describe('job', function () {
         Http::assertSent(fn ($request) => $request->method() === 'PUT'
             && str_contains($request->url(), "pos.pages.fm/api/v1/shops/{$shop->id}/orders/9001")
             && str_contains($request->url(), 'api_key=pos-123')
-            && $request['shipping_address']['commune_id'] === '63_108_lipa_1'
-            && $request['shipping_address']['phone_number'] === '09171234567');
+            && $request['shipping_address']['commune_id'] === '63_108_lipa_1');
     });
 
     it('leaves it for review when a level did not match', function () {
@@ -272,7 +272,10 @@ describe('job', function () {
             ->status->toBe(AddressAutofill::QUEUED)
             ->attempts->toBe(1)
             ->reason->toContain('Reading again at');
-        Queue::assertPushed(AutoFillOrderAddress::class, fn ($job) => $job->delay->between(now()->addMinutes(24), now()->addMinutes(26)));
+        Queue::assertPushed(AutoFillOrderAddress::class, fn ($job) => $job->delay->between(
+            now()->addMinutes(config('pancake.auto_fill_address.retry_minutes'))->subSeconds(30),
+            now()->addMinutes(config('pancake.auto_fill_address.retry_minutes'))->addSeconds(30),
+        ));
 
         $record = runAutofill($record);
 
@@ -332,12 +335,15 @@ describe('job', function () {
         'address filled' => [['shipping_address' => ['commune_id' => '63_1']], 'The address was filled in meanwhile.'],
     ]);
 
-    it('builds the update on the order as Pancake has it now', function () {
+    it('never sends the customer name or phone', function () {
         config(['pancake.auto_fill_address.dry_run' => false]);
-        runAutofill(queuedAutofill(autofillShop(), orderNow: ['shipping_address' => ['phone_number' => '09998887777']]));
+        runAutofill(queuedAutofill(autofillShop(), orderNow: ['shipping_address' => ['country_code' => '63']]));
 
         Http::assertSent(fn ($request) => $request->method() === 'PUT'
-            && $request['shipping_address']['phone_number'] === '09998887777');
+            && ! array_key_exists('full_name', $request['shipping_address'])
+            && ! array_key_exists('phone_number', $request['shipping_address'])
+            // Built on the order as Pancake has it now.
+            && $request['shipping_address']['country_code'] === '63');
     });
 
     it('skips when the page has no Pancake token', function () {
