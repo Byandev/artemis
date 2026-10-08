@@ -12,6 +12,11 @@ const fl =
 const fe = 'mt-1 font-mono text-[11px] text-red-500';
 
 interface Props {
+    /**
+     * The creative's format. Once picked, only files of that kind are
+     * accepted; before then either kind is, and the file sets the format.
+     */
+    format: 'video' | 'image' | '';
     /** Endpoint that signs an upload for this workspace. */
     presignUrl: string;
     /** The newly picked file, or null when nothing is staged. */
@@ -38,12 +43,35 @@ function isVideo(type: string | undefined): boolean {
     return !!type?.startsWith('video/');
 }
 
+function isImage(type: string | undefined): boolean {
+    return !!type?.startsWith('image/');
+}
+
+function matchesFormat(type: string | undefined, format: Props['format']) {
+    if (format === 'video') return isVideo(type);
+    if (format === 'image') return isImage(type);
+    return isImage(type) || isVideo(type);
+}
+
+const ACCEPT: Record<Props['format'], string> = {
+    video: 'video/*',
+    image: 'image/*',
+    '': 'image/*,video/*',
+};
+
+const NOUN: Record<Props['format'], string> = {
+    video: 'a video',
+    image: 'an image',
+    '': 'an image or video',
+};
+
 /**
  * Picks an image or video and uploads it straight to the bucket the moment it
  * is chosen, so saving the form is a small request rather than a multipart
  * upload through PHP.
  */
 export function CreativeMediaField({
+    format,
     presignUrl,
     file,
     onFileChange,
@@ -75,8 +103,9 @@ export function CreativeMediaField({
     async function accept(picked: File | null) {
         if (!picked) return;
 
-        if (!picked.type.startsWith('image/') && !isVideo(picked.type)) {
-            setClientError('Must be an image or a video.');
+        if (!matchesFormat(picked.type, format)) {
+            setClientError(`Must be ${NOUN[format]}.`);
+            if (inputRef.current) inputRef.current.value = '';
             return;
         }
 
@@ -133,7 +162,15 @@ export function CreativeMediaField({
     );
     const Icon = shownIsVideo ? Clapperboard : FileImage;
 
-    const message = clientError ?? error;
+    // A saved file can still disagree with the format if the user switches it.
+    const shownType =
+        file?.type ?? (showExisting ? existing.mime_type : undefined);
+    const mismatch =
+        shownName && format && !matchesFormat(shownType, format)
+            ? `The format is ${format}, but this file is not ${NOUN[format]}. Replace it.`
+            : null;
+
+    const message = clientError ?? mismatch ?? error;
 
     return (
         <div className="space-y-1.5">
@@ -220,7 +257,7 @@ export function CreativeMediaField({
                 >
                     <Upload className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                     <p className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
-                        Drop an image or video, or{' '}
+                        Drop {NOUN[format]}, or{' '}
                         <span className="text-emerald-600 dark:text-emerald-400">
                             browse
                         </span>
@@ -231,7 +268,7 @@ export function CreativeMediaField({
             <input
                 ref={inputRef}
                 type="file"
-                accept="image/*,video/*"
+                accept={ACCEPT[format]}
                 className="hidden"
                 onChange={(e) => accept(e.target.files?.[0] ?? null)}
             />
