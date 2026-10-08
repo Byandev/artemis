@@ -18,12 +18,15 @@ class Shop extends Model
 
     protected $hidden = [
         'pos_token',
+        'webhook_secret',
     ];
 
     protected $casts = [
         'orders_last_synced_at' => 'datetime',
         'rts_snapshot' => 'float',
         'rts_snapshot_updated_at' => 'datetime',
+        'auto_fill_address' => 'boolean',
+        'webhook_secret' => 'encrypted',
     ];
 
     public function workspace(): BelongsTo

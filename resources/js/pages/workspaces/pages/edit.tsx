@@ -250,6 +250,45 @@ export default function Edit({ workspace, page, users, sims }: Props) {
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div className={`${fieldClass} sm:col-span-2`}>
                                     <label className={labelClass}>
+                                        Pancake Token
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className={inputClass}
+                                        placeholder="Enter Pancake token"
+                                        value={data.pancake_token}
+                                        onChange={(e) =>
+                                            setData(
+                                                'pancake_token',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                        Used to read this page's Messenger
+                                        conversations (e.g. auto-fill order
+                                        address).
+                                    </p>
+                                    <ValidateTokenButton
+                                        url={`/workspaces/${workspace.slug}/pages/validate-pancake-token`}
+                                        payload={{
+                                            page_id: page.id.toString(),
+                                            token: data.pancake_token,
+                                        }}
+                                        disabledReason={
+                                            !data.pancake_token
+                                                ? 'Enter a token first'
+                                                : undefined
+                                        }
+                                    />
+                                    {errors.pancake_token && (
+                                        <p className={errorClass}>
+                                            {errors.pancake_token}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className={`${fieldClass} sm:col-span-2`}>
+                                    <label className={labelClass}>
                                         Botcake Token
                                     </label>
                                     <input
