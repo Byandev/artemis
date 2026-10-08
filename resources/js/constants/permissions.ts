@@ -196,6 +196,9 @@ export const PERMISSIONS = {
     CreateCourses: 'Create Courses',
     EditCourses: 'Edit Courses',
     DeleteCourses: 'Delete Courses',
+
+    // Task Management
+    ViewTasks: 'View Tasks',
 } as const;
 
 export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

@@ -77,6 +77,7 @@ interface Workspace {
     ad_spend_goals_module_enabled: boolean;
     billing_module_enabled: boolean;
     courses_module_enabled: boolean;
+    task_management_module_enabled: boolean;
     welle_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
@@ -104,6 +105,7 @@ const MODULE_FIELDS: Array<{
         | 'ad_spend_goals_module_enabled'
         | 'billing_module_enabled'
         | 'courses_module_enabled'
+        | 'task_management_module_enabled'
         | 'welle_module_enabled'
     >;
     label: string;
@@ -210,6 +212,11 @@ const MODULE_FIELDS: Array<{
         description: 'Training courses and learning material',
     },
     {
+        key: 'task_management_module_enabled',
+        label: 'Task Management',
+        description: 'Tasks, assignees, and due dates for the team',
+    },
+    {
         key: 'welle_module_enabled',
         label: 'Welle',
         description: 'Connect a Welle account from workspace settings',
@@ -241,7 +248,11 @@ const MODULE_GROUPS: {
     {
         title: 'Team & CSR',
         description: 'People, assignments, and customer service',
-        keys: ['teams_module_enabled', 'csr_module_enabled'],
+        keys: [
+            'teams_module_enabled',
+            'csr_module_enabled',
+            'task_management_module_enabled',
+        ],
     },
     {
         title: 'Marketing & Ads',
@@ -1241,6 +1252,8 @@ function ModulesModal({
         ad_spend_goals_module_enabled: workspace.ad_spend_goals_module_enabled,
         billing_module_enabled: workspace.billing_module_enabled,
         courses_module_enabled: workspace.courses_module_enabled,
+        task_management_module_enabled:
+            workspace.task_management_module_enabled,
         welle_module_enabled: workspace.welle_module_enabled,
     });
 

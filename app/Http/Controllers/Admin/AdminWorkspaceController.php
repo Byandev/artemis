@@ -185,6 +185,7 @@ class AdminWorkspaceController extends Controller
             'ad_spend_goals_module_enabled' => 'required|boolean',
             'billing_module_enabled' => 'required|boolean',
             'courses_module_enabled' => 'required|boolean',
+            'task_management_module_enabled' => 'required|boolean',
             'welle_module_enabled' => 'required|boolean',
         ]);
 

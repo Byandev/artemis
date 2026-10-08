@@ -107,6 +107,8 @@ use Modules\Products\Http\Controllers\ProductResearchController;
 use Modules\Products\Http\Controllers\TargetMarketController;
 use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
 use Modules\SimGateway\Http\Controllers\SmsController;
+use Modules\TaskManagement\Http\Controllers\TaskManagementController;
+use Modules\TaskManagement\Http\Middleware\EnsureTaskManagementAccess;
 
 /*
 |--------------------------------------------------------------------------
@@ -840,6 +842,16 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{course}/modules/{module}/lessons/{lesson}/video', [CourseLessonController::class, 'showVideo'])->name('lessons.video.show');
         Route::delete('/{course}/modules/{module}/lessons/{lesson}/video', [CourseLessonController::class, 'destroyVideo'])->name('lessons.video.destroy');
     });
+
+    // Task Management pages. Shells only -- the board reads everything from
+    // the task-management endpoints in routes/browser-api.php.
+    Route::prefix('/workspaces/{workspace:slug}/tasks')
+        ->name('workspaces.tasks.')
+        ->middleware(EnsureTaskManagementAccess::class)
+        ->group(function () {
+            Route::get('/', [TaskManagementController::class, 'index'])->name('index');
+            Route::get('/{task}', [TaskManagementController::class, 'show'])->name('show');
+        });
 
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
     Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');

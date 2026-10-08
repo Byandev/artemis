@@ -30,6 +30,7 @@ function moduleTogglePayload(Workspace $workspace, array $overrides = []): array
         'ad_spend_goals_module_enabled',
         'billing_module_enabled',
         'courses_module_enabled',
+        'task_management_module_enabled',
         'welle_module_enabled',
     ];
 
@@ -118,6 +119,32 @@ it('rejects a module update that omits the welle flag', function () {
     $this->actingAs($admin)
         ->put(route('admin.workspaces.update-modules', $workspace), $payload)
         ->assertSessionHasErrors('welle_module_enabled');
+});
+
+it('lets a super admin enable the task management module for a workspace', function () {
+    $admin = User::factory()->superAdmin()->create();
+    $workspace = Workspace::factory()->create();
+
+    $this->actingAs($admin)
+        ->put(
+            route('admin.workspaces.update-modules', $workspace),
+            moduleTogglePayload($workspace, ['task_management_module_enabled' => true])
+        )
+        ->assertRedirect();
+
+    expect($workspace->fresh()->task_management_module_enabled)->toBeTrue();
+});
+
+it('rejects a module update that omits the task management flag', function () {
+    $admin = User::factory()->superAdmin()->create();
+    $workspace = Workspace::factory()->create();
+
+    $payload = moduleTogglePayload($workspace);
+    unset($payload['task_management_module_enabled']);
+
+    $this->actingAs($admin)
+        ->put(route('admin.workspaces.update-modules', $workspace), $payload)
+        ->assertSessionHasErrors('task_management_module_enabled');
 });
 
 it('does not let a non-admin toggle the billing module', function () {
