@@ -70,7 +70,7 @@ class AutoFillAddressWebhookController extends Controller
         // Not read straight away: the order is often created before the
         // customer has typed the address.
         AutoFillOrderAddress::dispatch($record)
-            ->delay(now()->addMinutes((int) config('pancake.auto_fill_address.delay_minutes', 5)));
+            ->delay(now()->addSeconds((int) config('pancake.auto_fill_address.delay_seconds', 15)));
 
         return response()->json(['status' => 'queued']);
     }

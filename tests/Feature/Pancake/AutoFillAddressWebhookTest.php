@@ -150,8 +150,8 @@ describe('webhook', function () {
         // Read a few minutes later, not straight away.
         Queue::assertPushed(AutoFillOrderAddress::class, fn ($job) => $job->record->is($record)
             && $job->delay->between(
-                now()->addMinutes(config('pancake.auto_fill_address.delay_minutes'))->subSeconds(30),
-                now()->addMinutes(config('pancake.auto_fill_address.delay_minutes'))->addSeconds(30),
+                now()->addSeconds(config('pancake.auto_fill_address.delay_seconds') - 5),
+                now()->addSeconds(config('pancake.auto_fill_address.delay_seconds') + 5),
             ));
     });
 
