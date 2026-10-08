@@ -93,6 +93,7 @@ class ExtractOrderAddressAction
                 $match['province']?->name,
             ])->filter()->implode(', '),
             'messages_read' => count($messages),
+            'ai_usage' => $extracted['usage'],
         ];
     }
 

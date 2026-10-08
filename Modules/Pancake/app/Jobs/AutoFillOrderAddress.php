@@ -135,6 +135,10 @@ class AutoFillOrderAddress implements ShouldQueue
             'status' => $status,
             'reason' => $reason ? mb_substr($reason, 0, 255) : null,
             'result' => $result,
+            // Null when the job stopped before the AI call.
+            'ai_cost_usd' => data_get($result, 'ai_usage.cost_usd'),
+            'input_tokens' => data_get($result, 'ai_usage.input_tokens'),
+            'output_tokens' => data_get($result, 'ai_usage.output_tokens'),
             'processed_at' => now(),
         ]);
     }

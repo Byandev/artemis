@@ -63,7 +63,7 @@ function autofillAiAnswer(array $overrides = []): array
         'landmark' => 'near the chapel',
         'confidence' => 0.92,
         ...$overrides,
-    ])]]]];
+    ])]]], 'usage' => ['prompt_tokens' => 2840, 'completion_tokens' => 120, 'total_tokens' => 2960, 'cost' => 0.000498]];
 }
 
 /** A queued record plus the page, chat and AI the job will hit. */
@@ -172,6 +172,15 @@ describe('job', function () {
         config(['pancake.auto_fill_address.dry_run' => true]);
         $record = runAutofill(queuedAutofill(autofillShop()));
 
+        expect($record)
+            ->ai_cost_usd->toBe(0.000498)
+            ->input_tokens->toBe(2840)
+            ->output_tokens->toBe(120);
+
+        // OpenRouter is asked to report the cost.
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'openrouter.ai')
+            && $request['usage'] === ['include' => true]);
+
         expect($record->status)->toBe(AddressAutofill::DRY_RUN)
             // Stored as JSON, which does not keep key order.
             ->and($record->result['would_send']['shipping_address'])->toEqualCanonicalizing([
@@ -221,7 +230,9 @@ describe('job', function () {
     it('records no_address when the customer has not sent one', function () {
         $record = runAutofill(queuedAutofill(autofillShop(), ['found' => false, 'confidence' => 0]));
 
-        expect($record->status)->toBe(AddressAutofill::NO_ADDRESS);
+        // The AI was still called, so the cost is still recorded.
+        expect($record->status)->toBe(AddressAutofill::NO_ADDRESS)
+            ->and($record->ai_cost_usd)->toBe(0.000498);
     });
 
     it('skips when the page has no Pancake token', function () {
@@ -231,7 +242,8 @@ describe('job', function () {
 
         expect(runAutofill($record))
             ->status->toBe(AddressAutofill::SKIPPED)
-            ->reason->toContain('no Pancake token');
+            ->reason->toContain('no Pancake token')
+            ->ai_cost_usd->toBeNull();
     });
 
     it('records a failure when Pancake refuses the update', function () {

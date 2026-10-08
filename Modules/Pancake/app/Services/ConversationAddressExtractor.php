@@ -42,7 +42,7 @@ class ConversationAddressExtractor
 
     /**
      * @param  list<array{from: 'customer'|'page', text: string, at: ?string}>  $messages  oldest first
-     * @return array{found: bool, address_text: string, street: string, barangay: string, city: string, province: string, landmark: string, confidence: float}
+     * @return array{found: bool, address_text: string, street: string, barangay: string, city: string, province: string, landmark: string, confidence: float, usage: array{cost_usd: ?float, input_tokens: ?int, output_tokens: ?int}}
      *
      * @throws AddressExtractionFailed
      */
@@ -93,7 +93,24 @@ class ConversationAddressExtractor
             };
         }
 
+        $result['usage'] = $this->usage((array) data_get($response->json(), 'usage', []));
+
         return $result;
+    }
+
+    /**
+     * What the call cost, as OpenRouter reported it — `cost` is in US dollars
+     * (OpenRouter credits). Each part is null when the provider left it out.
+     *
+     * @return array{cost_usd: ?float, input_tokens: ?int, output_tokens: ?int}
+     */
+    private function usage(array $usage): array
+    {
+        return [
+            'cost_usd' => isset($usage['cost']) ? (float) $usage['cost'] : null,
+            'input_tokens' => isset($usage['prompt_tokens']) ? (int) $usage['prompt_tokens'] : null,
+            'output_tokens' => isset($usage['completion_tokens']) ? (int) $usage['completion_tokens'] : null,
+        ];
     }
 
     private function request(): PendingRequest
@@ -149,6 +166,8 @@ class ConversationAddressExtractor
             ],
             // Only route to endpoints that honour strict structured outputs.
             'provider' => ['require_parameters' => true],
+            // Have OpenRouter put the call's cost in the answer's `usage`.
+            'usage' => ['include' => true],
         ];
     }
 

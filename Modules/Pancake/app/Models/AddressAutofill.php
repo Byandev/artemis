@@ -44,6 +44,9 @@ class AddressAutofill extends Model
         'result' => 'array',
         'payload' => 'array',
         'processed_at' => 'datetime',
+        'ai_cost_usd' => 'float',
+        'input_tokens' => 'integer',
+        'output_tokens' => 'integer',
     ];
 
     public function shop(): BelongsTo

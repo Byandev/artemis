@@ -45,7 +45,10 @@ function aiAnswer(array $overrides = []): array
         'confidence' => 0.92,
     ], $overrides);
 
-    return ['choices' => [['message' => ['content' => json_encode($answer)], 'finish_reason' => 'stop']]];
+    return [
+        'choices' => [['message' => ['content' => json_encode($answer)], 'finish_reason' => 'stop']],
+        'usage' => ['prompt_tokens' => 2840, 'completion_tokens' => 120, 'total_tokens' => 2960, 'cost' => 0.000498],
+    ];
 }
 
 function orderWithConversation(Workspace $workspace, ?string $token = 'page-token'): Order
@@ -88,6 +91,7 @@ it('reads the address from the conversation and matches every level', function (
         ->and($response['district']['typed'])->toBe('Lipa City')
         ->and($response['commune']['id'])->toBe('63_108_lipa_1')
         ->and($response['address'])->toBe('Purok 3, near the chapel')
+        ->and($response['ai_usage'])->toBe(['cost_usd' => 0.000498, 'input_tokens' => 2840, 'output_tokens' => 120])
         ->and($response['formatted_address'])->toBe('Purok 3, near the chapel, Sabang, Lipa-city, Batangas');
 
     // The page's own message went to the model as "Page:", the customer's as "Customer:".
