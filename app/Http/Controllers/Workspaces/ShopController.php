@@ -170,7 +170,7 @@ class ShopController extends Controller
         }
 
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-        dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subDays(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
 
         (new PostHogService)->capture((string) $request->user()->id, 'shop_connected', [
             'workspace_id' => $workspace->id,

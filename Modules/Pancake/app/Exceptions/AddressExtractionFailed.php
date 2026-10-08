@@ -12,14 +12,24 @@ use Exception;
  */
 class AddressExtractionFailed extends Exception
 {
+    /** How the auto-fill webhook should record it: skipped, no_address or failed. */
+    public string $outcome = 'failed';
+
+    private function withOutcome(string $outcome): self
+    {
+        $this->outcome = $outcome;
+
+        return $this;
+    }
+
     public static function noConversation(): self
     {
-        return new self('This order has no Messenger conversation to read.');
+        return (new self('This order has no Messenger conversation to read.'))->withOutcome('skipped');
     }
 
     public static function noPageToken(): self
     {
-        return new self("This order's page has no Pancake token. Add it on the Pages screen first.");
+        return (new self("This order's page has no Pancake token. Add it on the Pages screen first."))->withOutcome('skipped');
     }
 
     public static function conversationUnavailable(): self
@@ -29,12 +39,12 @@ class AddressExtractionFailed extends Exception
 
     public static function emptyConversation(): self
     {
-        return new self('The conversation has no customer messages yet.');
+        return (new self('The conversation has no customer messages yet.'))->withOutcome('no_address');
     }
 
     public static function aiNotConfigured(): self
     {
-        return new self('The address reader is not set up (no OpenRouter key).');
+        return (new self('The address reader is not set up (no OpenRouter key).'))->withOutcome('skipped');
     }
 
     public static function aiUnavailable(?int $status = null): self

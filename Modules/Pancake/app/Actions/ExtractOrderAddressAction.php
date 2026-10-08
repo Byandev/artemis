@@ -14,7 +14,10 @@ use Modules\Pancake\Support\GeoMatcher;
 /**
  * Order → its Messenger conversation → the address the customer typed → that
  * address split into parts and matched to Pancake's province / district /
- * commune ids. Read-only: nothing is saved or sent back to Pancake yet.
+ * commune ids. Read-only: writing it back is AutoFillOrderAddress's job.
+ *
+ * Works from a synced Order (the "Get address" button) or straight from the
+ * page / conversation ids (the webhook, whose order may not be synced yet).
  */
 class ExtractOrderAddressAction
 {
@@ -35,15 +38,23 @@ class ExtractOrderAddressAction
     {
         $order->loadMissing('page:id,pancake_token');
 
-        if (blank($order->fb_id) || ! $order->page_id) {
+        return $this->fromConversation($order->page_id, $order->fb_id, $order->page?->pancake_token);
+    }
+
+    /**
+     * @throws AddressExtractionFailed
+     */
+    public function fromConversation(int|string|null $pageId, ?string $conversationId, ?string $pageToken): array
+    {
+        if (blank($conversationId) || blank($pageId)) {
             throw AddressExtractionFailed::noConversation();
         }
 
-        if (blank($order->page?->pancake_token)) {
+        if (blank($pageToken)) {
             throw AddressExtractionFailed::noPageToken();
         }
 
-        $messages = $this->messages($order);
+        $messages = $this->messages((string) $pageId, $conversationId, $pageToken);
 
         if (! collect($messages)->contains('from', 'customer')) {
             throw AddressExtractionFailed::emptyConversation();
@@ -92,13 +103,13 @@ class ExtractOrderAddressAction
      *
      * @throws AddressExtractionFailed
      */
-    private function messages(Order $order): array
+    private function messages(string $pageId, string $conversationId, string $pageToken): array
     {
         try {
-            $raw = Pancake::listConversationMessages((string) $order->page_id, $order->fb_id, $order->page->pancake_token);
+            $raw = Pancake::listConversationMessages($pageId, $conversationId, $pageToken);
         } catch (RequestException|ConnectionException $e) {
             Log::warning('Order address extraction: could not load the conversation.', [
-                'order_id' => $order->id,
+                'conversation_id' => $conversationId,
                 'reason' => mb_substr($e->getMessage(), 0, 300),
             ]);
 
@@ -106,7 +117,7 @@ class ExtractOrderAddressAction
         }
 
         return collect($raw)
-            ->map(function (array $m) use ($order) {
+            ->map(function (array $m) use ($pageId) {
                 $text = (string) ($m['original_message'] ?? '');
 
                 if ($text === '') {
@@ -114,7 +125,7 @@ class ExtractOrderAddressAction
                 }
 
                 return [
-                    'from' => (string) data_get($m, 'from.id') === (string) $order->page_id ? 'page' : 'customer',
+                    'from' => (string) data_get($m, 'from.id') === $pageId ? 'page' : 'customer',
                     'text' => mb_substr(trim($text), 0, self::MAX_MESSAGE_LENGTH),
                     'at' => $m['inserted_at'] ?? null,
                 ];

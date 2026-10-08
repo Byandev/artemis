@@ -54,6 +54,20 @@ class Pancake
     }
 
     /**
+     * PUT /shops/{shop_id}/orders/{order_id} — change fields on one order.
+     *
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public function updateOrder(string $orderId, array $data): array
+    {
+        return Http::timeout(20)
+            ->put('https://pos.pages.fm/api/v1/shops/'.$this->shop_id.'/orders/'.$orderId.'?api_key='.$this->api_key, $data)
+            ->throw()
+            ->json() ?? [];
+    }
+
+    /**
      * Public API: GET /pages/{page_id}/conversations/{conversation_id}/messages
      *
      * @throws RequestException
