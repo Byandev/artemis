@@ -158,25 +158,6 @@ class GeoMatcher
     }
 
     /**
-     * Province and city names, normalised — what AddressMessageFilter looks for
-     * to tell a message that names a place. Names under five letters are left
-     * out: too many of them are ordinary words.
-     *
-     * @return list<string>
-     */
-    public function placeNames(): array
-    {
-        static $names = null;
-
-        return $names ??= collect([Province::query(), District::query()])
-            ->flatMap(fn (Builder $q) => $q->get(['search_key', 'search_key_en'])->flatMap(fn ($p) => [$p->search_key, $p->search_key_en]))
-            ->filter(fn (?string $key) => $key !== null && strlen($key) >= 5)
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    /**
      * Recompute every row's search keys from its names. One UPDATE per
      * thousand rows, so the whole list (≈45k) takes a few seconds.
      */

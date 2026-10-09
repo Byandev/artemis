@@ -286,20 +286,7 @@ describe('job', function () {
             ->ai_cost_usd->toBe(0.000996);
     });
 
-    it('does not call the AI when no customer message looks like an address', function () {
-        $record = runAutofill(queuedAutofill(autofillShop(), chat: [
-            ['from' => ['id' => '777'], 'original_message' => 'Hello po! Ano po order nila?', 'inserted_at' => '2026-10-08T01:00:00'],
-            ['from' => ['id' => '555'], 'original_message' => 'Magkano po 2 box?', 'inserted_at' => '2026-10-08T01:05:00'],
-        ]));
-
-        expect($record)
-            ->status->toBe(AddressAutofill::QUEUED)
-            ->reason->toContain('No message in the chat looks like an address')
-            ->ai_cost_usd->toBeNull();
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'openrouter.ai'));
-    });
-
-    it('sends the AI only the messages that look like an address', function () {
+    it('sends the AI the whole chat, not just address-like messages', function () {
         runAutofill(queuedAutofill(autofillShop(), chat: [
             ['from' => ['id' => '555'], 'original_message' => 'Magkano po?', 'inserted_at' => '2026-10-08T00:50:00'],
             ['from' => ['id' => '777'], 'original_message' => '499 po. Pa send po ng complete address.', 'inserted_at' => '2026-10-08T01:00:00'],
@@ -308,10 +295,10 @@ describe('job', function () {
         ]));
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'openrouter.ai')
-            && str_contains($request['messages'][1]['content'], 'Customer: Purok 3')
+            && str_contains($request['messages'][1]['content'], 'Customer: Magkano po?')
             && str_contains($request['messages'][1]['content'], 'Page: 499 po')
-            && ! str_contains($request['messages'][1]['content'], 'Magkano')
-            && ! str_contains($request['messages'][1]['content'], 'Salamat'));
+            && str_contains($request['messages'][1]['content'], 'Customer: Purok 3')
+            && str_contains($request['messages'][1]['content'], 'Customer: Salamat po'));
     });
 
     it('fills a level from the shortlist when the name did not match', function () {

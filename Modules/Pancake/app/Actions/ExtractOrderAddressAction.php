@@ -12,7 +12,6 @@ use Modules\Pancake\Models\Order;
 use Modules\Pancake\Models\Province;
 use Modules\Pancake\Services\ConversationAddressExtractor;
 use Modules\Pancake\Services\Pancake;
-use Modules\Pancake\Support\AddressMessageFilter;
 use Modules\Pancake\Support\GeoMatcher;
 
 /**
@@ -23,18 +22,13 @@ use Modules\Pancake\Support\GeoMatcher;
  * Works from a synced Order (the "Get address" button) or straight from the
  * page / conversation ids (the webhook, whose order may not be synced yet).
  *
- * Kept cheap three ways: only the messages that look like an address go to the
- * AI (AddressMessageFilter); a chat with none is "no address" without an AI
- * call at all (the webhook — the button still reads the tail); and the second,
- * shortlist call only runs for a level the names alone could not match.
+ * The AI reads the tail of the chat as it is. The second, shortlist call only
+ * runs for a level the names alone could not match.
  */
 class ExtractOrderAddressAction
 {
-    /** How much of the chat is fetched and scanned — the address is almost always recent. */
+    /** How much of the chat the AI reads — the address is almost always recent. */
     public const MAX_MESSAGES = 40;
-
-    /** What the button reads when no message looks like an address. */
-    public const FALLBACK_MESSAGES = 15;
 
     /** Shortlist checks per order — each is an AI call of its own. */
     public const MAX_PICKS = 2;
@@ -47,7 +41,6 @@ class ExtractOrderAddressAction
     public function __construct(
         private readonly ConversationAddressExtractor $extractor,
         private readonly GeoMatcher $matcher,
-        private readonly AddressMessageFilter $filter,
     ) {}
 
     /**
@@ -61,13 +54,9 @@ class ExtractOrderAddressAction
     }
 
     /**
-     * @param  bool  $strict  true for the webhook: no address-like message means
-     *                        "no address" without calling the AI. false for the
-     *                        button, which then reads the tail of the chat.
-     *
      * @throws AddressExtractionFailed
      */
-    public function fromConversation(int|string|null $pageId, ?string $conversationId, ?string $pageToken, bool $strict = false): array
+    public function fromConversation(int|string|null $pageId, ?string $conversationId, ?string $pageToken): array
     {
         if (blank($conversationId) || blank($pageId)) {
             throw AddressExtractionFailed::noConversation();
@@ -83,17 +72,7 @@ class ExtractOrderAddressAction
             throw AddressExtractionFailed::emptyConversation();
         }
 
-        $selected = $this->filter->select($messages);
-
-        if ($selected === []) {
-            if ($strict) {
-                throw AddressExtractionFailed::noAddressLikeMessage();
-            }
-
-            $selected = array_slice($messages, -self::FALLBACK_MESSAGES);
-        }
-
-        $extracted = $this->extractor->extract($selected);
+        $extracted = $this->extractor->extract($messages);
         $usage = $extracted['usage'];
         $pickedByAi = [];
 
@@ -133,7 +112,7 @@ class ExtractOrderAddressAction
             ])->filter()->implode(', '),
             // Levels the names alone could not match, picked from the real list by the AI.
             'picked_by_ai' => $pickedByAi,
-            'messages_read' => count($selected),
+            'messages_read' => count($messages),
             'ai_usage' => $usage,
         ];
     }

@@ -88,7 +88,7 @@ class AutoFillOrderAddress implements ShouldQueue
         $page = $record->page_id ? Page::find($record->page_id) : null;
 
         try {
-            $result = $extract->fromConversation($record->page_id, $record->conversation_id, $page?->pancake_token, strict: true);
+            $result = $extract->fromConversation($record->page_id, $record->conversation_id, $page?->pancake_token);
         } catch (AddressExtractionFailed $e) {
             $e->outcome === AddressAutofill::NO_ADDRESS
                 ? $this->noAddressYet($e->getMessage())
