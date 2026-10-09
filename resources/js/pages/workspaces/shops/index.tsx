@@ -27,6 +27,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -54,6 +55,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner'; // Added toast import
 import OrderTagsModal from './partials/OrderTagsModal';
+import WebhookDetails from './partials/WebhookDetails';
 
 const inputClass =
     'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
@@ -134,6 +136,7 @@ const Shops = ({
     const editForm = useForm({
         name: '',
         pos_token: '',
+        auto_fill_address: false,
     });
 
     const openEdit = (shop: Shop) => {
@@ -141,6 +144,7 @@ const Shops = ({
         editForm.setData({
             name: shop.name ?? '',
             pos_token: shop.pos_token ?? '',
+            auto_fill_address: shop.auto_fill_address ?? false,
         });
         editForm.clearErrors();
     };
@@ -640,12 +644,19 @@ const Shops = ({
                                             className={inputClass}
                                             placeholder="POS token"
                                             value={editForm.data.pos_token}
-                                            onChange={(e) =>
-                                                editForm.setData(
-                                                    'pos_token',
-                                                    e.target.value,
-                                                )
-                                            }
+                                            onChange={(e) => {
+                                                // Auto-fill needs a token, so
+                                                // clearing it switches that off.
+                                                const token = e.target.value;
+                                                editForm.setData((d) => ({
+                                                    ...d,
+                                                    pos_token: token,
+                                                    auto_fill_address:
+                                                        token.trim()
+                                                            ? d.auto_fill_address
+                                                            : false,
+                                                }));
+                                            }}
                                         />
                                         {shopToEdit &&
                                             editForm.data.pos_token && (
@@ -665,6 +676,55 @@ const Shops = ({
                                                 {editForm.errors.pos_token}
                                             </p>
                                         )}
+                                    </div>
+
+                                    <div className="space-y-3 rounded-[10px] border border-black/8 p-3 dark:border-white/8">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="space-y-0.5">
+                                                <label className={labelClass}>
+                                                    Auto-fill order address
+                                                </label>
+                                                <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                                                    {editForm.data.pos_token.trim()
+                                                        ? "Read the address from the customer's Messenger chat on new orders and fill in province, district, commune and address in Pancake."
+                                                        : 'Add a POS token first.'}
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                checked={
+                                                    editForm.data
+                                                        .auto_fill_address
+                                                }
+                                                disabled={
+                                                    !editForm.data.pos_token.trim()
+                                                }
+                                                onCheckedChange={(v) =>
+                                                    editForm.setData(
+                                                        'auto_fill_address',
+                                                        v,
+                                                    )
+                                                }
+                                                aria-label="Auto-fill order address"
+                                            />
+                                        </div>
+                                        {editForm.errors.auto_fill_address && (
+                                            <p className={errorClass}>
+                                                {
+                                                    editForm.errors
+                                                        .auto_fill_address
+                                                }
+                                            </p>
+                                        )}
+                                        {shopToEdit &&
+                                            editForm.data.auto_fill_address && (
+                                                <WebhookDetails
+                                                    shopId={shopToEdit.id}
+                                                    secret={
+                                                        shopToEdit.webhook_secret ??
+                                                        null
+                                                    }
+                                                />
+                                            )}
                                     </div>
                                 </div>
 

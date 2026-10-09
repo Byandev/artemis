@@ -111,7 +111,7 @@ class ShopController extends Controller
         // Reveal the POS token only to users who can edit shops, so the edit form
         // can pre-fill it. It stays hidden from everyone else.
         if ($request->user()->can(Permission::EditShops->value, $workspace)) {
-            $pages->getCollection()->each->makeVisible('pos_token');
+            $pages->getCollection()->each->makeVisible(['pos_token', 'webhook_secret']);
         }
 
         $shopLimitInfo = $workspace->shopLimitInfo();
@@ -170,7 +170,7 @@ class ShopController extends Controller
         }
 
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-        dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subDays(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
 
         (new PostHogService)->capture((string) $request->user()->id, 'shop_connected', [
             'workspace_id' => $workspace->id,
@@ -200,7 +200,20 @@ class ShopController extends Controller
             // Optional — leave blank to keep the current token. When changed it is
             // verified against the POS API before being saved.
             'pos_token' => 'nullable|string|max:255',
+            // Read new orders' addresses from the conversation and write them
+            // back to Pancake. Left untouched when the form does not send it.
+            'auto_fill_address' => 'sometimes|boolean',
         ]);
+
+        $autoFill = $validated['auto_fill_address'] ?? $shop->auto_fill_address;
+
+        // Writing the address back to Pancake goes through the POS API, so
+        // auto-fill cannot be on without a token to call it with.
+        if ($autoFill && empty($validated['pos_token']) && empty($shop->pos_token)) {
+            throw ValidationException::withMessages([
+                'auto_fill_address' => 'Add the shop\'s POS token before turning on auto-fill.',
+            ]);
+        }
 
         $tokenChanged = ! empty($validated['pos_token'])
             && $validated['pos_token'] !== $shop->pos_token;
@@ -218,6 +231,11 @@ class ShopController extends Controller
         $shop->update([
             'name' => $validated['name'],
             ...($tokenChanged ? ['pos_token' => $validated['pos_token']] : []),
+            'auto_fill_address' => $autoFill,
+            // Created once, the first time auto-fill goes on, and kept after it
+            // is switched off — so turning it back on does not break the
+            // webhook already set up in Pancake.
+            ...($autoFill && blank($shop->webhook_secret) ? ['webhook_secret' => Str::random(40)] : []),
         ]);
 
         return redirect()->route('workspaces.shops.index', $workspace)
