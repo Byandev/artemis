@@ -36,6 +36,23 @@ class Pancake
     }
 
     /**
+     * PUT /shops/{shop_id}/orders/{order_id} — `$orderId` is the Pancake order
+     * id, which we store locally as `order_number`.
+     *
+     * @throws RequestException
+     * @throws ConnectionException
+     */
+    public function updateOrderStatus(string $orderId, int $status): array
+    {
+        return Http::timeout(15)
+            ->put('https://pos.pages.fm/api/v1/shops/'.$this->shop_id.'/orders/'.$orderId.'?api_key='.$this->api_key, [
+                'status' => $status,
+            ])
+            ->throw()
+            ->json() ?? [];
+    }
+
+    /**
      * Public API: GET /pages/{page_id}/page_customers
      *
      * @throws RequestException
