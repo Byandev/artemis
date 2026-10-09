@@ -12,6 +12,10 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Modules\Pancake\Actions\ExtractOrderAddressAction;
+use Modules\Pancake\Actions\PushOrderAddressAction;
+use Modules\Pancake\Exceptions\AddressExtractionFailed;
+use Modules\Pancake\Exceptions\OrderAddressPushFailed;
 use Modules\Pancake\Filters\CustomerOrdersFilter;
 use Modules\Pancake\Filters\CustomerRtsReportFilter;
 use Modules\Pancake\Filters\IgnoredFilter;
@@ -23,6 +27,7 @@ use Modules\Pancake\Filters\OrderSearchFilter;
 use Modules\Pancake\Filters\OrderShopFilter;
 use Modules\Pancake\Filters\OrderStatusFilter;
 use Modules\Pancake\Jobs\ImportOrderShippingFees;
+use Modules\Pancake\Models\Commune;
 use Modules\Pancake\Models\Order;
 use Modules\Pancake\Support\CustomerOrderHistory;
 use Modules\Pancake\Support\CustomerRtsRisk;
@@ -246,5 +251,59 @@ class OrderController extends Controller
         return response()->json([
             'import' => ShippingFeeImportStatus::get($workspace->id),
         ]);
+    }
+
+    /**
+     * Read the order's Messenger conversation and pull out the delivery
+     * address, matched to Pancake's province / district / commune ids.
+     * Read-only — nothing is saved or pushed to Pancake.
+     */
+    public function extractAddress(Request $request, Workspace $workspace, int $order, ExtractOrderAddressAction $action)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewOrders->value, $workspace);
+
+        $order = Order::ofWorkspace($workspace)
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->visibleTo($request->user(), $workspace),
+            )
+            ->findOrFail($order);
+
+        try {
+            return response()->json($action->execute($order));
+        } catch (AddressExtractionFailed $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Write a reviewed address to the order in Pancake: the commune (its
+     * district and province follow from it) and the address line.
+     */
+    public function pushAddress(Request $request, Workspace $workspace, int $order, PushOrderAddressAction $action)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::UpdateOrderAddress->value, $workspace);
+
+        $validated = $request->validate([
+            'commune_id' => 'required|string|exists:pancake_communes,id',
+            'address' => 'required|string|max:500',
+        ]);
+
+        $order = Order::ofWorkspace($workspace)
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->visibleTo($request->user(), $workspace),
+            )
+            ->findOrFail($order);
+
+        try {
+            $sent = $action->execute($order, Commune::findOrFail($validated['commune_id']), trim($validated['address']));
+        } catch (OrderAddressPushFailed $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['message' => 'Address updated in Pancake.', 'shipping_address' => $sent]);
     }
 }

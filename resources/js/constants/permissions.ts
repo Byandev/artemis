@@ -24,6 +24,7 @@ export const PERMISSIONS = {
     // Orders (Pancake)
     ViewOrders: 'View Orders',
     ImportOrderShippingFees: 'Import Order Shipping Fees',
+    UpdateOrderAddress: 'Update Order Address',
 
     // Shops
     ViewShops: 'View Shops',

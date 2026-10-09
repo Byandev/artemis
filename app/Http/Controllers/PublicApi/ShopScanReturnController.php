@@ -4,11 +4,19 @@ namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\Shop;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Modules\Pancake\Services\Pancake;
 
 class ShopScanReturnController extends Controller
 {
+    /** Pancake POS order status code for "returned". */
+    private const PANCAKE_STATUS_RETURNED = 5;
+
     public function scan(Request $request): JsonResponse
     {
         $request->validate([
@@ -31,7 +39,43 @@ class ShopScanReturnController extends Controller
             return response()->json(['error' => 'Order is already marked as returned.'], 422);
         }
 
+        $shop = Shop::where('workspace_id', $workspace->id)->find($order->shop_id);
+
+        if (! $shop?->pos_token) {
+            return response()->json(['error' => 'Shop has no Pancake POS token configured.'], 422);
+        }
+
+        // Pancake is the source of truth — only mark locally once POS accepted
+        // the change, otherwise the next order sync would revert it anyway.
+        try {
+            $result = (new Pancake($shop->id, $shop->pos_token))
+                ->updateOrderStatus((string) $order->order_number, self::PANCAKE_STATUS_RETURNED);
+        } catch (RequestException|ConnectionException $e) {
+            Log::warning('Pancake scan-return update failed', [
+                'order_id' => $order->id,
+                'shop_id' => $shop->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['error' => 'Failed to update the order in Pancake POS.'], 502);
+        }
+
+        if (($result['success'] ?? true) === false) {
+            Log::warning('Pancake scan-return update rejected', [
+                'order_id' => $order->id,
+                'shop_id' => $shop->id,
+                'response' => $result,
+            ]);
+
+            return response()->json([
+                'error' => 'Pancake POS rejected the update.',
+                'pancake_message' => $result['message'] ?? null,
+            ], 502);
+        }
+
         $order->update([
+            'status' => self::PANCAKE_STATUS_RETURNED,
+            'status_name' => 'returned',
             'parcel_status' => 'returned',
             'returned_at' => now(),
         ]);
