@@ -42,6 +42,7 @@ import {
     LayoutDashboard,
     LifeBuoy,
     ListChecks,
+    ListTodo,
     Map,
     MapPin,
     Megaphone,
@@ -99,6 +100,16 @@ export function AppSidebar() {
                       href: `/workspaces/${slug}/courses`,
                       icon: GraduationCap,
                       permission: PERMISSIONS.ViewCourses,
+                  },
+              ]
+            : []),
+        ...(currentWorkspace.task_management_module_enabled
+            ? [
+                  {
+                      title: 'Tasks',
+                      href: `/workspaces/${slug}/tasks`,
+                      icon: ListTodo,
+                      permission: PERMISSIONS.ViewTasks,
                   },
               ]
             : []),

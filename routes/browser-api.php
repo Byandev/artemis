@@ -21,6 +21,17 @@ use Modules\Courses\Http\Controllers\Api\CourseCatalogController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
 use Modules\Products\Http\Controllers\Api\ProductController;
+use Modules\TaskManagement\Http\Controllers\Api\CommentController as TaskCommentController;
+use Modules\TaskManagement\Http\Controllers\Api\FolderController as TaskFolderController;
+use Modules\TaskManagement\Http\Controllers\Api\LabelController as TaskLabelController;
+use Modules\TaskManagement\Http\Controllers\Api\SpaceController as TaskSpaceController;
+use Modules\TaskManagement\Http\Controllers\Api\SpaceMemberCandidateController as TaskSpaceMemberCandidateController;
+use Modules\TaskManagement\Http\Controllers\Api\SpaceMemberController as TaskSpaceMemberController;
+use Modules\TaskManagement\Http\Controllers\Api\TaskAttachmentController;
+use Modules\TaskManagement\Http\Controllers\Api\TaskController;
+use Modules\TaskManagement\Http\Controllers\Api\TaskListController;
+use Modules\TaskManagement\Http\Controllers\Api\TaskStatusController;
+use Modules\TaskManagement\Http\Middleware\EnsureTaskManagementAccess;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
 Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
@@ -196,6 +207,77 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/stats', [CourseCatalogController::class, 'stats'])->name('stats');
             Route::get('/leaderboard', [CourseCatalogController::class, 'leaderboard'])->name('leaderboard');
         });
+
+        // Task Management — the Space > Folder > List > Task API the tasks
+        // board reads and writes, ported from Matrix's /api/v1. Records are
+        // addressed by id below the workspace prefix; the middleware 404s any
+        // that belong to another workspace, and the space-role policies decide
+        // the rest.
+        Route::prefix('task-management')
+            ->name('task-management.')
+            ->middleware(EnsureTaskManagementAccess::class)
+            ->group(function () {
+                // `missing` answers an unknown id exactly as a policy denial
+                // does, so the response never names the model or the id.
+                $notFound = fn () => abort(404, 'Not Found');
+
+                Route::get('spaces', [TaskSpaceController::class, 'index'])->name('spaces.index');
+                Route::post('spaces', [TaskSpaceController::class, 'store'])->name('spaces.store');
+                Route::get('spaces/{space}', [TaskSpaceController::class, 'show'])->missing($notFound)->name('spaces.show');
+                Route::match(['put', 'patch'], 'spaces/{space}', [TaskSpaceController::class, 'update'])->missing($notFound)->name('spaces.update');
+                Route::delete('spaces/{space}', [TaskSpaceController::class, 'destroy'])->missing($notFound)->name('spaces.destroy');
+
+                Route::get('spaces/{space}/folders', [TaskFolderController::class, 'index'])->missing($notFound)->name('spaces.folders.index');
+                Route::post('spaces/{space}/folders', [TaskFolderController::class, 'store'])->missing($notFound)->name('spaces.folders.store');
+                Route::get('folders/{folder}', [TaskFolderController::class, 'show'])->missing($notFound)->name('folders.show');
+                Route::match(['put', 'patch'], 'folders/{folder}', [TaskFolderController::class, 'update'])->missing($notFound)->name('folders.update');
+                Route::delete('folders/{folder}', [TaskFolderController::class, 'destroy'])->missing($notFound)->name('folders.destroy');
+
+                Route::get('spaces/{space}/lists', [TaskListController::class, 'index'])->missing($notFound)->name('spaces.lists.index');
+                Route::post('spaces/{space}/lists', [TaskListController::class, 'store'])->missing($notFound)->name('spaces.lists.store');
+                Route::get('lists/{list}', [TaskListController::class, 'show'])->missing($notFound)->name('lists.show');
+                Route::match(['put', 'patch'], 'lists/{list}', [TaskListController::class, 'update'])->missing($notFound)->name('lists.update');
+                Route::delete('lists/{list}', [TaskListController::class, 'destroy'])->missing($notFound)->name('lists.destroy');
+
+                Route::get('spaces/{space}/member-candidates', [TaskSpaceMemberCandidateController::class, 'index'])->missing($notFound)->name('spaces.member-candidates.index');
+                Route::get('spaces/{space}/members', [TaskSpaceMemberController::class, 'index'])->missing($notFound)->name('spaces.members.index');
+                Route::post('spaces/{space}/members', [TaskSpaceMemberController::class, 'store'])->missing($notFound)->name('spaces.members.store');
+                Route::patch('spaces/{space}/members/{user}', [TaskSpaceMemberController::class, 'update'])->missing($notFound)->name('spaces.members.update');
+                Route::delete('spaces/{space}/members/{user}', [TaskSpaceMemberController::class, 'destroy'])->missing($notFound)->name('spaces.members.destroy');
+
+                Route::get('spaces/{space}/statuses', [TaskStatusController::class, 'index'])->missing($notFound)->name('spaces.statuses.index');
+                Route::post('spaces/{space}/statuses', [TaskStatusController::class, 'store'])->missing($notFound)->name('spaces.statuses.store');
+                Route::match(['put', 'patch'], 'statuses/{status}', [TaskStatusController::class, 'update'])->missing($notFound)->name('statuses.update');
+                Route::delete('statuses/{status}', [TaskStatusController::class, 'destroy'])->missing($notFound)->name('statuses.destroy');
+
+                Route::get('spaces/{space}/labels', [TaskLabelController::class, 'index'])->missing($notFound)->name('spaces.labels.index');
+                Route::post('spaces/{space}/labels', [TaskLabelController::class, 'store'])->missing($notFound)->name('spaces.labels.store');
+                Route::match(['put', 'patch'], 'labels/{label}', [TaskLabelController::class, 'update'])->missing($notFound)->name('labels.update');
+                Route::delete('labels/{label}', [TaskLabelController::class, 'destroy'])->missing($notFound)->name('labels.destroy');
+
+                // Tasks can be read across every visible space in the
+                // workspace or scoped to a single list.
+                Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
+                Route::get('lists/{list}/tasks', [TaskController::class, 'indexForList'])->missing($notFound)->name('lists.tasks.index');
+                Route::post('lists/{list}/tasks', [TaskController::class, 'store'])->missing($notFound)->name('lists.tasks.store');
+                Route::get('tasks/{task}', [TaskController::class, 'show'])->missing($notFound)->name('tasks.show');
+                Route::match(['put', 'patch'], 'tasks/{task}', [TaskController::class, 'update'])->missing($notFound)->name('tasks.update');
+                Route::delete('tasks/{task}', [TaskController::class, 'destroy'])->missing($notFound)->name('tasks.destroy');
+
+                Route::get('tasks/{task}/comments', [TaskCommentController::class, 'index'])->missing($notFound)->name('tasks.comments.index');
+                Route::post('tasks/{task}/comments', [TaskCommentController::class, 'store'])->missing($notFound)->name('tasks.comments.store');
+                Route::match(['put', 'patch'], 'comments/{comment}', [TaskCommentController::class, 'update'])->missing($notFound)->name('comments.update');
+                Route::delete('comments/{comment}', [TaskCommentController::class, 'destroy'])->missing($notFound)->name('comments.destroy');
+
+                // `download` and `preview` are plain GETs a browser follows as
+                // a link; the disk is private, so every fetch is authorized and
+                // the file streamed back from here.
+                Route::get('tasks/{task}/attachments', [TaskAttachmentController::class, 'index'])->missing($notFound)->name('tasks.attachments.index');
+                Route::post('tasks/{task}/attachments', [TaskAttachmentController::class, 'store'])->missing($notFound)->name('tasks.attachments.store');
+                Route::get('attachments/{attachment}/download', [TaskAttachmentController::class, 'download'])->missing($notFound)->name('attachments.download');
+                Route::get('attachments/{attachment}/preview', [TaskAttachmentController::class, 'preview'])->missing($notFound)->name('attachments.preview');
+                Route::delete('attachments/{attachment}', [TaskAttachmentController::class, 'destroy'])->missing($notFound)->name('attachments.destroy');
+            });
 
         // Inventory dashboard — one endpoint per KPI so each loads, skeletons
         // and refreshes independently. See InventoryDashboardStatsController.

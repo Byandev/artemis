@@ -124,6 +124,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Task Attachment Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where files attached to Task Management tasks live. S3 in every deployed
+    | environment; override to "local" on machines with no AWS credentials.
+    | Private: every download is authorized and streamed by the app.
+    |
+    */
+
+    'task_attachment_disk' => env('TASK_ATTACHMENT_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Creative CDN (CloudFront)
     |--------------------------------------------------------------------------
     |

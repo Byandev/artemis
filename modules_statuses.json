@@ -9,5 +9,6 @@
     "SimGateway": true,
     "Billing": true,
     "Courses": true,
-    "Products": true
+    "Products": true,
+    "TaskManagement": true
 }

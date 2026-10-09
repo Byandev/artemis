@@ -212,6 +212,10 @@ enum Permission: string
     case EditCourses = 'Edit Courses';
     case DeleteCourses = 'Delete Courses';
 
+    // Task Management
+    case ViewTasks = 'View Tasks';
+    case ManageTasks = 'Manage Tasks';
+
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
@@ -396,6 +400,9 @@ enum Permission: string
             self::CreateCourses,
             self::EditCourses,
             self::DeleteCourses => 'Courses',
+
+            self::ViewTasks,
+            self::ManageTasks => 'Task Management',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,
