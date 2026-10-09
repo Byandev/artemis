@@ -5,14 +5,13 @@ import {
     ParcelStatusEntry,
 } from '@/components/rts/rmo-config';
 import {
-    RmoSubStatusMenuItems,
-    RmoSubStatusPicker,
-} from '@/components/rts/RmoSubStatusPicker';
-import {
     RmoPersonaCallStats,
     RmoStatCards,
 } from '@/components/rts/RmoStatCards';
-import { RmoStatusPicker } from '@/components/rts/RmoStatusPicker';
+import {
+    RmoSubStatusMenuItems,
+    RmoSubStatusPicker,
+} from '@/components/rts/RmoSubStatusPicker';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
@@ -2061,49 +2060,66 @@ function RmoManagement({
                     );
                 },
             },
-            {
-                id: 'status',
-                enableSorting: false,
-                header: 'Status',
-                cell: ({ row }) => {
-                    // Status is editable for today's orders, and for yesterday's
-                    // orders only when the parcel was returned, returning, or
-                    // delivered.
-                    const yesterdayParcelStatus =
-                        row.original.parcel_status?.toLowerCase();
-                    const canEditStatus =
-                        isToday ||
-                        canEditPastDay ||
-                        (isYesterday &&
-                            (yesterdayParcelStatus === 'returned' ||
-                                yesterdayParcelStatus === 'returning' ||
-                                yesterdayParcelStatus === 'delivered'));
+            ...(
+                [
+                    ['cx', 'Customer Status', cx_statuses, 'cx_status_id'],
+                    [
+                        'rider',
+                        'Rider Status',
+                        rider_statuses,
+                        'rider_status_id',
+                    ],
+                ] as const
+            ).map(
+                ([
+                    type,
+                    title,
+                    statuses,
+                    field,
+                ]): ColumnDef<OrderForDelivery> => ({
+                    id: `${type}_status`,
+                    enableSorting: false,
+                    header: title,
+                    cell: ({ row }) => {
+                        // Status is editable for today's orders, and for yesterday's
+                        // orders only when the parcel was returned, returning, or
+                        // delivered.
+                        const yesterdayParcelStatus =
+                            row.original.parcel_status?.toLowerCase();
+                        const canEditStatus =
+                            isToday ||
+                            canEditPastDay ||
+                            (isYesterday &&
+                                (yesterdayParcelStatus === 'returned' ||
+                                    yesterdayParcelStatus === 'returning' ||
+                                    yesterdayParcelStatus === 'delivered'));
 
-                    return (
-                        <div>
-                            <RmoSubStatusPicker
-                                cxStatuses={cx_statuses}
-                                riderStatuses={rider_statuses}
-                                cxStatusId={row.original.cx_status_id}
-                                riderStatusId={row.original.rider_status_id}
-                                onChange={(type, statusId) =>
-                                    handleChangeSubStatus(
-                                        type,
-                                        statusId,
-                                        row.original.id,
-                                    )
-                                }
-                                disabled={!canEditStatus}
-                            />
-                            {row.original.rmo_by_external_team && (
-                                <p className="mt-1 text-[10px] text-gray-400 italic dark:text-gray-500">
-                                    Handled by external team
-                                </p>
-                            )}
-                        </div>
-                    );
-                },
-            },
+                        return (
+                            <div>
+                                <RmoSubStatusPicker
+                                    type={type}
+                                    statuses={statuses}
+                                    statusId={row.original[field] ?? null}
+                                    onChange={(statusId) =>
+                                        handleChangeSubStatus(
+                                            type,
+                                            statusId,
+                                            row.original.id,
+                                        )
+                                    }
+                                    disabled={!canEditStatus}
+                                />
+                                {type === 'cx' &&
+                                    row.original.rmo_by_external_team && (
+                                        <p className="mt-1 text-[10px] text-gray-400 italic dark:text-gray-500">
+                                            Handled by external team
+                                        </p>
+                                    )}
+                            </div>
+                        );
+                    },
+                }),
+            ),
         ],
         [
             handleAssignToMe,

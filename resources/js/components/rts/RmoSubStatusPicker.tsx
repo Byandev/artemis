@@ -95,44 +95,34 @@ export function RmoSubStatusMenuItems({
 }
 
 interface Props {
-    cxStatuses: RmoSubStatus[];
-    riderStatuses: RmoSubStatus[];
-    cxStatusId: number | null;
-    riderStatusId: number | null;
-    onChange: (type: RmoSubStatusType, statusId: number | null) => void;
+    type: RmoSubStatusType;
+    statuses: RmoSubStatus[];
+    statusId: number | null;
+    onChange: (statusId: number | null) => void;
     disabled?: boolean;
 }
 
 /**
- * The RMO row's status: one dropdown listing the workspace-defined customer and
- * rider statuses together. The pill shows whichever of the two are set, by
- * name only.
+ * One RMO row status — customer or rider — as a dropdown of that kind's
+ * workspace-defined statuses. The pill shows the picked status by name.
  */
 export function RmoSubStatusPicker({
-    cxStatuses,
-    riderStatuses,
-    cxStatusId,
-    riderStatusId,
+    type,
+    statuses,
+    statusId,
     onChange,
     disabled = false,
 }: Props) {
-    const cx = cxStatuses.find((o) => o.id === cxStatusId);
-    const rider = riderStatuses.find((o) => o.id === riderStatusId);
-    const isSet = Boolean(cx || rider);
+    const current = statuses.find((o) => o.id === statusId);
 
     const pill = cn(
-        'inline-flex max-w-full flex-col items-start gap-0.5 rounded-lg border px-2 py-1 text-left text-[11px] font-medium',
-        isSet
+        'inline-flex max-w-full items-center rounded-lg border px-2 py-1 text-left text-[11px] font-medium',
+        current
             ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300'
             : 'border-dashed border-gray-300 text-gray-400 dark:border-zinc-700 dark:text-gray-500',
     );
-    const content = isSet ? (
-        <>
-            {cx && <span className="max-w-[160px] truncate">{cx.name}</span>}
-            {rider && (
-                <span className="max-w-[160px] truncate">{rider.name}</span>
-            )}
-        </>
+    const content = current ? (
+        <span className="max-w-[160px] truncate">{current.name}</span>
     ) : (
         <span>Set status</span>
     );
@@ -154,18 +144,18 @@ export function RmoSubStatusPicker({
                 )}
             >
                 {content}
-                <ChevronDown className="absolute top-1.5 right-1.5 h-2.5 w-2.5 opacity-60" />
+                <ChevronDown className="absolute top-1/2 right-1.5 h-2.5 w-2.5 -translate-y-1/2 opacity-60" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="end"
                 className="w-56 overflow-hidden p-1"
             >
                 <RmoSubStatusMenuItems
-                    cxStatuses={cxStatuses}
-                    riderStatuses={riderStatuses}
-                    cxStatusId={cxStatusId}
-                    riderStatusId={riderStatusId}
-                    onChange={onChange}
+                    cxStatuses={type === 'cx' ? statuses : []}
+                    riderStatuses={type === 'rider' ? statuses : []}
+                    cxStatusId={type === 'cx' ? statusId : null}
+                    riderStatusId={type === 'rider' ? statusId : null}
+                    onChange={(_, id) => onChange(id)}
                 />
             </DropdownMenuContent>
         </DropdownMenu>
