@@ -253,18 +253,24 @@ class PageController extends Controller
             'token' => 'required|string',
         ]);
 
+        // page_customers needs the same window/paging params the daily sync
+        // sends; without them Pancake rejects even a good token.
         try {
             $response = Http::timeout(10)->get('https://pages.fm/api/public_api/v1/pages/'.$validated['page_id'].'/page_customers', [
                 'page_access_token' => $validated['token'],
+                'since' => now()->subDay()->getTimestamp(),
+                'until' => now()->getTimestamp(),
+                'page_number' => 1,
+                'page_size' => 1,
             ]);
 
-            if ($response->successful() && $response->json()['success']) {
-                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.', 'data' => $response->json()], 200);
+            if ($response->successful() && $response->json('success') === true) {
+                return response()->json(['valid' => true, 'message' => 'Pancake token is valid.']);
             }
 
             return response()->json([
                 'valid' => false,
-                'message' => 'Invalid Pancake token',
+                'message' => 'Invalid Pancake token'.($response->json('message') ? ': '.$response->json('message') : '.'),
             ]);
         } catch (\Throwable $e) {
             return response()->json([

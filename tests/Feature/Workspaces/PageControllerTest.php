@@ -242,11 +242,14 @@ test('validatePancakeToken returns valid:true when Pancake API confirms success'
         ])
         ->assertOk()
         ->assertJsonPath('valid', true);
+
+    Http::assertSent(fn ($request) => $request['page_access_token'] === 'abc'
+        && isset($request['since'], $request['until'], $request['page_number'], $request['page_size']));
 });
 
 test('validatePancakeToken returns valid:false when Pancake API reports unsuccessful', function () {
     Http::fake([
-        'pages.fm/api/public_api/v1/pages/*/page_customers' => Http::response(['success' => false, 'message' => 'bad token'], 200),
+        'pages.fm/api/public_api/v1/pages/*/page_customers*' => Http::response(['success' => false, 'message' => 'bad token'], 200),
     ]);
 
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -257,7 +260,8 @@ test('validatePancakeToken returns valid:false when Pancake API reports unsucces
             'token' => 'abc',
         ])
         ->assertOk()
-        ->assertJsonPath('valid', false);
+        ->assertJsonPath('valid', false)
+        ->assertJsonPath('message', 'Invalid Pancake token: bad token');
 });
 
 test('validateBotcakeToken returns valid:true on 2xx upstream response', function () {
