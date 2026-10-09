@@ -318,3 +318,17 @@ function welleDay(
         'synced_at' => now(),
     ]);
 }
+
+/**
+ * A plain local disk, like local development's — unlike Storage::fake(), which
+ * can sign URLs, this one can't, so previews fall back to the app's routes.
+ */
+function useUnsignableCreativeDisk(): void
+{
+    $root = storage_path('framework/testing/disks/creatives-unsigned');
+    config([
+        'filesystems.disks.creatives-unsigned' => ['driver' => 'local', 'root' => $root],
+        'filesystems.creative_media_disk' => 'creatives-unsigned',
+    ]);
+    test()->beforeApplicationDestroyed(fn () => File::deleteDirectory($root));
+}

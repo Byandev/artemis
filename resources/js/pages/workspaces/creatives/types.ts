@@ -11,10 +11,27 @@ export type ReviewStatus =
 // Statuses a reviewer can actually choose when leaving a review.
 export const REVIEW_STATUS_OPTIONS: ReviewStatus[] = ['approved', 'revision'];
 
+/**
+ * An area of an image as fractions of its width/height (0–1), so it lands in
+ * the same place at any display size. w = h = 0 is a single point.
+ */
+export interface Region {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
 export interface Review {
     id: number;
     status: ReviewStatus;
     feedback: string | null;
+    /** The second of a video creative this review points at; null for the whole creative. */
+    timestamp_seconds: number | null;
+    /** The area of an image creative this review points at; null for the whole creative. */
+    region: Region | null;
+    /** A recorded voice message; `url` is signed, for the player to load directly. */
+    voice: { duration_seconds: number | null; url: string } | null;
     reviewer: { id: number; name: string } | null;
     created_at: string;
 }
@@ -33,6 +50,8 @@ export interface Creative {
     submission_status: 'late' | 'early' | 'on_time' | null;
     script: string | null;
     picture_url: string | null;
+    /** File uploaded into Artemis; `media.url` is signed, for previews to load directly. */
+    media: CreativeMedia | null;
     reference_link: string | null;
     ads_status: AdsStatus;
     ads_manager_link: string | null;
@@ -49,6 +68,15 @@ export interface Creative {
     reviews: Review[];
     review_count: number;
     latest_review: { status: ReviewStatus; feedback: string | null } | null;
+}
+
+export interface CreativeMedia {
+    id: number;
+    file_name: string;
+    mime_type: string;
+    size: number;
+    /** Signed URL to load directly (S3, or CloudFront when configured). */
+    url: string;
 }
 
 export interface Creator {

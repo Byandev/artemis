@@ -338,23 +338,29 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
                 );
             },
         },
-        {
-            accessorKey: 'auto_update_ad_budget',
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title={'Auto Update Budget'}
-                    enabled={false}
-                />
-            ),
-            cell: ({ row }) => (
-                <PageAutoBudgetToggle
-                    workspace={workspace}
-                    page={row.original}
-                    canEdit={canEditPageBudget}
-                />
-            ),
-        },
+        // Auto update pulls the budget from Meta Ads snapshots, so the switch
+        // means nothing without the Meta Ads module.
+        ...(workspace.meta_ads_module_enabled
+            ? [
+                  {
+                      accessorKey: 'auto_update_ad_budget',
+                      header: ({ column }) => (
+                          <SortableHeader
+                              column={column}
+                              title={'Auto Update Budget'}
+                              enabled={false}
+                          />
+                      ),
+                      cell: ({ row }) => (
+                          <PageAutoBudgetToggle
+                              workspace={workspace}
+                              page={row.original}
+                              canEdit={canEditPageBudget}
+                          />
+                      ),
+                  } as ColumnDef<Page>,
+              ]
+            : []),
         {
             accessorKey: 'deleted_at',
             header: ({ column }) => (

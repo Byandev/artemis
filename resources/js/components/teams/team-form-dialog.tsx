@@ -31,6 +31,7 @@ interface TeamFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     team?: Team | null;
+    onSaved?: () => void;
 }
 
 export function TeamFormDialog({
@@ -39,6 +40,7 @@ export function TeamFormDialog({
     open,
     onOpenChange,
     team,
+    onSaved,
 }: TeamFormDialogProps) {
     const isEditing = !!team;
 
@@ -66,19 +68,25 @@ export function TeamFormDialog({
         if (isEditing) {
             put(workspaces.teams.update.url({ workspace, team: team.id }), {
                 preserveScroll: true,
+                // Keep the page mounted; it refetches the list itself.
+                preserveState: true,
                 onSuccess: () => {
                     toast.success('Team updated successfully!');
                     reset();
+                    onSaved?.();
                     onOpenChange(false);
                 },
             });
         } else {
             post(workspaces.teams.store.url({ workspace }), {
                 preserveScroll: true,
+                // Keep the page mounted; it refetches the list itself.
+                preserveState: true,
                 onSuccess: () => {
                     // 3. Add the success notification for Creating
                     toast.success('Team created successfully!');
                     reset();
+                    onSaved?.();
                     onOpenChange(false);
                 },
             });

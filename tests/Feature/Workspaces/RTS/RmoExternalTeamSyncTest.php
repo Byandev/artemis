@@ -66,20 +66,54 @@ it('flags every sheet row and auto-tags confirmed, delivered and returned', func
         ->assertJsonPath('data.tagged', 3)
         ->assertJsonPath('data.unmatched', ['JT999']);
 
-    $synced = collect($this->postJson('/api/v1/public/rmo-orders/external-team', [
-        'rows' => [['tracking_number' => 'JT001', 'status' => 'Confirmed']],
-    ], ['Authorization' => "Bearer {$this->apiKey}"])->json('data.synced'));
+    // A re-run still matches the row, but doesn't count it as freshly tagged.
+    $this->withToken($this->apiKey)
+        ->postJson('/api/v1/public/rmo-orders/external-team', [
+            'rows' => [['tracking_number' => 'JT001', 'status' => 'Confirmed']],
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.matched', 1)
+        ->assertJsonPath('data.tagged', 0)
+        ->assertJsonMissingPath('data.synced');
 
-    // A re-run still reports the row as synced, but not as freshly tagged.
-    expect($synced->all())->toBe([
-        ['tracking_number' => 'JT001', 'rmo_status' => 'RIDER OTW', 'tagged' => false],
-    ]);
+    // Untouched settings tag the default rider statuses by name.
+    $rider = $this->workspace->rmoRiderStatuses()->pluck('id', 'name');
+
+    expect($confirmed->fresh()->rider_status_id)->toBe($rider['RIDER OTW'])
+        ->and($delivered->fresh()->rider_status_id)->toBe($rider['DELIVERED'])
+        ->and($returned->fresh()->rider_status_id)->toBe($rider['RETURNING'])
+        ->and($ringing->fresh()->rider_status_id)->toBeNull();
 
     expect($confirmed->fresh())->status->toBe('RIDER OTW')->rmo_by_external_team->toBeTrue()
         ->and($delivered->fresh())->status->toBe('DELIVERED')->rmo_by_external_team->toBeTrue()
         ->and($returned->fresh())->status->toBe('RETURNING')->rmo_by_external_team->toBeTrue()
         ->and($ringing->fresh())->status->toBe('PENDING')->rmo_by_external_team->toBeTrue()
         ->and($notInSheet->fresh())->status->toBe('PENDING')->rmo_by_external_team->toBeFalse();
+});
+
+it('tags the customer / rider status picked in settings, or none', function () {
+    $cxCancelled = $this->workspace->rmoCxStatuses()->where('name', 'CANCELLED')->value('id');
+    $this->workspace->rmoSetting->update(['external_team_status_map' => [
+        'confirmed' => '',
+        'delivered' => 'rider:'.$this->workspace->rmoRiderStatuses()->where('name', 'DELIVERED')->value('id'),
+        'returned' => "cx:{$cxCancelled}",
+    ]]);
+
+    $confirmed = makeSheetDelivery($this->workspace, 'JT001');
+    $returned = makeSheetDelivery($this->workspace, 'JT003');
+
+    $this->withToken($this->apiKey)
+        ->postJson('/api/v1/public/rmo-orders/external-team', [
+            'rows' => [
+                ['tracking_number' => 'JT001', 'status' => 'Confirmed'],
+                ['tracking_number' => 'JT003', 'status' => 'Returned'],
+            ],
+        ])
+        ->assertOk();
+
+    // The main status is still tagged either way.
+    expect($confirmed->fresh())->status->toBe('RIDER OTW')->rider_status_id->toBeNull()->cx_status_id->toBeNull()
+        ->and($returned->fresh())->status->toBe('RETURNING')->cx_status_id->toBe($cxCancelled)->rider_status_id->toBeNull();
 });
 
 it('only touches rows on the given delivery date and workspace', function () {

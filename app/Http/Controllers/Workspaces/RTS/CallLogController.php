@@ -57,6 +57,10 @@ class CallLogController extends Controller
                 fn ($query) => $query->whereHas('order', fn ($order) => $order->visibleTo($user, $workspace)),
             );
 
+        // Taken before the filters land on $calls, so picking one caller doesn't
+        // empty the list of the others.
+        $callers = CallLogCallers::options($calls->clone());
+
         $logs = QueryBuilder::for($calls)
             ->allowedFilters([
                 // Phone number or order id — the two things someone arrives at
@@ -81,6 +85,7 @@ class CallLogController extends Controller
                     ? $query->whereNull('persona')
                     : $query->where('persona', $value)),
                 AllowedFilter::exact('type'),
+                AllowedFilter::callback('caller', fn ($query, $value) => CallLogCallers::filter($query, (string) $value)),
             ])
             ->allowedSorts(['call_date', 'duration', 'persona', 'type', 'phone_number'])
             // call_time is a time, not a timestamp, so the day has to lead the sort;
@@ -117,6 +122,7 @@ class CallLogController extends Controller
                 CallLogPersona::VERIFICATION,
                 $scoped ? null : self::UNMATCHED,
             ])),
+            'callers' => $callers,
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),

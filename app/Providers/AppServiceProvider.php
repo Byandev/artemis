@@ -68,6 +68,15 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // Creatives Tracker app password login — throttle per email+IP, plus a looser
+        // per-IP cap so one device cannot spray many accounts.
+        RateLimiter::for('creatives-tracker-login', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by($request->ip().'|'.strtolower((string) $request->input('email'))),
+                Limit::perMinute(20)->by('ip:'.$request->ip()),
+            ];
+        });
+
         RateLimiter::for('csr-public-performance', function (Request $request) {
             $workspace = $request->route('workspace');
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');

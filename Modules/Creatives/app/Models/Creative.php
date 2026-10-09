@@ -4,15 +4,24 @@ namespace Modules\Creatives\Models;
 
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Products\Models\Product;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Creative extends Model
+class Creative extends Model implements HasMedia
 {
+    use InteractsWithMedia;
+
+    /** The image or video uploaded straight into Artemis, as opposed to a link. */
+    public const MEDIA_COLLECTION = 'media';
+
     protected $guarded = [];
 
     protected $casts = [
@@ -36,6 +45,13 @@ class Creative extends Model
         static::creating(function (Creative $creative) {
             $creative->code ??= static::generateCode();
         });
+
+        // Reviews go with the creative through a cascading foreign key, which
+        // skips model events — so their voice messages would be left in the
+        // bucket. Deleting them as models first takes the files with them.
+        static::deleting(function (Creative $creative) {
+            $creative->reviews()->each(fn (CreativeReview $review) => $review->delete());
+        });
     }
 
     /** A random 10-character code not yet used by any creative. */
@@ -51,6 +67,20 @@ class Creative extends Model
         } while (static::where('code', $code)->exists());
 
         return $code;
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(static::MEDIA_COLLECTION)
+            // One file per creative: uploading again replaces the old object
+            // rather than leaving an orphan in the bucket.
+            ->singleFile()
+            ->useDisk(config('filesystems.creative_media_disk'));
+    }
+
+    public function mediaFile(): ?Media
+    {
+        return $this->getFirstMedia(static::MEDIA_COLLECTION);
     }
 
     /** Calendar-date label for the planned creative date (timezone-safe). */
@@ -114,5 +144,38 @@ class Creative extends Model
     public function latestReview(): HasOne
     {
         return $this->hasOne(CreativeReview::class)->latestOfMany();
+    }
+
+    /**
+     * Creatives this user reviews: still for approval, they are an assigned
+     * reviewer, and it is in a workspace they belong to with the Creatives
+     * module on. The mobile app's list shows these, reviewed or not.
+     */
+    public function scopeAssignedForApprovalTo(Builder $query, User $user): Builder
+    {
+        return $query
+            ->where('final_status', 'for_approval')
+            ->whereHas('assignedReviewers', fn ($q) => $q->where('users.id', $user->id))
+            ->whereHas('workspace', function (Builder $q) use ($user) {
+                $q->where('creatives_module_enabled', true);
+
+                // Being on the pivot of a workspace you have since left
+                // should not keep its creatives visible.
+                if (! $user->isSuperAdmin()) {
+                    $q->where(fn ($w) => $w->where('owner_id', $user->id)
+                        ->orWhereHas('users', fn ($m) => $m->where('users.id', $user->id)));
+                }
+            });
+    }
+
+    /**
+     * The ones above the user has not reviewed yet — what the daily push
+     * reminder counts.
+     */
+    public function scopeAwaitingReviewBy(Builder $query, User $user): Builder
+    {
+        return $query
+            ->assignedForApprovalTo($user)
+            ->whereDoesntHave('reviews', fn ($q) => $q->where('reviewer_id', $user->id));
     }
 }

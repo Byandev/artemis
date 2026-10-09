@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MobileApi\AuthController as MobileAuthController;
 use App\Http\Controllers\PublicApi\CallLogController;
 use App\Http\Controllers\PublicApi\CallLogV2Controller;
 use App\Http\Controllers\PublicApi\CsrDailyRecordController;
@@ -14,6 +15,11 @@ use App\Http\Controllers\PublicApi\ShopController;
 use App\Http\Controllers\PublicApi\ShopScanReturnController;
 use App\Http\Controllers\PublicApi\TransactionHistoryController;
 use App\Http\Controllers\PublicApi\UserController;
+use Modules\Creatives\Http\Controllers\Api\AssignedCreativesController;
+use Modules\Creatives\Http\Controllers\Api\PushTokenController;
+use Modules\Creatives\Http\Controllers\Api\ReminderSettingController;
+use Modules\Creatives\Http\Controllers\Api\TrackerCreativeController;
+use Modules\Creatives\Http\Controllers\Api\WebPushSubscriptionController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Api\InternController as GencysInternApiController;
 use Modules\GencysERP\Http\Controllers\Api\InternDailyRecordController as GencysInternDailyRecordApiController;
@@ -110,6 +116,44 @@ Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' =>
     Route::get('/call-logs/kpi', [CallLogV2Controller::class, 'kpi'])->name('call-logs.kpi');
     Route::get('/call-logs/list', [CallLogV2Controller::class, 'list'])->name('call-logs.list');
     Route::get('/call-logs/summary', [CallLogV2Controller::class, 'summary'])->name('call-logs.summary');
+});
+
+// Creatives Tracker mobile app — per-user Sanctum tokens, not workspace API keys. The
+// app logs in with email + password (+ 2FA code) and sends the returned
+// token as `Authorization: Bearer <token>`.
+Route::group(['prefix' => 'v1/creatives-tracker', 'as' => 'api.v1.creatives-tracker.'], function () {
+    Route::post('/login', [MobileAuthController::class, 'login'])
+        ->middleware('throttle:creatives-tracker-login')
+        ->name('login');
+
+    // A review's voice message, for the app's audio player — which can't send
+    // the bearer token, so the presenter hands out a signed URL instead.
+    Route::get('/creatives/{creative}/reviews/{review}/voice', [TrackerCreativeController::class, 'voice'])
+        ->middleware('signed')
+        ->whereNumber(['creative', 'review'])
+        ->name('creatives.reviews.voice');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/me', [MobileAuthController::class, 'me'])->name('me');
+        Route::post('/logout', [MobileAuthController::class, 'logout'])->name('logout');
+
+        Route::get('/creatives/assigned', [AssignedCreativesController::class, 'index'])->name('creatives.assigned');
+        Route::get('/creatives/{creative}', [TrackerCreativeController::class, 'show'])->whereNumber('creative')->name('creatives.show');
+        Route::patch('/creatives/{creative}/final-status', [TrackerCreativeController::class, 'updateFinalStatus'])->whereNumber('creative')->name('creatives.final-status');
+        Route::post('/creatives/{creative}/reviews', [TrackerCreativeController::class, 'storeReview'])->whereNumber('creative')->name('creatives.reviews.store');
+        Route::delete('/creatives/{creative}/reviews/{review}', [TrackerCreativeController::class, 'destroyReview'])->whereNumber(['creative', 'review'])->name('creatives.reviews.destroy');
+
+        Route::post('/push-token', [PushTokenController::class, 'store'])->name('push-token.store');
+        Route::delete('/push-token', [PushTokenController::class, 'destroy'])->name('push-token.destroy');
+
+        // Same, for the installed web app (PWA) through Web Push.
+        Route::get('/web-push/key', [WebPushSubscriptionController::class, 'key'])->name('web-push.key');
+        Route::post('/web-push/subscription', [WebPushSubscriptionController::class, 'store'])->name('web-push.subscription.store');
+        Route::delete('/web-push/subscription', [WebPushSubscriptionController::class, 'destroy'])->name('web-push.subscription.destroy');
+
+        Route::get('/reminder-settings', [ReminderSettingController::class, 'show'])->name('reminder-settings.show');
+        Route::put('/reminder-settings', [ReminderSettingController::class, 'update'])->name('reminder-settings.update');
+    });
 });
 
 // Pancake POS order webhook for "Auto-fill order address" (Shops → Edit).

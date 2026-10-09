@@ -27,6 +27,7 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\HeatMapController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
+use App\Http\Controllers\Workspaces\RTS\RmoSubStatusController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DailyReportController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DashboardController as SalesMarketingDashboardController;
 use App\Http\Controllers\Workspaces\SalesMarketing\NewCreativesTrackerController;
@@ -56,6 +57,8 @@ use Modules\Courses\Http\Controllers\CourseLessonController;
 use Modules\Courses\Http\Controllers\CourseModuleController;
 use Modules\Courses\Http\Controllers\CourseProgressController;
 use Modules\Courses\Http\Controllers\CoursesController;
+use Modules\Creatives\Http\Controllers\CreativeMediaController;
+use Modules\Creatives\Http\Controllers\CreativeReviewController;
 use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
@@ -136,7 +139,9 @@ Route::middleware('public.subscription')->group(function () {
     Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
     Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
     Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-status', [ForDeliveryController::class, 'publicBulkUpdateStatus'])->name('public-page.rmo-management.bulkUpdateStatus');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-sub-status', [RmoSubStatusController::class, 'bulkUpdate'])->name('public-page.rmo-management.bulkUpdateSubStatus');
     Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
+    Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/sub-status', [RmoSubStatusController::class, 'update'])->name('public-page.rmo-management.updateSubStatus');
     Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
     Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
     Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
@@ -774,11 +779,22 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/create', [CreativesController::class, 'create'])->name('create');
         Route::post('/', [CreativesController::class, 'store'])->name('store');
         Route::post('/bulk-reviewers', [CreativesController::class, 'bulkAssignReviewers'])->name('reviewers.bulk');
+        // Presigned direct-to-S3: the browser PUTs the file to the bucket and
+        // only hands the key to store/update, so nginx and PHP never see the bytes.
+        Route::post('/media/presign', [CreativeMediaController::class, 'presign'])->name('media.presign');
+        // An upload that was never saved (swapped, cleared, or the form was left).
+        Route::delete('/media/pending', [CreativeMediaController::class, 'discardPending'])->name('media.pending.destroy');
+        // The bucket is private; this redirects to a short-lived signed URL.
+        Route::get('/{creative}/media', [CreativeMediaController::class, 'show'])->name('media.show');
         Route::get('/{creative}/edit', [CreativesController::class, 'edit'])->name('edit');
+        Route::get('/{creative}/review', [CreativeReviewController::class, 'show'])->name('review');
         Route::put('/{creative}', [CreativesController::class, 'update'])->name('update');
         Route::delete('/{creative}', [CreativesController::class, 'destroy'])->name('destroy');
-        Route::post('/{creative}/reviews', [CreativesController::class, 'addReview'])->name('reviews.store');
-        Route::put('/{creative}/reviews/{review}', [CreativesController::class, 'updateReview'])->name('reviews.update');
+        Route::post('/{creative}/reviews', [CreativeReviewController::class, 'store'])->name('reviews.store');
+        Route::put('/{creative}/reviews/{review}', [CreativeReviewController::class, 'update'])->name('reviews.update');
+        Route::delete('/{creative}/reviews/{review}', [CreativeReviewController::class, 'destroy'])->name('reviews.destroy');
+        // A review's voice message; redirects to a signed URL (private bucket).
+        Route::get('/{creative}/reviews/{review}/voice', [CreativeReviewController::class, 'voice'])->name('reviews.voice');
         Route::put('/{creative}/ads-campaign', [CreativesController::class, 'updateAdsCampaign'])->name('ads-campaign.update');
     });
 
@@ -849,7 +865,9 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/workspaces/invitations/{token}', [WorkspaceInvitationController::class, 'show'])->name('workspaces.invitations.show');
 Route::get('/workspaces/invitations/{token}/accept', [WorkspaceInvitationController::class, 'accept'])->name('workspaces.invitations.accept');
 
-Route::prefix('/workspaces/{workspace:slug}')->group(function () {
+// Role management. Behind `auth` — each action also checks its own role
+// permission in RoleController.
+Route::middleware(['auth'])->prefix('/workspaces/{workspace:slug}')->group(function () {
     Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
     Route::post('/roles/{role}/restore', [RoleController::class, 'restore'])
         ->withTrashed()

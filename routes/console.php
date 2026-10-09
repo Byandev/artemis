@@ -147,6 +147,13 @@ Schedule::command('metaads:report-team-budgets')->dailyAt('08:00');
 // else cleans up. 24h is well clear of any upload still in flight.
 Schedule::command('courses:prune-pending-uploads')->dailyAt('04:00')->withoutOverlapping();
 
+// Same for creative files: uploaded to S3 when picked, adopted only on save.
+Schedule::command('creatives:prune-pending-uploads')->dailyAt('04:15')->withoutOverlapping();
+
+// Daily push to Creatives Tracker app users with creatives waiting on their review. Each user
+// picks their own time in the app, so this checks every minute who is due.
+Schedule::command('creatives:send-review-reminders')->everyMinute()->withoutOverlapping();
+
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();
 // Schedule::command('analytics:rollup --date="2 days ago"')->dailyAt('02:00')->withoutOverlapping();

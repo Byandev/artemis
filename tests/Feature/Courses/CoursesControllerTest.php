@@ -35,6 +35,21 @@ it('lists courses for an owner when the module is on', function () {
     $this->get("/workspaces/{$workspace->slug}/courses")->assertOk();
 });
 
+it('404s the courses API when the module is off', function (string $endpoint) {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $this->getJson("/api/workspaces/{$workspace->slug}/courses{$endpoint}")->assertNotFound();
+})->with(['', '/stats', '/leaderboard']);
+
+it('does not let a non-member reach a workspace\'s courses API', function (string $endpoint) {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+
+    $this->actingAs(User::factory()->create())
+        ->getJson("/api/workspaces/{$workspace->slug}/courses{$endpoint}")
+        ->assertForbidden();
+})->with(['', '/stats', '/leaderboard']);
+
 it('does not let a non-member reach a workspace\'s courses', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     $workspace->update(['courses_module_enabled' => true]);

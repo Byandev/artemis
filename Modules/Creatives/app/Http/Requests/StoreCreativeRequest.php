@@ -5,9 +5,13 @@ namespace Modules\Creatives\Http\Requests;
 use App\Models\Workspace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
+use Modules\Creatives\Http\Requests\Concerns\ChecksMediaMatchesFormat;
 
 class StoreCreativeRequest extends FormRequest
 {
+    use ChecksMediaMatchesFormat;
+
     public function authorize(): bool
     {
         return true;
@@ -33,11 +37,19 @@ class StoreCreativeRequest extends FormRequest
             'assigned_reviewer_ids.*' => ['integer', 'exists:users,id'],
             'description' => ['nullable', 'string', 'max:5000'],
             'script' => ['nullable', 'string'],
-            // Media is a plain text link (e.g. Google Drive), not an uploaded image.
+            // Media is either a link (e.g. Google Drive) or a file uploaded
+            // into Artemis — one of the two is required.
             'picture_url' => [
-                'required', 'string', 'max:2048',
+                'nullable', 'required_without_all:media_key,media_file', 'string', 'max:2048',
                 Rule::unique('creatives', 'picture_url')->where('workspace_id', $workspaceId),
             ],
+            // A key from CreativesController@presignMedia: the usual path, where
+            // the browser has already put the file in the bucket. `media_file`
+            // is the fallback for disks that cannot sign an upload.
+            'media_key' => ['nullable', 'string'],
+            // The browser's file name, kept for display and download.
+            'media_name' => ['nullable', 'string', 'max:255'],
+            'media_file' => ['nullable', 'file', 'mimetypes:image/*,video/*'],
             'reference_link' => ['nullable', 'string', 'max:2048'],
             'ads_status' => ['nullable', Rule::in(['pending', 'running', 'kill', 'scale'])],
             'ads_manager_link' => ['nullable', 'string', 'max:2048'],
@@ -49,11 +61,17 @@ class StoreCreativeRequest extends FormRequest
         ];
     }
 
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(fn (Validator $validator) => $this->checkMediaMatchesFormat($validator, $this->input('format')));
+    }
+
     public function messages(): array
     {
         return [
             'name.unique' => 'A creative with this name already exists in this workspace.',
             'picture_url.unique' => 'A creative with this media link already exists in this workspace.',
+            'picture_url.required_without_all' => 'Add a media link or upload a file.',
         ];
     }
 }

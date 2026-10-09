@@ -3,6 +3,9 @@
 namespace Modules\Creatives\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\Creatives\Console\Commands\GenerateWebPushKeysCommand;
+use Modules\Creatives\Console\Commands\PrunePendingCreativeUploadsCommand;
+use Modules\Creatives\Console\Commands\SendReviewRemindersCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class CreativesServiceProvider extends ModuleServiceProvider
@@ -22,7 +25,11 @@ class CreativesServiceProvider extends ModuleServiceProvider
      *
      * @var string[]
      */
-    // protected array $commands = [];
+    protected array $commands = [
+        PrunePendingCreativeUploadsCommand::class,
+        SendReviewRemindersCommand::class,
+        GenerateWebPushKeysCommand::class,
+    ];
 
     /**
      * Provider classes to register.

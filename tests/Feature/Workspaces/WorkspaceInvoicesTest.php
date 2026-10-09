@@ -121,7 +121,7 @@ it('filters by status', function () {
     workspaceInvoice($this->workspace, ['status' => Invoice::STATUS_SENT]);
 
     $this->actingAs($this->owner)
-        ->get($this->url.'?status=paid')
+        ->get($this->url.'?filter[status]=paid')
         ->assertInertia(fn (Assert $page) => $page->where('invoices.total', 1));
 });
 
@@ -130,7 +130,7 @@ it('searches by invoice number', function () {
     workspaceInvoice($this->workspace);
 
     $this->actingAs($this->owner)
-        ->get($this->url.'?search='.$target->number)
+        ->get($this->url.'?filter[search]='.$target->number)
         ->assertInertia(fn (Assert $page) => $page
             ->where('invoices.total', 1)
             ->where('invoices.data.0.number', $target->number)
@@ -249,7 +249,7 @@ it('keeps the filter applied while sorting', function () {
     workspaceInvoice($this->workspace, ['total' => 300, 'status' => Invoice::STATUS_PAID]);
 
     $this->actingAs($this->owner)
-        ->get($this->url.'?status=paid&sort=-total')
+        ->get($this->url.'?filter[status]=paid&sort=-total')
         ->assertInertia(fn (Assert $page) => $page
             ->where('invoices.total', 2)
             ->where('invoices.data.0.total', '300.00')
@@ -261,7 +261,7 @@ it('searches by bill-to name as well as number', function () {
     workspaceInvoice($this->workspace, ['bill_to_name' => 'Acme Corp']);
 
     $this->actingAs($this->owner)
-        ->get($this->url.'?search=Northwind')
+        ->get($this->url.'?filter[search]=Northwind')
         ->assertInertia(fn (Assert $page) => $page
             ->where('invoices.total', 1)
             ->where('invoices.data.0.bill_to_name', 'Northwind Trading')
@@ -274,4 +274,93 @@ it('echoes the applied sort back so the header can render its arrow', function (
     $this->actingAs($this->owner)
         ->get($this->url.'?sort=-total')
         ->assertInertia(fn (Assert $page) => $page->where('filters.sort', '-total'));
+});
+
+it('filters by an issue date range, inclusive of both ends', function () {
+    workspaceInvoice($this->workspace, ['issue_date' => '2026-02-28']);
+    $first = workspaceInvoice($this->workspace, ['issue_date' => '2026-03-01']);
+    $last = workspaceInvoice($this->workspace, ['issue_date' => '2026-03-31']);
+    workspaceInvoice($this->workspace, ['issue_date' => '2026-04-01']);
+
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[date_from]=2026-03-01&filter[date_to]=2026-03-31&sort=issue_date')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('invoices.total', 2)
+            ->where('invoices.data.0.number', $first->number)
+            ->where('invoices.data.1.number', $last->number)
+        );
+});
+
+it('filters on a single day when from and to match', function () {
+    $target = workspaceInvoice($this->workspace, ['issue_date' => '2026-05-10']);
+    workspaceInvoice($this->workspace, ['issue_date' => '2026-05-11']);
+
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[date_from]=2026-05-10&filter[date_to]=2026-05-10')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('invoices.total', 1)
+            ->where('invoices.data.0.number', $target->number)
+        );
+});
+
+it('accepts an open-ended range on either side', function () {
+    workspaceInvoice($this->workspace, ['issue_date' => '2026-01-15']);
+    workspaceInvoice($this->workspace, ['issue_date' => '2026-06-15']);
+
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[date_from]=2026-03-01')
+        ->assertInertia(fn (Assert $page) => $page->where('invoices.total', 1));
+
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[date_to]=2026-03-01')
+        ->assertInertia(fn (Assert $page) => $page->where('invoices.total', 1));
+});
+
+it('combines the date range with the status filter', function () {
+    workspaceInvoice($this->workspace, ['issue_date' => '2026-03-10', 'status' => Invoice::STATUS_PAID]);
+    workspaceInvoice($this->workspace, ['issue_date' => '2026-03-10', 'status' => Invoice::STATUS_SENT]);
+    workspaceInvoice($this->workspace, ['issue_date' => '2026-07-10', 'status' => Invoice::STATUS_PAID]);
+
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[status]=paid&filter[date_from]=2026-03-01&filter[date_to]=2026-03-31')
+        ->assertInertia(fn (Assert $page) => $page->where('invoices.total', 1));
+});
+
+it('echoes the date range back so the picker can show it', function () {
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[date_from]=2026-03-01&filter[date_to]=2026-03-31')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.date_from', '2026-03-01')
+            ->where('filters.date_to', '2026-03-31')
+        );
+});
+
+it('rejects a range that ends before it starts', function () {
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[date_from]=2026-03-31&filter[date_to]=2026-03-01')
+        ->assertSessionHasErrors('filter.date_to');
+});
+
+it('rejects a date that is not Y-m-d', function () {
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[date_from]=not-a-date')
+        ->assertSessionHasErrors('filter.date_from');
+});
+
+it('still forbids a member without the permission when a range is given', function () {
+    $user = invoiceMemberWithPermissions($this->workspace, []);
+
+    $this->actingAs($user)
+        ->get($this->url.'?filter[date_from]=2026-03-01&filter[date_to]=2026-03-31')
+        ->assertForbidden();
+});
+
+it('rejects a filter that is not allowed', function () {
+    workspaceInvoice($this->workspace);
+
+    // Spatie throws on an unknown filter key, so a probe such as
+    // filter[bill_to_email] can't be used to narrow on hidden columns.
+    $this->actingAs($this->owner)
+        ->get($this->url.'?filter[bill_to_email]=a@b.com')
+        ->assertStatus(400);
 });

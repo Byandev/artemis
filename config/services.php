@@ -104,4 +104,19 @@ return [
         'device_name' => env('WELLE_DEVICE_NAME', 'Artemis'),
     ],
 
+    // Push notifications to the Creatives Tracker app. Only needed when
+    // "enhanced push security" is on for the Expo project.
+    'expo' => [
+        'access_token' => env('EXPO_ACCESS_TOKEN'),
+    ],
+
+    // Web Push to the Creatives Tracker web app (PWA). Generate the keys once
+    // with `php artisan creatives:web-push-keys`; the subject must be a
+    // mailto: or https: URL push services can reach you at.
+    'webpush' => [
+        'public_key' => env('WEB_PUSH_PUBLIC_KEY'),
+        'private_key' => env('WEB_PUSH_PRIVATE_KEY'),
+        'subject' => env('WEB_PUSH_SUBJECT', env('APP_URL')),
+    ],
+
 ];
