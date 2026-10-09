@@ -4,7 +4,6 @@ namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\ScannedReturnedOrder;
 use App\Models\Shop;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -12,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Modules\Pancake\Models\ScannedReturnedOrder;
 use Modules\Pancake\Services\Pancake;
 
 class ShopScanReturnController extends Controller

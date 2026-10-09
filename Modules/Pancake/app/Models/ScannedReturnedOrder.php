@@ -1,7 +1,10 @@
 <?php
 
-namespace App\Models;
+namespace Modules\Pancake\Models;
 
+use App\Models\Order;
+use App\Models\Shop;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

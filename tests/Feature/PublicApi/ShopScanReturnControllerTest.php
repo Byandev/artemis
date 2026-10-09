@@ -1,10 +1,10 @@
 <?php
 
 use App\Models\Order;
-use App\Models\ScannedReturnedOrder;
 use App\Models\Shop;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Modules\Pancake\Models\ScannedReturnedOrder;
 
 function scanReturnSetup(array $shopAttrs = []): array
 {
