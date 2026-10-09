@@ -4,11 +4,13 @@ namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\ScannedReturnedOrder;
 use App\Models\Shop;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Pancake\Services\Pancake;
 
@@ -38,6 +40,21 @@ class ShopScanReturnController extends Controller
         if ($order->parcel_status === 'returned') {
             return response()->json(['error' => 'Order is already marked as returned.'], 422);
         }
+
+        // Logged before Pancake is called, so a scan that fails to sync still
+        // shows up (synced_to_pancake = false) to retry. Scanning the same
+        // order again after a failure reuses its unsynced row.
+        $scan = ScannedReturnedOrder::firstOrNew([
+            'workspace_id' => $workspace->id,
+            'order_id' => $order->id,
+            'synced_to_pancake' => false,
+        ]);
+        $scan->fill([
+            'shop_id' => $order->shop_id,
+            'order_number' => $order->order_number,
+            'tracking_code' => $order->tracking_code,
+            'scanned_at' => now(),
+        ])->save();
 
         $shop = Shop::where('workspace_id', $workspace->id)->find($order->shop_id);
 
@@ -73,12 +90,16 @@ class ShopScanReturnController extends Controller
             ], 502);
         }
 
-        $order->update([
-            'status' => self::PANCAKE_STATUS_RETURNED,
-            'status_name' => 'returned',
-            'parcel_status' => 'returned',
-            'returned_at' => now(),
-        ]);
+        DB::transaction(function () use ($order, $scan) {
+            $order->update([
+                'status' => self::PANCAKE_STATUS_RETURNED,
+                'status_name' => 'returned',
+                'parcel_status' => 'returned',
+                'returned_at' => now(),
+            ]);
+
+            $scan->update(['synced_to_pancake' => true]);
+        });
 
         return response()->json([
             'message' => 'Order marked as returned.',

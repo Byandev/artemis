@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Order;
+use App\Models\ScannedReturnedOrder;
 use App\Models\Shop;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -119,4 +120,64 @@ test('validates the request body', function () {
 
 test('rejects unauthenticated request', function () {
     $this->postJson('/api/v1/public/shops/scan-return', [])->assertStatus(401);
+});
+
+// Scan log (scanned_returned_orders)
+
+test('a successful scan is logged as synced to Pancake', function () {
+    ['workspace' => $workspace, 'raw' => $raw, 'shop' => $shop, 'order' => $order] = scanReturnSetup();
+    Http::fake(['pos.pages.fm/*' => Http::response(['success' => true])]);
+
+    scanReturn($raw, ['shop_id' => $shop->id, 'tracking_code' => 'TRK-1'])->assertOk();
+
+    $scan = ScannedReturnedOrder::sole();
+    expect($scan->workspace_id)->toBe($workspace->id)
+        ->and($scan->shop_id)->toBe($shop->id)
+        ->and($scan->order_id)->toBe($order->id)
+        ->and($scan->order_number)->toBe('1234')
+        ->and($scan->tracking_code)->toBe('TRK-1')
+        ->and($scan->synced_to_pancake)->toBeTrue()
+        ->and($scan->scanned_at)->not->toBeNull();
+});
+
+test('a scan Pancake refuses is logged as not synced', function () {
+    ['raw' => $raw, 'shop' => $shop] = scanReturnSetup();
+    Http::fake(['pos.pages.fm/*' => Http::response(['message' => 'boom'], 500)]);
+
+    scanReturn($raw, ['shop_id' => $shop->id, 'tracking_code' => 'TRK-1'])->assertStatus(502);
+
+    expect(ScannedReturnedOrder::sole()->synced_to_pancake)->toBeFalse();
+});
+
+test('a scan for a shop without a POS token is logged as not synced', function () {
+    ['raw' => $raw, 'shop' => $shop] = scanReturnSetup(['pos_token' => null]);
+    Http::fake();
+
+    scanReturn($raw, ['shop_id' => $shop->id, 'tracking_code' => 'TRK-1'])->assertStatus(422);
+
+    expect(ScannedReturnedOrder::sole()->synced_to_pancake)->toBeFalse();
+});
+
+test('retrying a failed scan reuses its row and marks it synced', function () {
+    ['raw' => $raw, 'shop' => $shop] = scanReturnSetup();
+    Http::fakeSequence('pos.pages.fm/*')
+        ->push(['message' => 'boom'], 500)
+        ->push(['success' => true]);
+
+    scanReturn($raw, ['shop_id' => $shop->id, 'tracking_code' => 'TRK-1'])->assertStatus(502);
+    scanReturn($raw, ['shop_id' => $shop->id, 'tracking_code' => 'TRK-1'])->assertOk();
+
+    expect(ScannedReturnedOrder::count())->toBe(1)
+        ->and(ScannedReturnedOrder::sole()->synced_to_pancake)->toBeTrue();
+});
+
+test('unknown and already returned orders are not logged', function () {
+    ['raw' => $raw, 'shop' => $shop, 'order' => $order] = scanReturnSetup();
+    Http::fake();
+
+    scanReturn($raw, ['shop_id' => $shop->id, 'tracking_code' => 'NOPE'])->assertNotFound();
+    $order->update(['parcel_status' => 'returned']);
+    scanReturn($raw, ['shop_id' => $shop->id, 'tracking_code' => 'TRK-1'])->assertStatus(422);
+
+    expect(ScannedReturnedOrder::count())->toBe(0);
 });
