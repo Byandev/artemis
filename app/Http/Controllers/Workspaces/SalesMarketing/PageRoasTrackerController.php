@@ -31,6 +31,10 @@ use Inertia\Response;
  * toggle (Orders/Sales/Ad Spend/Budget/Var/ROAS by default), so switching a
  * column on is instant rather than a round trip.
  *
+ * The one day-cell exception is RTS: a single day's rate swings on a handful of
+ * parcels, so each day shows the page's RTS over the 7 days ending on it — see
+ * trailingRts(). The Total and Average rows keep the blend over the range.
+ *
  * On top of the recorded figures it carries an estimated margin — see
  * estimateSelects(). It is an envelope calculation, not the income statement:
  * flat courier rates and a flat freight cost, against each page's recent RTS.
@@ -69,13 +73,16 @@ class PageRoasTrackerController extends Controller
      */
     private const RTS_WINDOW_DAYS = 30;
 
+    /** How far back a day cell's RTS looks, the day itself included. */
+    private const RTS_TREND_DAYS = 7;
+
     /** What a day cell renders, read verbatim by PageRoasTally::stored(). */
     private const FIELDS = [
         'page_type', 'page_id', 'date',
         'orders', 'item_quantity', 'order_cogs',
         'sales', 'ad_spent', 'ad_spend_budget', 'ad_sales', 'ad_purchases',
         'delivered_amount', 'returning_amount',
-        'roas', 'ad_roas', 'ad_cpp', 'cpp', 'rts_rate',
+        'roas', 'ad_roas', 'ad_cpp', 'cpp', 'previous_7_days_rts AS rts_rate',
     ];
 
     /**
@@ -168,7 +175,15 @@ class PageRoasTrackerController extends Controller
 
         $base = $this->baseQuery($workspace, $user, $filters, $start, $end);
 
-        [$pages, $overall] = $this->build($base, $dates);
+        // The same rows reaching back far enough that the first day's trailing
+        // RTS covers a full window rather than only the days in view.
+        $trendStart = Carbon::parse($start)->subDays(self::RTS_TREND_DAYS - 1)->toDateString();
+        $trend = $this->trailingRts(
+            $this->baseQuery($workspace, $user, $filters, $trendStart, $end),
+            $dates,
+        );
+
+        [$pages, $overall] = $this->build($base, $dates, $trend);
 
         return Inertia::render('workspaces/sales-marketing/page-roas-tracker/index', [
             'workspace' => $workspace,
@@ -194,9 +209,10 @@ class PageRoasTrackerController extends Controller
      * — one per grain — so nothing is added up in PHP.
      *
      * @param  list<string>  $dates
+     * @param  array<string, float|null>  $trend
      * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>|null}
      */
-    private function build(Builder $base, array $dates): array
+    private function build(Builder $base, array $dates, array $trend): array
     {
         $factor = $this->rtsFactor();
 
@@ -266,11 +282,66 @@ class PageRoasTrackerController extends Controller
 
         return [$pages, [
             'days' => collect($dates)
-                ->mapWithKeys(fn (string $d) => [$d => $this->cell($perDate->get($d))])
+                ->mapWithKeys(fn (string $d) => [$d => [
+                    ...$this->cell($perDate->get($d)),
+                    'rts_rate' => $trend[$d] ?? null,
+                ]])
                 ->all(),
             'total' => $this->cell($grand),
             'average' => $this->cell($grand, 'avg_'),
         ]];
+    }
+
+    /**
+     * Each day's RTS over the RTS_TREND_DAYS ending on it, across all pages.
+     * Per page it is stored by the builder as previous_7_days_rts; a blend
+     * across pages can't be read off their stored rates, so it is rolled here.
+     *
+     * Blended like every other RTS here — what went back over what moved, across
+     * the window — so a quiet day with two parcels cannot outvote a busy one.
+     * Days with no row simply add nothing, and a window in which nothing moved
+     * has no rate: null, not 0%.
+     *
+     * The database sums each page-day; the window is rolled here, because a day
+     * with no stored row still gets a trailing rate and a SQL window function
+     * only returns the rows that exist.
+     *
+     * @param  list<string>  $dates
+     * @return array<string, float|null>
+     */
+    private function trailingRts(Builder $window, array $dates): array
+    {
+        $rows = (clone $window)
+            ->selectRaw('date, SUM(returning_amount) AS returning_amount, SUM(delivered_amount) AS delivered_amount')
+            ->groupBy('date')
+            ->get();
+
+        // [returning, delivered] per date.
+        $byDate = fn (Collection $rows) => $rows->groupBy('date')->map(fn (Collection $day) => [
+            $day->sum(fn ($r) => (float) $r->returning_amount),
+            $day->sum(fn ($r) => (float) $r->delivered_amount),
+        ]);
+
+        $roll = function (Collection $sums) use ($dates): array {
+            $rates = [];
+
+            foreach ($dates as $date) {
+                $returning = $delivered = 0.0;
+
+                for ($back = 0; $back < self::RTS_TREND_DAYS; $back++) {
+                    [$r, $d] = $sums->get(Carbon::parse($date)->subDays($back)->toDateString(), [0.0, 0.0]);
+                    $returning += $r;
+                    $delivered += $d;
+                }
+
+                $moved = $returning + $delivered;
+                $rates[$date] = $moved > 0 ? round($returning / $moved * 100, 2) : null;
+            }
+
+            return $rates;
+        };
+
+        return $roll($byDate($rows));
     }
 
     /**

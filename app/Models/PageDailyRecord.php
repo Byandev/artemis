@@ -39,6 +39,8 @@ class PageDailyRecord extends Model
         // The same blend over the 30 days ending on this one. Null when nothing
         // moved in that window — no rate, as opposed to a rate of zero.
         'rts_rate_30d' => 'decimal:2',
+        // The same blend over the 7 days ending on this one.
+        'previous_7_days_rts' => 'decimal:2',
         'ad_spent' => 'decimal:2',
         // The planned daily spend for the page, snapshotted from
         // page_daily_budget_records — null when the page had none on record.
