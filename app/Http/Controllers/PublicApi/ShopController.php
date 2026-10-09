@@ -13,7 +13,7 @@ class ShopController extends Controller
     {
         $workspace = $request->attributes->get('workspace');
 
-        $shops = Shop::where('workspace_id', $workspace->id)->get(['id', 'name']);
+        $shops = Shop::where('workspace_id', $workspace->id)->orderBy('name')->get(['id', 'name']);
 
         return response()->json(['shops' => $shops]);
     }

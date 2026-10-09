@@ -55,6 +55,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Order Address Model
+    |--------------------------------------------------------------------------
+    |
+    | Reads a customer's delivery address out of their Messenger conversation
+    | (Pancake Orders → "Get address"). Same strict-JSON requirement as above —
+    | see Modules\Pancake\Services\ConversationAddressExtractor.
+    |
+    */
+
+    'address_extraction_model' => env('OPEN_ROUTER_ADDRESS_EXTRACTION_MODEL', 'openai/gpt-4o-mini'),
+
+    /*
+    |--------------------------------------------------------------------------
     | RDP Packshot Model
     |--------------------------------------------------------------------------
     |

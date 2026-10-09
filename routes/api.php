@@ -21,6 +21,7 @@ use Modules\GencysERP\Http\Controllers\Api\PageController as GencysPageApiContro
 use Modules\GencysERP\Http\Controllers\Api\SyncRunController as GencysSyncRunApiController;
 use Modules\GencysERP\Http\Controllers\Api\UnitCodeInventoryController as GencysUnitCodeInventoryApiController;
 use Modules\Inventory\Http\Controllers\Api\UnitCodeController as InventoryUnitCodeApiController;
+use Modules\Pancake\Http\Controllers\AutoFillAddressWebhookController;
 
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', HealthController::class)->name('health');
@@ -110,3 +111,10 @@ Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' =>
     Route::get('/call-logs/list', [CallLogV2Controller::class, 'list'])->name('call-logs.list');
     Route::get('/call-logs/summary', [CallLogV2Controller::class, 'summary'])->name('call-logs.summary');
 });
+
+// Pancake POS order webhook for "Auto-fill order address" (Shops → Edit).
+// Authenticated by the shop's own secret in the X-Artemis-Secret header, not
+// an API key — Pancake can only send fixed headers.
+Route::post('webhooks/pancake/shops/{shop}/orders', AutoFillAddressWebhookController::class)
+    ->middleware('throttle:600,1')
+    ->name('api.webhooks.pancake.orders');

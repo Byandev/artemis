@@ -111,6 +111,14 @@ class PancakeServiceProvider extends ServiceProvider
      */
     protected function merge_config_from(string $path, string $key): void
     {
+        // With the config cached (Forge's `config:cache`), this file is already
+        // in the cache — and .env is no longer loaded, so requiring it again
+        // would read every env() as its default and overwrite the real value
+        // (it turned PANCAKE_AUTO_FILL_DRY_RUN=false back into true).
+        if ($this->app->configurationIsCached()) {
+            return;
+        }
+
         $existing = config($key, []);
         $module_config = require $path;
 
